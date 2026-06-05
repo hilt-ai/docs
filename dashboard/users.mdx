@@ -4,19 +4,7 @@ sidebarTitle: "Users"
 description: "Tracking user identity and activity across hosts."
 ---
 
-Shows who is active across your infrastructure, surfaces at-risk identities, and lets you drill into a single user's activity and forensic timeline. In the app this page is titled **User Timeline**.
-
-## Page layout
-
-The page is a master–detail layout: a **user list** on the left and a **detail panel** on the right. On smaller screens you see one pane at a time, with a **Back to users** button to return from a user's detail to the list.
-
-The header carries the shared controls:
-
-- **Host selector** — *Select a host...* by default; leaving it empty scopes to **all hosts**.
-- **Time range** — presets **5m / 15m / 1h / 6h / 24h** (default 24h). A custom range appears as an extra segment when you arrive via a deep link carrying `since`/`until`.
-- **Investigate events** — appears when a host is selected, jumping to Investigate for that scope.
-
-The first matching user is selected automatically when data loads.
+Shows who is active across infrastructure, surfaces at-risk identities, and allows to drill into a single user's activity and forensic timeline. 
 
 ---
 
@@ -34,11 +22,13 @@ Above the user list, three stat pills summarize the current scope:
 
 ## User list
 
-The left panel lists users matching the current scope.
+{/* TODO: Describe user cards — identity, activity summary, risk indicators */}
+
+{/* TODO: Describe user cards — identity, activity summary, risk indicators */}
 
 ### Filter and search
 
-- **Segmented toggle** — **All** or **At risk** (users whose risk level is *unusual* or *critical*).
+- **Segmented toggle** — **All** or **At risk** (users whose risk level is _unusual_ or _critical_).
 - **Search** — filter by identity, identity source, or Okta name/email.
 
 Users are sorted by risk (critical → unusual → normal), then identity-source priority, then event count.
@@ -59,16 +49,28 @@ The selected card is outlined (green for normal risk, red/amber for at-risk).
 
 ## User detail
 
+{/* TODO: Describe the user timeline view — chronological activity per user */}
+
+{/* TODO: Describe the user timeline view — chronological activity per user */}
+
+{/* TODO: Describe the insight cards — behavioral patterns, access anomalies */}
+
+{/* TODO: Describe the insight cards — behavioral patterns, access anomalies */}
+
+{/* TODO: Describe the process list within a user's timeline */}
+
+{/* TODO: Describe the process list within a user's timeline */}
+
 The right panel has two sub-views: a **summary** (default) and the **full timeline**.
 
 ### Summary header
 
-- The user's **name** in green, with a **risk badge** (*critical* / *unusual*) and **Shared** / **Service** badges where applicable.
+- The user's **name** in green, with a **risk badge** (_critical_ / _unusual_) and **Shared** / **Service** badges where applicable.
 - A metadata line: identity, email, department, identity source, event count, host count, and anomaly-alert count when greater than zero.
 
 ### Insight card
 
-A short behavioral narrative. For a normal user it reads **"Standard activity pattern. No anomalies detected."**; for an at-risk user it shows the risk explanation with a red or amber accent.
+A short behavioral narrative. 
 
 ### Activity breakdown
 
@@ -83,11 +85,11 @@ A donut chart of the user's events, with the total in the center. The legend row
 
 ### Key events
 
-Up to five recent events that match the user's behavioral flags. Each row shows a timestamp, event-type badge, detail, a flag pill (e.g. **Sensitive files**, **Data exfiltration**, **Credential access**), and a short reason. If nothing matches, it reads **"No highlighted events for this user."**
+Up to five recent events that match the user's behavioral flags. Each row shows a timestamp, event-type badge, detail, a flag pill (e.g. **Sensitive files**, **Data exfiltration**, **Credential access**), and a short reason. 
 
 ### Forensic timeline preview
 
-A condensed preview grouped by process — up to three processes with up to three events each — followed by a **View full timeline** link and an `N events across N process(es)` summary.
+A condensed preview grouped by process, up to three processes with up to three events each, followed by a **View full timeline** link and an `N events across N process(es)` summary.
 
 ### Navigate
 
@@ -105,12 +107,4 @@ Outline buttons to jump elsewhere with the user's scope carried over:
 
 Selecting **View full timeline** (or the timeline sub-view) replaces the summary with a chronological **swimlane** of the user's activity. A **Back to summary** button returns to the overview, and the subtitle shows the identity with its event and process counts.
 
-Each row lays out the timestamp, colored process-thread lanes, the command, an event-type badge, and the detail. Rows expand to reveal forensic fields — file path, command line, flow, user/owner/lineage/UID, and pivot links, with **More** / **Less** to show additional fields. A footer summarizes the event count and peak concurrent processes.
-
-The timeline draws on the user's most recent 50 events for the selected scope.
-
----
-
-## Refresh behavior
-
-User data is query-cached and refreshes when you change the host or time range — there is no background auto-polling.
+Each row lays out the timestamp, colored process-thread lanes, the command, an event-type badge, and the detail. Rows expand to show forensic fields, file path, command line, flow, user/owner/lineage/UID, and pivot links, with **More** / **Less** to show additional fields. A footer summarizes the event count and peak concurrent processes.
