@@ -57,13 +57,13 @@ In **Time aggregate** mode you configure:
 
 | Control | Options |
 | --- | --- |
-| **Function** | Count of events · Sum of {field} · Average of {field} |
+| **Function** | Count of events · Sum of a field · Average of a field |
 | **Event type / Field** | The event type to count, or the numeric field to sum/average |
 | **Over the last** | A window — seconds, minutes, or hours |
 | **Trigger when** | A comparison: `>`, `≥`, `<`, `≤`, `=`, `≠` |
 | **Threshold** | The value to compare against (byte fields offer B/KB/MB/GB/TB units) |
 
-The builder summarizes the result in plain English — e.g. *"Fires when {function} over the window is {op} the threshold."*
+The builder summarizes the result in plain English — e.g. *"Fires when the chosen function over the window crosses the threshold."*
 
 ### Condition (expression builder)
 
