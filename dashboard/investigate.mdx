@@ -14,7 +14,7 @@ The page has three parts stacked top to bottom:
 2. A **timeline scrubber** (activity histogram).
 3. The **event list**.
 
-The header title is **Investigate**, and the subtitle reflects how you got here — for example *"All hosts · 12,340 events"*, *"web-01 · 512 events"*, or, when arriving from a finding, *"Investigating: {group} - {host}"*.
+The header title is **Investigate**, and the subtitle reflects how you got here — for example *"All hosts · 12,340 events"*, *"web-01 · 512 events"*, or, when arriving from a finding, *"Investigating: \<alert group\> - \<host\>"* naming the finding's group and host.
 
 Time presets are **5m / 15m / 1h / 6h / 24h** (the window is capped at 24h here). The host selector isn't in the header — hosts are chosen under the **Location** filter tab.
 
@@ -71,7 +71,7 @@ Below the scrubber is the event list. Despite being internally called a "process
 ### Toolbar
 
 - **Sort** — **Newest** or **Oldest** first.
-- A **{n} loaded** count.
+- A count of how many events are loaded.
 - **Refresh** — manually reloads (the list does not auto-poll; anomaly markers do refresh every 30 seconds).
 
 ### Columns
