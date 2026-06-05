@@ -1,0 +1,117 @@
+---
+title: "Update workflow"
+sidebarTitle: "Update workflow"
+description: "Step-by-step update flow and rollback procedures for the auto-update agent."
+---
+
+## Update agent script logic
+
+The agent container runs a script with the following flow:
+
+<Steps>
+  <Step title="Read current image_tag">
+  </Step>
+  <Step title="List available tags from the Hilt release ECR">
+  </Step>
+  <Step title="Filter tags by UPDATE_POLICY">
+  </Step>
+  <Step title="No eligible update?">
+    Exit 0 (nothing to do).
+  </Step>
+  <Step title="Verify the candidate tag exists in ALL 6 repositories">
+    Ensures Hilt published a complete release, not a partial push.
+  </Step>
+  <Step title="Mirror images">
+
+    ```bash
+    docker pull 297433793776.dkr.ecr.us-east-1.amazonaws.com/${repo}:${NEW_TAG}
+    docker tag  ... ${CUSTOMER_ECR}/${prefix}${repo}:${NEW_TAG}
+    docker push ${CUSTOMER_ECR}/${prefix}${repo}:${NEW_TAG}
+    ```
+  </Step>
+  <Step title="Update ECS task definitions">
+  </Step>
+  <Step title="Force ECS redeployments">
+    ```bash
+    aws ecs update-service --cluster collector \
+      --service collector-service --force-new-deployment
+    aws ecs update-service --cluster dashboard \
+      --service dashboard-frontend-service --force-new-deployment
+    aws ecs update-service --cluster dashboard \
+      --service dashboard-backend-service --force-new-deployment
+    aws ecs update-service --cluster dashboard \
+      --service dashboard-query-service --force-new-deployment
+    ```
+  </Step>
+  <Step title="Restart EKS deployments">
+    ```bash
+    kubectl rollout restart deployment/enrichment-app \
+      deployment/dag-classification -n default
+    ```
+  </Step>
+  <Step title="Wait for stability">
+    ```bash
+    aws ecs wait services-stable --cluster collector --services collector-service
+    aws ecs wait services-stable --cluster dashboard \
+      --services dashboard-frontend-service dashboard-backend-service \
+                 dashboard-query-service
+    kubectl rollout status deployment/enrichment-app --timeout=300s
+    kubectl rollout status deployment/dag-classification --timeout=300s
+    ```
+  </Step>
+  <Step title="Health check">
+    ```bash
+    curl -sf http://dashboard-backend-service:8080/healthz
+    curl -sf http://dashboard-query-service:8080/healthz
+    ```
+  </Step>
+  <Step title="Update ConfigMap with the new tag">
+    ```bash
+    kubectl patch configmap dag-release -p '{"data":{"image_tag":"NEW_TAG"}}'
+    ```
+  </Step>
+  <Step title="Send webhook notification">
+    `POST $WEBHOOK_URL` with JSON payload:
+
+    ```json
+    {
+      "text": "DAG auto-update: v2026.04.27 → v2026.04.28 applied successfully",
+      "previous_tag": "v2026.04.27",
+      "new_tag": "v2026.04.28",
+      "services_updated": [
+        "collector",
+        "enrichment",
+        "classification",
+        "dashboard-frontend",
+        "dashboard-backend",
+        "dashboard-query"
+      ],
+      "status": "success"
+    }
+    ```
+  </Step>
+  <Step title="On failure after mirroring">
+    - Send failure webhook.
+    - Do **not** update the ConfigMap (next run will retry).
+    - Exit 1 (CronJob records failure in Kubernetes events).
+  </Step>
+</Steps>
+
+## Rollback
+
+If an update causes issues, operators can manually revert:
+
+```bash
+# Point back to the previous tag
+kubectl patch configmap dag-release -n default \
+  -p '{"data":{"image_tag":"v2026.04.27"}}'
+
+# Force rollout to previous images (already in customer ECR)
+./scripts/rollout-services.sh
+
+# Or roll back Kubernetes deployments
+kubectl rollout undo deployment/enrichment-app
+kubectl rollout undo deployment/dag-classification
+```
+
+The auto-update agent will not re-apply the problematic tag on the next run because it only moves forward. If the operator sets the ConfigMap tag back, the agent will see the "new" tag again and attempt the update. To prevent this, set `auto_update_enabled = false` or `auto_update_dry_run = true` in `terraform.tfvars` and re-apply.

@@ -1,0 +1,89 @@
+---
+title: "Prerequisites"
+sidebarTitle: "Prerequisites"
+description: "IAM roles and access requirements for the auto-update agent."
+---
+
+## Image account access
+
+The deployment account must already have ECR pull access to the release registry.
+
+## Customer-side IAM
+
+The auto-update agent runs as a Kubernetes ServiceAccount with IRSA (IAM Roles for Service Accounts). The role needs:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PullFromHiltECR",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:GetAuthorizationToken"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ReadHiltReleaseImages",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchGetImage",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:DescribeImages",
+        "ecr:ListImages"
+      ],
+      "Resource": [
+        "arn:aws:ecr:us-east-1:297433793776:repository/controlplane",
+        "arn:aws:ecr:us-east-1:297433793776:repository/enrichment",
+        "arn:aws:ecr:us-east-1:297433793776:repository/dag/detection",
+        "arn:aws:ecr:us-east-1:297433793776:repository/dashboard-frontend",
+        "arn:aws:ecr:us-east-1:297433793776:repository/dashboard-backend",
+        "arn:aws:ecr:us-east-1:297433793776:repository/dashboard-query"
+      ]
+    },
+    {
+      "Sid": "PushToCustomerECR",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchGetImage",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload",
+        "ecr:PutImage",
+        "ecr:DescribeRepositories"
+      ],
+      "Resource": "arn:aws:ecr:*:<CUSTOMER_ACCOUNT_ID>:repository/*"
+    },
+    {
+      "Sid": "ECSRollout",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:UpdateService",
+        "ecs:DescribeServices"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "ecs:cluster": [
+            "arn:aws:ecs:*:<CUSTOMER_ACCOUNT_ID>:cluster/collector",
+            "arn:aws:ecs:*:<CUSTOMER_ACCOUNT_ID>:cluster/dashboard"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "ECSWait",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:DescribeServices"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+The ServiceAccount also needs a Kubernetes `ClusterRole` granting `apps/deployments: patch` in the `default` namespace for `kubectl rollout restart`.

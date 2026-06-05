@@ -1,0 +1,27 @@
+---
+title: "Auto-update agent"
+sidebarTitle: "Overview"
+description: "Overview of the auto-update agent and its version policy for on-prem Hilt deployments."
+---
+
+## Overview
+
+The auto-update agent is a lightweight container deployed as a Kubernetes CronJob on the existing EKS cluster. It:
+
+1. Polls the Hilt release ECR (`297433793776`) for new image tags matching a configured version policy.
+2. Mirrors new images to the customer's ECR repositories.
+3. Forces ECS service redeployments and EKS rollout restarts.
+4. Verifies health after rollout.
+5. Reports status to a configurable webhook (Slack, email, etc.).
+
+## Version policy
+
+Release tags follow the format `vMAJOR.MINOR.PATCH` (e.g. `v1.04.27`). The agent uses a **prefix-based minor update policy**:
+
+| Current tag | Auto-update scope | Example match |
+| :-- | :-- | :-- |
+| `v1.04.27` | Same `vMAJOR.MINOR.*` prefix | `v1.04.28`, `v1.04.30` |
+| `v1.04.27` | Blocked | `v1.05.01` (minor bump) |
+| `v1.04.27` | Blocked | `v2.01.01` (major bump) |
+
+The scope is configurable. An operator can set `UPDATE_POLICY=patch` (default), `UPDATE_POLICY=minor`, or `UPDATE_POLICY=any` (any newer tag). Major version jumps always require explicit operator action unless `UPDATE_POLICY=any`.

@@ -1,0 +1,144 @@
+---
+title: "Running exports"
+sidebarTitle: "Running exports"
+description: "Anonymization rules, running the export pipeline, and customer controls."
+---
+
+## Anonymization rules
+
+### Host ID remapping
+
+```text
+Original:  a3f8c2e1-7b4d-4a9e-b6f3-2c8d1e5a7f90
+Exported:  host-0001
+```
+
+A deterministic mapping is built at export time: hosts are sorted by first appearance and assigned sequential IDs. The mapping is stored in a separate `host_map.json` that stays on the deployment's S3 bucket (never exported to Hilt) so they can correlate back if needed.
+
+### Temporal jitter
+
+The entire dataset is shifted by a uniform random offset between 0 and 48 hours. This prevents Hilt from correlating export timestamps with known customer events (outages, incidents, press releases). The offset is recorded in the export manifest for the customer's records.
+
+### UID remapping
+
+Unix UIDs are remapped to sequential integers per host. UID 0 (root) is preserved as 0 since it carries security semantics relevant to the model.
+
+### Column pruning
+
+The export query selects only allowlisted columns. No `SELECT *`. Specifically:
+
+- `token_evidence_json` is never selected from `dag_epoch_tokens`
+- `evidence`, `reason`, `drivers`, `owner`, `identity` are never selected from `dag_anomaly_scores`
+- `host_id` is selected but remapped before writing to Parquet
+
+### Dead epoch filtering
+
+Rows where `exec_count + file_open_count + net_flow_count == 0` are dropped.
+
+### Minimum host threshold
+
+Exports with fewer than 5 distinct hosts are rejected. This prevents exports from highly specialized single-host environments where the feature distribution alone could identify the workload.
+
+## Running an export
+
+The export runs as a one-shot Kubernetes Job on the existing EKS cluster, using the same ClickHouse credentials as the enrichment service.
+
+<Steps>
+  <Step title="Enable the export capability">
+    ```bash
+    terraform -chdir=envs/app apply -var data_export_enabled=true
+    ```
+  </Step>
+  <Step title="Trigger the export job">
+    ```bash
+    kubectl create job --from=cronjob/dag-data-export dag-data-export-$(date +%s)
+    ```
+  </Step>
+  <Step title="Monitor progress">
+    ```bash
+    kubectl logs -f job/dag-data-export-<id>
+    ```
+  </Step>
+  <Step title="Review the manifest and sample">
+    Written to the S3 bucket.
+
+    ```bash
+    aws s3 cp s3://<bucket>/exports/latest/manifest.json -
+    aws s3 cp s3://<bucket>/exports/latest/sample.parquet ./sample.parquet
+    python3 -c "import pandas as pd; print(pd.read_parquet('sample.parquet').head(20))"
+    ```
+  </Step>
+  <Step title="Approve the export">
+    Only required if `data_export_require_approval=true`. The job polls for this ConfigMap and proceeds once found.
+
+    ```bash
+    kubectl create configmap dag-export-approval --from-literal=approved=true
+    ```
+  </Step>
+  <Step title="Verify the final archive">
+    ```bash
+    aws s3 ls s3://<bucket>/exports/latest/
+    # export-2026-06-05.parquet.zst        (compressed Parquet)
+    # export-2026-06-05.parquet.zst.sha256 (integrity hash)
+    # manifest.json                        (schema, row count, date range, host count)
+    # host_map.json                        (host ID mapping — stays in customer bucket)
+    ```
+  </Step>
+</Steps>
+
+### Export manifest (`manifest.json`)
+
+```json
+{
+  "schema_version": 1,
+  "export_id": "exp-20260605-a8c3f2",
+  "created_at": "2026-06-05T12:00:00Z",
+  "date_range": {
+    "start": "2026-05-06T00:00:00Z",
+    "end": "2026-06-05T00:00:00Z"
+  },
+  "temporal_jitter_hours": 17.3,
+  "row_count": 1482937,
+  "host_count": 47,
+  "columns": [
+    "epoch_ts", "host_id_anon", "uid_anon", "phase", "is_active", "is_anomaly",
+    "topk_sum", "volume_topk", "numeric_features", "derived_features",
+    "token_ids", "token_sub_epochs", "token_counts", "token_importances",
+    "token_depths", "token_roles", "total_events", "tokens_before_topk",
+    "ml_label", "ml_source"
+  ],
+  "excluded_columns_note": "token_evidence_json, evidence, reason, drivers, owner, identity, host_id, boot_id, alert_source, rule_id, rule_name, rule_label, rule_severity, matched_conditions, all dag_events columns, all Postgres tables",
+  "file_size_bytes": 284729384,
+  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "format": "parquet+zstd",
+  "approved": false,
+  "approved_by": "",
+  "approved_at": ""
+}
+```
+
+## Customer controls
+
+### Review before transfer
+
+When `data_export_require_approval = true` (default), the export produces a manifest and a 20-row sample Parquet file. The full archive is encrypted and staged but not transferred until the customer creates the approval ConfigMap. The user can:
+
+- Inspect the manifest to see exactly which columns are included.
+- Load the sample Parquet to verify anonymization.
+- Reject by deleting the staged files from their S3 bucket.
+
+### Date range control
+
+The user controls how much history to export via `data_export_date_range_days`. They can also run exports for specific windows by overriding the Job's `DATE_START` and `DATE_END` environment variables.
+
+### Deletion
+
+The user can delete exported data from their S3 bucket at any time.
+
+### Audit trail
+
+Every export creates a Kubernetes Event and (if a webhook is configured) a notification with the export ID, row count, date range, and approval status. The `host_map.json` stays exclusively in the customer's bucket.
+
+## What Hilt sees
+
+No filenames, IP addresses, hostnames, usernames, cloud resource IDs, detection rule names or match descriptions. Just behavioral feature vectors and abstracted security token sequences.

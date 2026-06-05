@@ -1,0 +1,57 @@
+---
+title: "Anonymized data export"
+sidebarTitle: "Overview"
+description: "How telemetry from on-prem deployments is anonymized for Hilt model training while preserving the statistical structure ML models need."
+---
+
+## Why we need customer data
+
+Hilt ships four ML model families that learn normal host behavior and flag anomalies:
+
+| Model | What it learns | Why customer data helps |
+| :-- | :-- | :-- |
+| **TS-VAE** | Temporal patterns in host activity epochs | Real workload diversity (CI, web, batch, GPU) that synthetic data cannot replicate |
+| **Isolation Forest** | Outlier boundaries on VAE-enriched features | Calibrated decision thresholds across heterogeneous fleets |
+| **TRACE** | Token-sequence patterns across security-relevant operations | Ground-truth attack traces interleaved with real operational noise |
+| **HDBSCAN clusters** | Behavioral archetypes across hosts | Stable cluster geometry that transfers to new deployments |
+
+## Safe for export (what models consume)
+
+| Data | Examples | Why it's safe |
+| :-- | :-- | :-- |
+| **24 raw numeric features** | `exec_count`, `bytes_sent`, `unique_dest_ips`, `sensitive_path_hits` | Aggregate counts per 5-minute epoch — no raw values |
+| **32 derived features** | `exec_intensity`, `dest_spread`, `epoch_entropy`, `wavelet_exec_s6`, `fork_burst_max` | Ratios, entropies, wavelet coefficients, session statistics — mathematical transforms |
+| **Token ID sequences** | `[FILE:read_sensitive, NET:connect_external, EXEC:shell]` | Closed vocabulary (~80 tokens); filenames / IPs already abstracted away |
+| **Token side features** | `token_sub_epochs`, `token_depths`, `token_roles`, `token_counts`, `token_importances` | Structural metadata about token sequences |
+| **Labels** | `ml_label`, `is_anomaly`, `ml_source`, `phase` | Attack-phase annotations (from HITL or synthetic injection) |
+| **Anomaly scores** | `composite_score`, `z_exec`, `mahal_distance`, `topk_sum` | Numerical outputs of the scoring pipeline |
+| **Temporal keys** | `epoch_ts` (5-min bucket timestamp) | Preserves temporal ordering |
+
+## Will be anonymized before export
+
+| Data | Risk | Anonymization |
+| :-- | :-- | :-- |
+| `host_id` | Correlates to a specific machine | Deterministic remap: `host-<sequential-id>` per export |
+| `uid` / `euid` | Unix user IDs, correlatable | Remap to sequential integers |
+| `owner` / `identity` | Human-readable identity strings | Drop entirely |
+
+## Will never be exported
+
+| Data | Why |
+| :-- | :-- |
+| `token_evidence_json` | Contains raw `filename`, `argv`, `dst_addr`, `comm`, `tree_path` |
+| `evidence`, `reason`, `drivers` | Free-text explanations that echo raw event context |
+| `matched_conditions` | Detection rule match descriptions that echo field values (e.g. "filename contains .pem") |
+| `rule_name`, `rule_label` | Customer-defined detection rule names — may reveal security posture |
+| `src_addr`, `dst_addr`, ports | Customer network topology |
+| `filename`, `argv`, `old_name`, `new_name` | File paths, command lines — direct PII / infra leakage |
+| `ssh_identity`, `ssh_source_ip` | Credential and network identity |
+| `username`, `teleport_owner`, `teleport_node_name` | Human / machine identity |
+| `instance_id`, `iam_role`, `region` | AWS account fingerprinting |
+| `container_id`, `pod_uid`, `pod_name`, `pod_namespace` | Kubernetes topology |
+| `comm`, `parent_comm`, `binary_build_id` | Can reveal proprietary software |
+| `dag_network_dns.hostname` | Internal DNS names |
+| `dag_alert_narratives.*` | LLM text that may echo sensitive event context |
+| `dag_entity_snapshots.*` | Serialized scorer state — contains baseline vectors tied to specific hosts |
+| Detection rule definitions | `detection_rules` Postgres table — customer security logic |
+| Postgres auth tables | `users`, `sessions`, `okta_users`, `audit_log` |

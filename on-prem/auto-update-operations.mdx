@@ -1,0 +1,84 @@
+---
+title: "Operational guide"
+sidebarTitle: "Operations"
+description: "Network requirements, monitoring, security, and enabling or disabling the auto-update agent."
+---
+
+## Network requirements
+
+The agent needs outbound access to the Hilt release ECR (`297433793776.dkr.ecr.us-east-1.amazonaws.com`).
+
+Required VPC endpoints (already provisioned):
+
+- `com.amazonaws.<region>.ecr.api`
+- `com.amazonaws.<region>.ecr.dkr`
+- `com.amazonaws.<region>.s3` (gateway, for ECR layer storage)
+- `com.amazonaws.<region>.ecs` (for ECS `update-service` calls)
+
+Cross-region ECR pull works over the internet or cross-region VPC peering. The agent authenticates to both registries independently.
+
+## Schema migrations
+
+The auto-update agent handles image rollouts only. ClickHouse and Postgres schema migrations are **not** run automatically.
+
+## Monitoring
+
+Beyond webhook notifications, the CronJob exposes standard Kubernetes observability:
+
+```bash
+# Check recent runs
+kubectl get jobs -l app=dag-auto-update --sort-by=.status.startTime
+
+# Check logs from the last run
+kubectl logs job/dag-auto-update-<timestamp>
+
+# Check for failures
+kubectl get events --field-selector reason=BackoffLimitExceeded
+```
+
+## Security
+
+- The agent never stores AWS credentials on disk. IRSA injects short-lived STS tokens via the projected service account token volume.
+- The agent only needs `ecr:ListImages` / `ecr:DescribeImages` read access to the Hilt release ECR and is unable to push to it.
+- ECS `UpdateService` is scoped to the `collector` and `dashboard` clusters only.
+- The webhook URL is stored as a Kubernetes Secret, not in the CronJob spec directly.
+
+## Enabling auto-update
+
+<Steps>
+  <Step title="Set variables in terraform.tfvars">
+    ```hcl
+    auto_update_enabled     = true
+    auto_update_schedule    = "*/30 * * * *"   # every 30 minutes
+    auto_update_policy      = "patch"          # only same-month updates
+    auto_update_webhook_url = "https://hooks.slack.com/services/T.../B.../xxx"
+    auto_update_dry_run     = false
+    ```
+  </Step>
+  <Step title="Apply Terraform">
+    ```bash
+    terraform -chdir=envs/app apply
+    ```
+  </Step>
+  <Step title="Verify the CronJob is scheduled">
+    ```bash
+    kubectl get cronjobs -n default
+    # NAME              SCHEDULE       SUSPEND   ACTIVE   LAST SCHEDULE
+    # dag-auto-update   */30 * * * *   False     0        <none>
+    ```
+  </Step>
+  <Step title="Trigger a manual test run">
+    ```bash
+    kubectl create job --from=cronjob/dag-auto-update dag-auto-update-test
+    kubectl logs -f job/dag-auto-update-test
+    ```
+  </Step>
+</Steps>
+
+## Disabling auto-update
+
+```hcl
+auto_update_enabled = false
+```
+
+Then `terraform apply`. The CronJob and associated IRSA role are removed. The last-applied image tag remains in the `dag-release` ConfigMap for reference.

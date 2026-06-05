@@ -43,7 +43,24 @@
           {
             "tab": "On-prem operations",
             "pages": [
-              "auto-update-agent"
+              "on-prem/overview",
+              {
+                "group": "Auto-update agent",
+                "pages": [
+                  "on-prem/auto-update-overview",
+                  "on-prem/auto-update-prerequisites",
+                  "on-prem/auto-update-workflow",
+                  "on-prem/auto-update-operations"
+                ]
+              },
+              {
+                "group": "Anonymized data export",
+                "pages": [
+                  "on-prem/data-export-overview",
+                  "on-prem/data-export-schema",
+                  "on-prem/data-export-implementation"
+                ]
+              }
             ]
           }
         ]
@@ -80,8 +97,13 @@
       "permanent": true
     },
     {
+      "source": "/auto-update-agent",
+      "destination": "/on-prem/overview",
+      "permanent": true
+    },
+    {
       "source": "/untitled-page",
-      "destination": "auto-update-agent",
+      "destination": "/on-prem/overview",
       "permanent": true
     }
   ]
