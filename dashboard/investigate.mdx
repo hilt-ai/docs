@@ -4,24 +4,92 @@ sidebarTitle: "Investigate"
 description: "Deep-dive investigation view for exploring host activity across time."
 ---
 
-<Warning>
-Under construction — check again in 24h.
-</Warning>
+The raw event explorer. Investigate lets you scope to hosts and a time window, narrow down with structured filters, and read individual events in chronological order — with anomaly windows highlighted inline. It's where most "Investigate events" links across the dashboard land.
 
-{/* TODO: Screenshot of the investigate page */}
+## Page layout
 
-## Timeline scrubber
+The page has three parts stacked top to bottom:
 
-{/* TODO: Describe the timeline scrubber — how to select time ranges and zoom */}
+1. **Filter tabs** in the header.
+2. A **timeline scrubber** (activity histogram).
+3. The **event list**.
 
-## Filters
+The header title is **Investigate**, and the subtitle reflects how you got here — for example *"All hosts · 12,340 events"*, *"web-01 · 512 events"*, or, when arriving from a finding, *"Investigating: {group} - {host}"*.
 
-{/* TODO: Describe available filters — host, event type, user, process, etc. */}
+Time presets are **5m / 15m / 1h / 6h / 24h** (the window is capped at 24h here). The host selector isn't in the header — hosts are chosen under the **Location** filter tab.
 
-## Process groups
-
-{/* TODO: Describe the process group list and how events are organized */}
+---
 
 ## Context banner
 
-{/* TODO: Describe the context banner and how it links to related findings */}
+When you arrive from another page, a context banner gives you a one-click way back, labeled for the source:
+
+| Came from | Back button |
+| --- | --- |
+| Anomalies | **Back to Anomalies** |
+| User Timeline | **Back to User Timeline** |
+| Collectors | **Back to Collectors** |
+| Data Lineage | **Back to Data Lineage** |
+| Networks | **Back to Networks** |
+| Files | **Back to Files** |
+| Session | **Back to Session** |
+
+---
+
+## Filters
+
+Filters are grouped into tabs across the header — **Event**, **Process**, **Network**, **File**, **Topology**, and **Location**. Each opens a panel of structured fields:
+
+| Tab | What you filter on |
+| --- | --- |
+| **Event** | Event types, grouped as Process, Files, Network, and Workloads (e.g. *Process started*, *File opened*, *Network flow*) |
+| **Process** | Command, parent command, PID, thread ID, parent PID, UID, effective UID, user, workload ID |
+| **Network** | Source/destination IP and port, protocol, connection type, bytes sent/received thresholds |
+| **File** | Path prefix, open flags, permission bits, command-line contains |
+| **Topology** | Program ID, session ID, process instance ID |
+| **Location** | Hosts (multi-select), boot ID, container ID, pod UID |
+
+Active filters show as removable chips, with **Clear all** to reset. There's no free-text search — filtering is entirely structured. You must pick a scope before events load; until then the list reads **"please select a host."**
+
+---
+
+## Timeline scrubber
+
+Above the event list, an **Activity** histogram plots event volume over time — one bar per time bucket, with the count on the Y axis.
+
+- **Drag to zoom** — select a region to narrow the window; the selection becomes a custom range.
+- **Back** and **Reset** step out of zoom levels.
+- **Anomaly overlay** — amber bands mark windows where findings occurred (±2.5 minutes).
+- Hovering a bucket shows its event count and time. An empty window reads **"No activity in range."**
+
+---
+
+## Event list
+
+Below the scrubber is the event list. Despite being internally called a "process group" list, it's a **flat, chronological list — one row per event**, not grouped under process headers.
+
+### Toolbar
+
+- **Sort** — **Newest** or **Oldest** first.
+- A **{n} loaded** count.
+- **Refresh** — manually reloads (the list does not auto-poll; anomaly markers do refresh every 30 seconds).
+
+### Columns
+
+| Column | Content |
+| --- | --- |
+| **Time** | Event timestamp |
+| **Host** | Host id (shown when scoped to multiple hosts) |
+| **Type** | Event-type badge (e.g. *Process started*) |
+| **Process** | The command (`comm`) |
+| **Identity** | The acting identity |
+| (anomaly) | A warning icon when the event overlaps a finding's window |
+| **Detail** | A summary of the event |
+
+### Expanding an event
+
+Click a row to expand it. If the event overlaps a finding, an **Anomaly overlap** banner explains why. The expansion shows type-specific forensic fields — path, command line, flow, user, lineage, UID — along with pivot links such as **Connections to…**, **File access for…**, and **Data Lineage**, plus a **More / Less** toggle for the full forensic detail (identity, execution, runtime, and so on).
+
+### Loading more
+
+Events load 200 at a time. Use **Show more** to fetch older events; when you reach the end it reads **"No more events in this range."**

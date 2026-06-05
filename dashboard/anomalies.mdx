@@ -4,56 +4,98 @@ sidebarTitle: "Anomalies"
 description: "Understanding and triaging anomaly findings detected by Hilt's ML models."
 ---
 
-<Warning>
-  Under construction — check again in 24h.
-</Warning>
+The triage queue for behavioral findings. Each finding represents a deviation detected by the anomaly scoring system (or raised by a detection rule); this page is where you review them and mark each one as a real anomaly or a false positive.
 
-{/* TODO: Screenshot of the anomalies page */}
+## Page layout
 
-## Finding cards
+The page is a split view: a **finding queue** on the left and a **detail panel** on the right. On smaller screens you see one at a time, with a **Back to findings** button to return from a finding to the queue.
 
-{/* TODO: Describe what information a finding card shows (host, time range, score, narrative) */}
+The header shows how much is waiting (e.g. *"3 to review · altogether 18 total"*) and carries the shared controls:
 
-{/* TODO: Describe what information a finding card shows (host, time range, score, narrative) */}
+- **Filters** popover (left).
+- **Host selector** (*All hosts* by default) and **time presets** — **5m / 15m / 1h / 6h / 24h / 7d**.
+
+The list refreshes automatically every 30 seconds.
+
+---
+
+## Filters
+
+There's no free-text search; filtering is structured through the **Filters** popover:
+
+| Section | Options |
+| --- | --- |
+| **Type** | All · Activity spike · Network · Sensitive file · Lateral movement · Detection rule |
+| **Severity** | All · Critical · High · Medium · Low |
+| **Source** | All · Detection rules · ML anomalies |
+| **Sort by** | Time · Severity · Confidence · Urgency |
+| **Visibility** | A **Suppressed** toggle to reveal findings hidden by prior feedback |
+
+Active filters appear as removable chips beneath the header. When you arrive scoped to a detection rule, a **Rule: {name}** chip shows the active scope.
+
+---
+
+## Finding queue
+
+The queue is split into three tabs by review state:
+
+| Tab | Contents | Empty state |
+| --- | --- | --- |
+| **Review** | Findings awaiting a verdict | "All caught up — No findings need your attention." |
+| **Accepted** | Findings you confirmed as real | "No accepted findings." |
+| **Denied** | Findings you dismissed | "No denied findings." |
+
+If nothing matches the current filters at all, the queue shows **"No findings — No anomalous behavior was detected in this time window."**
+
+### Finding cards
+
+Each finding is a card showing:
+
+- **Headline** — the finding's narrative headline (or its behavior label).
+- **Relative time** and short **hostname**.
+- **Type** — e.g. *Type: Activity spike* (when classified).
+- **Verdict** — an **Accepted** or **Denied** badge once reviewed.
+- A one-line **summary** of what happened, with inline event chips.
+- A **cluster** badge when the behavior is atypical for the host.
+- **User / Reviewer** and **Confidence** (High / Medium / Low).
+- A **Host quarantined · View** link when the host has been isolated.
+
+The selected card is highlighted with a green accent. Severity is available as a filter but isn't printed on the card.
+
+---
 
 ## Finding detail
 
-{/* TODO: Describe the detail drawer and its tabs */}
+Selecting a finding opens its report in the right panel. (If nothing is selected, the panel prompts you to *"Select a finding from the queue to view details."*) The report has two parts.
 
-{/* TODO: Describe the detail drawer and its tabs */}
+### Narrative
 
-### Overview tab
+The top band explains the finding:
 
-{/* TODO: Describe the overview tab — summary, identity badges, scoring breakdown */}
+- **Headline**, with the **host** and finding **time**.
+- A **type** badge and a **confidence** badge (hover for "Model Confidence").
+- A **Quarantined** link when applicable.
+- The narrative itself — *what happened* and a **Why unusual** section — plus context chips.
+- **Identity** badges for the job, application, or workload involved.
 
-{/* TODO: Describe the overview tab — summary, identity badges, scoring breakdown */}
+Two context banners may appear: a **workload phase change** note (explaining that volume-only signals were de-emphasized), and a **feedback-suppression** note when the pattern matches a prior finding a reviewer denied, including the pattern similarity (an exact match or a percentage).
 
-### Evidence tab
+### Reviewing a finding (Confirm / Dismiss)
 
-{/* TODO: Describe the evidence tab — what raw evidence is shown and how to interpret it */}
+In the narrative band you act on the finding:
 
-{/* TODO: Describe the evidence tab — what raw evidence is shown and how to interpret it */}
+- **Confirm** — mark it as a real anomaly (moves it to **Accepted**).
+- **Dismiss** — mark it as benign or a false positive (moves it to **Denied**).
+- A notes field (*"Add review notes..."*) lets you record context.
 
-### Lineage tab
+After you give a verdict on the Review tab, the queue automatically advances to the next item. Dismissing a finding for a quarantined host can release the host — you'll see a *"released from quarantine"* confirmation.
 
-{/* TODO: Describe the lineage tab — process tree and data flow context for the finding */}
+### Event timeline
 
-{/* TODO: Describe the lineage tab — process tree and data flow context for the finding */}
+Below the narrative, a **swimlane timeline** plots the evidence across a five-minute window in three lanes — **Process**, **Network**, and **File**. Nodes are colored by how strongly they contributed (the legend covers *key contributor*, *involved*, *background*, and *strongest link*), and clicking one pins a tooltip with the PID, parent, time, a relevance score and rank, and its linked events. Connecting arcs are labeled *strong*, *moderate*, or *weak link*. If a finding has no trace evidence, the panel notes that no trace data is available.
 
-### Timeline tab
+---
 
-{/* TODO: Describe the timeline tab — temporal view of the anomalous activity */}
+## Refresh behavior
 
-{/* TODO: Describe the timeline tab — temporal view of the anomalous activity */}
-
-### Report tab
-
-{/* TODO: Describe the report tab — exporting or sharing a finding */}
-
-{/* TODO: Describe the report tab — exporting or sharing a finding */}
-
-## Filtering and search
-
-{/* TODO: Describe how to filter anomalies by host, severity, time range, label */}
-
-{/* TODO: Describe how to filter anomalies by host, severity, time range, label */}
+The findings list and the open finding's detail both refetch every 30 seconds. The queue isn't paginated — it's a single scrollable column for the current filters.
