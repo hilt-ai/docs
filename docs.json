@@ -24,6 +24,62 @@
         "product": "Hilt",
         "tabs": [
           {
+            "tab": "Dashboard",
+            "pages": [
+              "dashboard/overview",
+              "dashboard/collectors",
+              {
+                "group": "Data Flow",
+                "pages": [
+                  "dashboard/data-lineage",
+                  "dashboard/networks",
+                  "dashboard/files",
+                  "dashboard/users",
+                  "dashboard/sessions",
+                  "dashboard/query"
+                ]
+              },
+              {
+                "group": "Security",
+                "pages": [
+                  "dashboard/anomalies",
+                  "dashboard/detection-rules",
+                  "dashboard/fleet-behavior",
+                  "dashboard/investigate",
+                  "dashboard/quarantine"
+                ]
+              },
+              {
+                "group": "Admin",
+                "pages": [
+                  "dashboard/reports",
+                  "dashboard/billing"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "Administration",
+            "pages": [
+              "administration/overview",
+              "administration/settings",
+              "administration/user-management",
+              "administration/teams",
+              "administration/identity-mappings",
+              "administration/audit-log"
+            ]
+          },
+          {
+            "tab": "Platform",
+            "pages": [
+              "platform/overview",
+              "platform/collector-ingest",
+              "platform/enrichment-pipeline",
+              "platform/ml-models",
+              "platform/query-agent"
+            ]
+          },
+          {
             "tab": "Linux Collector",
             "pages": [
               "linux-collector/overview",
@@ -72,24 +128,13 @@
     "dark": "/logo/hilt-logo.png"
   },
   "navbar": {
-    "links": [
-      {
-        "label": "Submit IT ticket",
-        "href": "/it-security/access-requests"
-      }
-    ],
     "primary": {
       "type": "button",
       "label": "Employee portal",
       "href": "https://dashboard.mintlify.com"
     }
   },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/yourcompany",
-      "linkedin": "https://linkedin.com/company/yourcompany"
-    }
-  },
+  "footer": {},
   "redirects": [
     {
       "source": "/linux-collector",
