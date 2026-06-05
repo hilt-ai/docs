@@ -6,14 +6,6 @@ description: "Creating teams and scoping collector visibility by team membership
 
 Teams organize your hosts into a scoped hierarchy and control which hosts each user can see. A team owns a set of hosts; its members can see those hosts, and child teams are limited to a subset of their parent's hosts. This page requires the **manage teams** permission and is available only with PostgreSQL-backed authentication (hidden in static admin mode).
 
-## Page layout
-
-The header has a **Teams** title and a **New Team** button. A filter bar searches across team names, host IDs, and member usernames.
-
-Teams render as an expandable tree (up to three levels deep). A **global admin** also sees a **Global Users** section at the top — users who belong to no team (plus the owner and the seeded admin) — which can be expanded to list them. A scoped admin sees only their subtree.
-
-When there are no teams yet, the page reads **"No teams yet. Create one to start assigning hosts."**
-
 ---
 
 ## Team cards
@@ -34,11 +26,11 @@ If you can manage the team, a row of action icons appears: **Show hosts & member
 - **Hosts** — each assigned host with a status dot, its host ID, and host-type badge.
 - **Members** — the team's members, each with their dashboard role badge.
 
-Note that there are no separate per-team roles — a member's badge reflects their global dashboard role, and a team's "admins" are simply the members who are admins or the owner.
-
----
+Note that there are no separate per-team roles, a member's badge reflects their global dashboard role, and a team's "admins" are simply the members who are admins or the owner.
 
 ## Creating a team
+
+{/* TODO: Describe how to create a new team */}
 
 **New Team** (or **Add sub-team** on an existing team) opens a drawer:
 
@@ -50,11 +42,15 @@ Note that there are no separate per-team roles — a member's badge reflects the
 
 ## Assigning members
 
+{/* TODO: Describe adding users to a team */}
+
 Members aren't added on this page — a user's team membership is set on the **User Management** page (when creating or editing a user). Team membership is what controls which hosts that user can see.
 
 ---
 
 ## Host scoping and visibility
+
+{/* TODO: Describe assigning collectors/hosts to a team and how visibility is scoped */}
 
 A few rules govern how host visibility works:
 
@@ -66,4 +62,6 @@ A few rules govern how host visibility works:
 
 ## Deleting a team
 
-**Delete team** asks for confirmation, warning that members will lose access to that team's hosts and that the action can't be undone. A team that still has sub-teams can't be deleted — remove or move its sub-teams first.
+{/* TODO: Describe team deletion and what happens to scoped data */}
+
+**Delete team** asks for confirmation, warning that members will lose access to that team's hosts and that the action can't be undone. A team that still has sub-teams can't be deleted, remove or move its sub-teams first.

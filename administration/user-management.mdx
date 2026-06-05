@@ -4,30 +4,7 @@ sidebarTitle: "User Management"
 description: "Inviting, managing, and removing dashboard users."
 ---
 
-Create and manage the accounts that can sign in to the dashboard, set each user's role, and scope what they can see through teams. This page requires the **manage users** permission and is available only with PostgreSQL-backed authentication (it's hidden in static admin mode).
-
-## Page layout
-
-The header has a **Users** title and a **New user** button. Below it, a stats line summarizes the account count and how many are admins (and, in a live deployment, how many are still using a temporary password).
-
-A filter bar lets you narrow the list:
-
-- **Search** — by username, role, or team name.
-- **Role** filter — All roles, or a specific role.
-- **Team** filter — All teams, No team, or a specific team.
-
-The list renders as a table on larger screens and as cards on mobile:
-
-| Column | Content |
-| --- | --- |
-| **Status** | **Active** or **Disabled** badge |
-| **Username** | The account name |
-| **Role** | A colored role badge |
-| **Team** | Team name (links to the Teams page), or — |
-| **Password** | *(live only)* **Temporary** or **User-set** |
-| **Actions** | The ⋯ menu |
-
-There's no pagination (the list is filtered/sorted client-side, alphabetically) and no auto-refresh.
+Create and manage the accounts that can sign in to the dashboard, set each user's role, and scope what they can see through teams. This page requires the **manage users** permission .
 
 ---
 
@@ -47,7 +24,7 @@ The **owner** role is special: it's locked to the seeded account, can't be assig
 
 ### Global vs scoped admins
 
-A **global admin** (an admin or owner with no team) can see everything. A **scoped admin** is an admin assigned to one or more teams — they only manage their subtree, and must assign at least one in-scope team when creating or editing a user.
+A **global admin** (an admin or owner with no team) can see everything. A **scoped admin** is an admin assigned to one or more teams, they only manage their subtree, and must assign at least one in-scope team when creating or editing a user.
 
 ---
 
@@ -63,8 +40,6 @@ There's no email invitation flow — you create the account directly. **New user
 Submitting creates the account immediately. The password is the one you typed — it isn't emailed or shown again — so share it with the user securely. In a live deployment the account is flagged with a **temporary password** until the user sets their own.
 
 ---
-
-## Managing users
 
 The ⋯ actions menu offers (availability depends on whether the target is you, an owner, or another user):
 
