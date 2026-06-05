@@ -45,8 +45,7 @@
                   "dashboard/anomalies",
                   "dashboard/detection-rules",
                   "dashboard/fleet-behavior",
-                  "dashboard/investigate",
-                  "dashboard/quarantine"
+                  "dashboard/investigate"
                 ]
               }
             ]
@@ -55,22 +54,9 @@
             "tab": "Administration",
             "pages": [
               "administration/layout",
-              "administration/settings",
               "administration/user-management",
               "administration/teams",
-              "administration/identity-mappings",
-              "administration/audit-log",
               "administration/reports"
-            ]
-          },
-          {
-            "tab": "Platform",
-            "pages": [
-              "platform/layout",
-              "platform/collector-ingest",
-              "platform/enrichment-pipeline",
-              "platform/ml-models",
-              "platform/query-agent"
             ]
           },
           {

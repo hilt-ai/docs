@@ -4,7 +4,7 @@ sidebarTitle: "Detection Rules"
 description: "Creating and managing custom detection rules for your environment."
 ---
 
-Custom *if-this-then-alert* rules over live telemetry. When a rule's condition matches, it raises a finding on the Anomalies page. In the app this page is labeled **Rules**.
+Custom _if-this-then-alert_ rules over live telemetry. When a rule's condition matches, it raises a finding on the Anomalies page. In the app this page is labeled **Rules**.
 
 ## Permissions
 
@@ -17,7 +17,7 @@ Two permissions govern this page:
 
 ## Rule list
 
-The page header carries the title, a **Search rules...** box (matching name, label, and description), and — for users who can manage rules — **Drafts**, **Create with AI**, and **New Rule** buttons.
+The page header carries the title, a **Search rules...** box (matching name, label, and description), and for users who can manage rules, **Drafts**, **Create with AI**, and **New Rule** buttons.
 
 The list is a table:
 
@@ -27,12 +27,10 @@ The list is a table:
 | **Name** | Rule name, with its label in monospace beneath |
 | **Severity** | Badge — high, medium, or low |
 | **Fires** | How many times the rule has fired |
-| **Last** | When it last fired (*Never*, *Just now*, *Xm ago*, …) |
+| **Last** | When it last fired (_Never_, _Just now_, _Xm ago_, …) |
 | **Action** | View anomalies, Edit, Delete |
 
-The **View anomalies** action jumps to the Anomalies page scoped to that rule. There's no pagination or auto-refresh. When there are no rules yet, the page reads **"No rules yet — Create a rule to alert when telemetry matches a condition you care about."**
-
-Deleting a rule asks for confirmation and notes that anomalies it already created are kept.
+The **View anomalies** action jumps to the Anomalies page scoped to that rule. 
 
 ---
 
@@ -63,19 +61,9 @@ In **Time aggregate** mode you configure:
 | **Trigger when** | A comparison: `>`, `≥`, `<`, `≤`, `=`, `≠` |
 | **Threshold** | The value to compare against (byte fields offer B/KB/MB/GB/TB units) |
 
-The builder summarizes the result in plain English — e.g. *"Fires when the chosen function over the window crosses the threshold."*
-
 ### Condition (expression builder)
 
-The condition section is where you build the matching logic (it's labeled *"Condition (build the equation)"* for per-event rules, or *"Filter (optional)"* for aggregates — i.e. which events count).
-
-The expression builder works in **AND groups** joined by **OR**:
-
-- Each condition has a **Field**, an **Op** (e.g. *equals*, *in (CIDR list)*), and a value.
-- Add conditions with **+ AND condition**, and additional groups with **+ OR group**.
-- A live preview shows the assembled expression.
-
-Available fields come from the telemetry registry — destination address, bytes sent/received, source port, file path, process name, and more.
+The condition section is where you build the matching logic (it's labeled _"Condition (build the equation)"_ for per-event rules, or _"Filter (optional)"_ for aggregates — i.e. which events count).
 
 ### Scope
 
@@ -99,13 +87,13 @@ The footer offers **Save draft** (when creating), **Cancel**, **Test (24h)**, an
 
 ### Drafts
 
-Drafts are saved locally (per user) via **Save draft** and reopened from the **Drafts** menu. They're a convenience for work-in-progress rules — distinct from a rule's enabled/disabled state.
+Drafts are saved locally (per user) via **Save draft** and reopened from the **Drafts** menu. 
 
 ---
 
 ## AI rule builder
 
-**Create with AI** opens a chat-style modal (*"Describe the rule in plain English. Review, then create."*). Type a description — or pick a suggestion such as *"Alert when a host sends more than 1 GB outbound in 5 minutes"* — and the assistant proposes a rule.
+**Create with AI** opens a chat-style modal (_"Describe the rule in plain English. Review, then create."_). Type a description, or pick a suggestion such as _"Alert when a host sends more than 1 GB outbound in 5 minutes"_ , and the assistant proposes a rule.
 
 The proposal appears under **Proposed rule**, summarizing the name, description, trigger, condition, scope, schedule, and response. From there you can:
 
@@ -116,7 +104,7 @@ The proposal appears under **Proposed rule**, summarizing the name, description,
 
 ## Testing a rule
 
-**Test (24h)** in the form drawer runs a backtest — replaying the rule against the last 24 hours of events without saving it. The results modal shows how many events would have matched out of those scanned, in a table of Time, Host, what matched, and the event summary. If the scan hits its event limit, a banner notes the results are partial.
+**Test (24h)** in the form drawer runs a backtest, replaying the rule against the last 24 hours of events without saving it. The results modal shows how many events would have matched out of those scanned, in a table of Time, Host, what matched, and the event summary. If the scan hits its event limit, a banner notes the results are partial.
 
 ---
 
