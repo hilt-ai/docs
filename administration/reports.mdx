@@ -4,20 +4,47 @@ sidebarTitle: "Reports"
 description: "Generating and exporting security reports from Hilt findings."
 ---
 
-<Warning>
-Under construction — check again in 24h.
-</Warning>
+Generates infrastructure and security reports from your telemetry and findings, exportable to PDF. Two report types are available — an executive **Overview** and a deeper **Process Intel** breakdown.
 
-{/* TODO: Screenshot of the reports page */}
+## Page layout
 
-## Report generation
+The header has a **Reports** title and three sets of controls:
 
-{/* TODO: Describe how to generate a report — selecting findings, time range, format */}
+- **View toggle** — **Overview** or **Process Intel**.
+- **Period** — Past 24 Hours, Past 7 Days (default), Past 30 Days, Past Quarter, or Past Year.
+- **Export PDF** — generates the report as a PDF.
 
-## One-pager export
+The report for the chosen view and period renders directly on the page; there's no per-finding selection or custom date picker — the period buttons set the time range, and the report covers all findings within it.
 
-{/* TODO: Describe the one-pager format and what it includes */}
+---
 
-## Sharing reports
+## Overview report
 
-{/* TODO: Describe export and sharing options */}
+A one-page executive summary covering the selected period:
+
+- **Risk identified** — a donut of detections by category, with the total anomaly count in the center.
+- **Detection funnel** — the stages from *anomalies flagged* through *analyst reviewed*, *validated threats*, *hosts quarantined*, and *hosts restored*, with accuracy KPIs.
+- **ROI cards** — collector coverage (active/offline/users), intercepted outbound requests, and blocked sensitive-file activity.
+- **Charts** — transfer volume (bytes over time) and file activity over the period.
+
+If there were no detections in the period, the risk donut notes that.
+
+---
+
+## Process Intel report
+
+A per-host process intelligence breakdown for the period, starting with a KPI strip (hosts, distinct programs, total processes, spawn chains, network processes, files touched). It then details:
+
+1. **Top spawn chains** — parent → child process launches, as a chart and table.
+2. **Process network activity** — flows, bytes sent/received, destinations, and hosts per process.
+3. **Process file activity** — top directories by event volume.
+4. **File classification breakdown** — files grouped by class.
+5. **Flagged files** — notable files with their class, event count, process, and reason.
+
+---
+
+## Exporting to PDF
+
+**Export PDF** renders the current view and period server-side and opens a full-screen **PDF preview** with a **Download** button. The file is named for the report type, period, and date (for example, `Hilt-Overview-Past-7-Days-2026-06-05.pdf`).
+
+The export produces a PDF only — there's no CSV, email, or share-link option from this page.

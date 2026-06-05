@@ -4,24 +4,89 @@ sidebarTitle: "User Management"
 description: "Inviting, managing, and removing dashboard users."
 ---
 
-<Warning>
-Under construction — check again in 24h.
-</Warning>
+Create and manage the accounts that can sign in to the dashboard, set each user's role, and scope what they can see through teams. This page requires the **manage users** permission and is available only with PostgreSQL-backed authentication (it's hidden in static admin mode).
 
-{/* TODO: Screenshot of the admin users page */}
+## Page layout
 
-## Inviting users
+The header has a **Users** title and a **New user** button. Below it, a stats line summarizes the account count and how many are admins (and, in a live deployment, how many are still using a temporary password).
 
-{/* TODO: Describe how to invite new users */}
+A filter bar lets you narrow the list:
+
+- **Search** — by username, role, or team name.
+- **Role** filter — All roles, or a specific role.
+- **Team** filter — All teams, No team, or a specific team.
+
+The list renders as a table on larger screens and as cards on mobile:
+
+| Column | Content |
+| --- | --- |
+| **Status** | **Active** or **Disabled** badge |
+| **Username** | The account name |
+| **Role** | A colored role badge |
+| **Team** | Team name (links to the Teams page), or — |
+| **Password** | *(live only)* **Temporary** or **User-set** |
+| **Actions** | The ⋯ menu |
+
+There's no pagination (the list is filtered/sorted client-side, alphabetically) and no auto-refresh.
+
+---
 
 ## Roles and permissions
 
-{/* TODO: Describe available roles and what each can do */}
+Each user has one role. The role picker includes an info tooltip describing each:
 
-## Removing users
+| Role | What it can do |
+| --- | --- |
+| **Admin** | Full access, including managing users, teams, and the audit log. |
+| **Analyst** | Full data access and detection rule management, but no admin pages. |
+| **Responder** | Like analyst, but cannot create, edit, or delete detection rules. |
+| **Viewer** | Read-only access plus the AI query page. |
+| **Owner** | Same as admin; fixed on the seeded account and cannot be assigned. |
 
-{/* TODO: Describe how to remove or deactivate a user */}
+The **owner** role is special: it's locked to the seeded account, can't be assigned to anyone else, and can't be changed, disabled, or deleted.
 
-## Teams
+### Global vs scoped admins
 
-{/* TODO: Describe team management — creating teams, assigning members */}
+A **global admin** (an admin or owner with no team) can see everything. A **scoped admin** is an admin assigned to one or more teams — they only manage their subtree, and must assign at least one in-scope team when creating or editing a user.
+
+---
+
+## Creating a user
+
+There's no email invitation flow — you create the account directly. **New user** opens a drawer with:
+
+- **Username**.
+- **Temporary password** (minimum 8 characters). In a live deployment this is a temporary password the user should replace under Settings after signing in.
+- **Role** (defaults to viewer).
+- **Teams** — which teams the user belongs to, controlling the hosts they can see. Scoped admins must pick at least one.
+
+Submitting creates the account immediately. The password is the one you typed — it isn't emailed or shown again — so share it with the user securely. In a live deployment the account is flagged with a **temporary password** until the user sets their own.
+
+---
+
+## Managing users
+
+The ⋯ actions menu offers (availability depends on whether the target is you, an owner, or another user):
+
+| Action | Notes |
+| --- | --- |
+| **Rename user** | Change the username |
+| **Edit role & team** | Change role and team membership (not available for the owner) |
+| **Reset password** | Set a new temporary password |
+| **Disable / Enable account** | Block or restore sign-in (not for the owner) |
+| **Delete user** | Permanently remove the account (not for the owner) |
+
+### Editing role and team
+
+The edit drawer lets you change the role and team membership. For the owner, it instead shows a note that the owner role is fixed and offers nothing to change.
+
+### Resetting a password
+
+Sets a new temporary password (minimum 8 characters). The user must sign in again and should choose their own password under Settings.
+
+### Disabling vs deleting
+
+- **Disable** is reversible — disabled users can't sign in, but you can re-enable them anytime.
+- **Delete** is permanent — it removes the account and all its sessions. Audit history keeps entries under the username, but the account can't be recovered.
+
+Both actions ask for confirmation first.
