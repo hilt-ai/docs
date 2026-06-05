@@ -6,14 +6,10 @@ description: "Cluster analysis and behavioral modeling across your host fleet."
 
 Groups your hosts by how they behave and shows how those groups shift over time. Hosts with similar activity form **clusters** (behavior groups); as behavior changes between periodic **refits**, hosts move between clusters. This page visualizes both the current grouping and the movement.
 
-## Page layout
-
-- **Header** — title, the subtitle *"How hosts group and shift over time"*, and a `{N} clusters · {M} hosts` summary.
-- **Insight strip** — a card summarizing the most notable change (e.g. *"3 hosts moved into Network-heavy"*), with a top driver metric and an **Investigate Event** button when relevant.
+- **Header** — title, the subtitle _"How hosts group and shift over time"_, and a `{N} clusters · {M} hosts` summary.
+- **Insight strip** — a card summarizing the most notable change (e.g. _"3 hosts moved into Network-heavy"_), with a top driver metric and an **Investigate Event** button when relevant.
 - **Canvas** (left) — the fleet visualization, with a refit timeline beneath it.
 - **Evidence rail** (right) — context panel that changes with your selection.
-
-Data is cached and refreshes when you change selection or refit — there's no background polling.
 
 ---
 
@@ -55,15 +51,15 @@ The right rail shows different content depending on what's selected.
 
 ### Activity summary (default)
 
-With nothing selected, the rail shows **Activity summary** — the recent shifts (up to three flows, each showing the number of hosts moving into a cluster with a driver) and the main **behavior groups** with their host counts. If nothing moved since the previous refit, it says so.
+With nothing selected, the rail shows **Activity summary** — the recent shifts (up to three flows, e.g. _"_{N} _hosts →_ {cluster}_"_ with a driver) and the main **behavior groups** with their host counts. If nothing moved since the previous refit, it says so.
 
 ### Cluster detail
 
-Selecting a cluster shows its label and host count, an **Investigate Event** button, an optional narrative, a **Cluster Profile** (metric bars grouped into Network, Process, and File), and the member **Hosts** list. The host list can be filtered to **Moved** hosts (which carry a badge naming the cluster they came from) and paginates after the first 10.
+Selecting a cluster shows its label and host count, an **Investigate Event** button, an optional narrative, a **Cluster Profile** (metric bars grouped into Network, Process, and File), and the member **Hosts** list. The host list can be filtered to **Moved** hosts (which carry a _from_ {cluster} badge) and paginates after the first 10.
 
 ### Movement detail
 
-Selecting a flow shows how many hosts moved, the *from → to* clusters, the refit time range, and a confidence level (high/medium/low). **Behavior Shifts** summarizes the typical change across the moved hosts with signed percentage bars, and an expandable **Hosts** list breaks down each host's deltas.
+Selecting a flow shows {N} **hosts moved**, the _from → to_ clusters, the refit time range, and a confidence level (high/medium/low). **Behavior Shifts** summarizes the typical change across the moved hosts with signed percentage bars, and an expandable **Hosts** list breaks down each host's deltas.
 
 ### Host trajectory
 
@@ -75,14 +71,8 @@ Selecting the **Idle** or **Returned** pool explains what the pool means and lis
 
 ---
 
-## Terminology
+With nothing selected, the rail shows **Activity summary** — the recent shifts (up to three flows, each showing the number of hosts moving into a cluster with a driver) and the main **behavior groups** with their host counts. If nothing moved since the previous refit, it says so.
 
-| Term | Meaning |
-| --- | --- |
-| **Cluster / behavior group** | A set of hosts with similar activity, with a label, narrative, and profile metrics |
-| **Refit** | A periodic re-clustering snapshot; the timeline steps through these |
-| **Movement / flow / shift** | Hosts moving from one cluster to another between refits |
-| **Idle** | Hosts with insufficient telemetry to place |
-| **Returned** | Hosts that disappeared and later reappeared |
-| **Ghost cluster** | An emptied cluster still shown as a movement endpoint |
-| **Confidence** | How strongly a movement is supported (high/medium/low) |
+Selecting a cluster shows its label and host count, an **Investigate Event** button, an optional narrative, a **Cluster Profile** (metric bars grouped into Network, Process, and File), and the member **Hosts** list. The host list can be filtered to **Moved** hosts (which carry a badge naming the cluster they came from) and paginates after the first 10.
+
+Selecting a flow shows how many hosts moved, the _from → to_ clusters, the refit time range, and a confidence level (high/medium/low). **Behavior Shifts** summarizes the typical change across the moved hosts with signed percentage bars, and an expandable **Hosts** list breaks down each host's deltas.

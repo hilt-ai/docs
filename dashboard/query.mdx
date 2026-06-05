@@ -4,11 +4,7 @@ sidebarTitle: "Query"
 description: "Natural language and structured queries against your Hilt telemetry."
 ---
 
-Ask natural-language questions about your telemetry — events, processes, file access, and network flows — and get answers back in a chat interface. Access requires the **run queries** permission.
-
-## Page layout
-
-The page is a chat workspace: a **chat history** sidebar on the left (on medium and larger screens) and the **conversation area** on the right, with the message input pinned to the bottom. There are no host or time filters on this page.
+Ask natural-language questions about telemetry, events, processes, file access, and network flows, and get answers back in a chat interface. Access requires the **run queries** permission.
 
 ---
 
@@ -21,47 +17,16 @@ The left sidebar lists your past conversations under a **Recents** heading.
 - The **⋯** row menu offers **Rename** (inline, up to 80 characters — Enter to save, Escape to cancel) and **Delete**.
 - **Collapse sidebar** / **Open sidebar** toggles a narrow rail; your preference is remembered.
 
-Before you've started anything, the sidebar reads **"No chats yet — Start a conversation to see it here."**
-
-Conversations are saved to your account when signed in; in demo or auth-disabled sessions they're kept locally in the browser instead. The history sidebar is hidden on mobile.
-
----
-
-## Asking a question
-
-When a conversation is empty, the main area shows **Query your telemetry** with the prompt *"Ask natural language questions about events, processes, file access, and network flows."* and four suggested questions you can click to drop into the input (they don't send automatically):
-
-- *Are any hosts showing signs of data exfiltration?*
-- *Which hosts had the most activity in the last 24 hours?*
-- *What did user jmartin do in the last hour?*
-- *Show me the most recent anomaly alert and what triggered it.*
-
-Type into the input bar (placeholder *"Ask a question about your telemetry..."*) and send with the **Send** button or **Enter** (**Shift+Enter** inserts a newline). The **Clear** (trash) control discards the current conversation and starts a new one.
-
-### How answers come back
-
-1. Your message appears immediately, followed by an assistant bubble.
-2. While the answer is being prepared, the bubble cycles through status messages (e.g. *Analyzing your query...*, *Pulling the relevant data...*, *Reviewing the telemetry...*).
-3. The completed answer is then revealed with a brief typewriter animation and rendered as formatted Markdown — paragraphs, lists, tables, code blocks, headings, and quotes.
-
-A new conversation is created on your first message, and its title is generated from that question.
-
-### Message styles
-
-| Role | Appearance |
-| --- | --- |
-| **You** | Right-aligned bubble with a user avatar |
-| **Assistant** | Hilt avatar, Markdown-formatted answer |
-| **Error** | Red alert icon with the error message |
+Conversations are saved to your account when signed in.
 
 ---
 
 ## Drafting detection rules
 
-You can ask the agent to turn a finding into a detection rule — for example, *"write a detection rule for that exfiltration pattern."* When it does, the proposed rule comes back as part of the answer. To put it into effect, take that draft to the **Detection Rules** page, where the rule builder lets you review, adjust, and save it. Saving and managing rules happens there, not on the Query page itself.
+You can ask the agent to turn a finding into a detection rule, for example, _"write a detection rule for that exfiltration pattern."_ When it does, the proposed rule comes back as part of the answer. To put it into effect, take that draft to the **Detection Rules** page, where the rule builder lets you review, adjust, and save it. 
 
 ---
 
-## What this page does not do
+## Drafting detection rules
 
-To set expectations, the Query page is natural-language chat only. It does not expose a structured query builder, show the underlying SQL or tool calls, search across history, or export conversations.
+You can ask the agent to turn a finding into a detection rule — for example, _"write a detection rule for that exfiltration pattern."_ When it does, the proposed rule comes back as part of the answer. To put it into effect, take that draft to the **Detection Rules** page, where the rule builder lets you review, adjust, and save it. Saving and managing rules happens there, not on the Query page itself.
