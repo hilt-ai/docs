@@ -41,10 +41,9 @@
             ]
           },
           {
-            "tab": "Auto-update agent",
+            "tab": "On-prem operations",
             "pages": [
-              "auto-update-agent",
-              "untitled-page"
+              "auto-update-agent"
             ]
           }
         ]
@@ -78,6 +77,11 @@
     {
       "source": "/linux-collector",
       "destination": "/linux-collector/overview",
+      "permanent": true
+    },
+    {
+      "source": "/untitled-page",
+      "destination": "auto-update-agent",
       "permanent": true
     }
   ]
