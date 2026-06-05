@@ -35,7 +35,7 @@ Hilt ships four ML model families that learn normal host behavior and flag anoma
 | `uid` / `euid` | Unix user IDs, correlatable | Remap to sequential integers |
 | `owner` / `identity` | Human-readable identity strings | Drop entirely |
 
-## Must never be exported
+## Will never be exported
 
 | Data | Why |
 | :-- | :-- |
@@ -60,7 +60,7 @@ Hilt ships four ML model families that learn normal host behavior and flag anoma
 
 ## Export schema (Parquet)
 
-The exported Parquet file contains exactly these columns and no others. Anything not listed here is excluded at the query level. 
+The exported Parquet file contains exactly these columns and no others. Anything not listed here is excluded at the query level.
 
 ### Temporal and grouping
 
@@ -274,7 +274,7 @@ The export runs as a one-shot Kubernetes Job on the existing EKS cluster, using 
 
 ### Review before transfer
 
-When `data_export_require_approval = true` (default), the export produces a manifest and a 20-row sample Parquet file. The full archive is encrypted and staged but not transferred until the customer creates the approval ConfigMap. The user can:
+When `data_export_require_approval = true` (default), the export produces a manifest and a 20-row sample Parquet file. The full archive is encrypted and staged but not transferred until the customer creates the approval ConfigMap. The customer can:
 
 - Inspect the manifest to see exactly which columns are included.
 - Load the sample Parquet to verify anonymization.
@@ -282,11 +282,11 @@ When `data_export_require_approval = true` (default), the export produces a mani
 
 ### Date range control
 
-The user controls how much history to export via `data_export_date_range_days`. They can also run exports for specific windows by overriding the Job's `DATE_START` and `DATE_END` environment variables.
+The customer controls how much history to export via `data_export_date_range_days`. They can also run exports for specific windows by overriding the Job's `DATE_START` and `DATE_END` environment variables.
 
 ### Deletion
 
-The user can delete exported data from their S3 bucket at any time.
+The customer can delete exported data from their S3 bucket at any time.
 
 ### Audit trail
 
