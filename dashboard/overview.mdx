@@ -4,40 +4,205 @@ sidebarTitle: "Overview"
 description: "The central view of host activity, anomaly findings, and fleet health."
 ---
 
-<Warning>
-  Under construction — check again in 24h.
-</Warning>
+Overview is the first page you see after login. It is titled **Dashboard** in the app and shows a grid of widgets that summarize fleet health, security posture, and recent activity.
 
-{/* TODO: Screenshot of the overview page */}
+Use Overview to answer three questions quickly:
 
-## Health signals
+1. Is telemetry flowing from my fleet?
+2. Are there security findings that need attention?
+3. Where should I go next?
 
-{/* TODO: Describe the health signal cards and what each one means */}
+Most widgets are clickable. Click a widget (outside edit mode) to jump to the page where you can investigate that signal in detail.
 
-{/* TODO: Describe the health signal cards and what each one means */}
+## How the page is organized
 
-{/* TODO: Describe the health signal cards and what each one means */}
+The page has three areas:
 
-## Recent findings
+- **Tutorial cards** (demo environments only) — guided walkthroughs at the top for new users.
+- **Page header** — the Dashboard title and an **Edit dashboard** button on the right.
+- **Widget grid** — draggable tiles arranged in a responsive layout.
 
-{/* TODO: Describe the recent findings feed and how to triage from here */}
+### Default layout
 
-{/* TODO: Describe the recent findings feed and how to triage from here */}
+New users start with six widgets:
 
-{/* TODO: Describe the recent findings feed and how to triage from here */}
+| Row | Widgets |
+|-----|---------|
+| 1 | Events analyzed · Monitored hosts · Users tracked |
+| 2 | Security impact (full width) |
+| 3 | Threat profile · Recent findings |
 
-## Threat profile
+You can add more widgets, remove defaults, and rearrange the grid. Your layout is saved per user.
 
-{/* TODO: Describe the threat profile radar and what the axes represent */}
+### Edit mode
 
-{/* TODO: Describe the threat profile radar and what the axes represent */}
+Click **Edit dashboard** to customize the page:
 
-{/* TODO: Describe the threat profile radar and what the axes represent */}
+- **Drag** a widget to move it.
+- **Resize** a widget from its bottom-right corner.
+- **Remove** a widget with the × on its tile.
+- **Add widget** opens a panel grouped by category (Key metrics, Fleet & hosts, Network, Files, Security).
 
-## Getting started tutorial
+Click **Save** to persist your layout, or **Cancel** to discard changes. While editing, widgets are not clickable — save first, then drill in.
 
-{/* TODO: Describe the tutorial cards for new users */}
+---
 
-{/* TODO: Describe the tutorial cards for new users */}
+## Widget reference
 
-{/* TODO: Describe the tutorial cards for new users */}
+Each widget below explains what it displays, how to read it, and where it takes you when clicked.
+
+### Events analyzed
+
+**Shows:** Total telemetry events ingested from your fleet in the last 24 hours.
+
+**How to read it:** This is your throughput indicator. A sudden drop usually means collectors stopped reporting or the ingest path has a problem. A large spike may reflect a noisy deployment, batch job, or activity worth reviewing.
+
+**Navigates to:** Investigate (event timeline).
+
+---
+
+### Monitored hosts
+
+**Shows:** Total host count, with alive / stale / dead sub-counts beneath the number.
+
+**How to read it:**
+
+| Sub-count | Meaning |
+|-----------|---------|
+| **Alive** | Collector shipped events recently |
+| **Stale** | Missed recent heartbeats but still within grace period |
+| **Dead** | No events for an extended period |
+
+Hover the status dots for a legend. A drop in alive count means hosts went offline — open Collectors to see which ones.
+
+**Navigates to:** Collectors.
+
+---
+
+### Users tracked
+
+**Shows:** Distinct user identities observed across the fleet in the last 24 hours (SSH users, UIDs, service accounts).
+
+**How to read it:** Tracks who is active on your infrastructure. Spikes can reflect onboarding, new access patterns, or unusual account usage. Drops are normal during off-hours or after decommissioning hosts.
+
+**Navigates to:** User Timeline.
+
+---
+
+### Security impact
+
+**Shows:** A full-width panel with impact metrics and a trend chart over a selectable time window (24h, 7d, 30d).
+
+**How to read it:** Combines anomaly volume, triage load, and model accuracy signals into one security posture view. Use the time-range toggle to distinguish a one-off spike from a sustained trend. Rising values usually mean more findings to triage or worsening impact; a flat, low line indicates stable operations.
+
+The chart metric can switch between anomaly count, accuracy, and false-positive rate depending on your deployment.
+
+**Navigates to:** Not linked as a whole — use the trend controls on the widget itself.
+
+---
+
+### Threat profile
+
+**Shows:** A radar chart of anomaly types from the last 24 hours.
+
+**Axes (finding categories):**
+
+| Category | What it represents |
+|----------|-------------------|
+| Activity spike | Unusual process or execution patterns |
+| Network | Suspicious or anomalous network behavior |
+| Sensitive file | Access to sensitive file paths |
+| Lateral movement | Cross-host or phase-related movement |
+| Detection rule | Matches from custom detection rules |
+| Combined signal | Findings spanning multiple categories |
+
+A balanced, small polygon means low, evenly distributed activity. A spike on one axis means that category dominates recent findings.
+
+**Navigates to:** Click a category sector to open Anomalies filtered to that type.
+
+---
+
+### Recent findings
+
+**Shows:** The three most recent anomaly findings, each with severity, type, affected host, and timestamp.
+
+**How to read it:** Your triage inbox at a glance. Findings are sorted by time — newest first. Use **View all →** in the widget header to open the full anomaly queue.
+
+**Navigates to:** Individual finding detail, or Anomalies via **View all →**.
+
+---
+
+### Host status
+
+**Shows:** A donut chart of fleet connectivity: alive, stale, and dead hosts as colored segments, with total count in the center.
+
+**How to read it:** A visual ratio of fleet health. Growing stale or dead slices mean connectivity problems worth checking on the Collectors page.
+
+**Navigates to:** Collectors.
+
+*Not in the default layout — add via **Add widget**.*
+
+---
+
+### Top talkers
+
+**Shows:** The five busiest hosts by network flow volume in the last 24 hours, plus a fleet-wide count of new destinations.
+
+**How to read it:** Highlights hosts generating the most network activity. Expected for data pipelines and backups; unexpected spikes may warrant review on the Networks page.
+
+**Navigates to:** Networks.
+
+*Not in the default layout — add via **Add widget**.*
+
+---
+
+### File mutations
+
+**Shows:** Fleet-wide file activity in the last 24 hours — opens, deletes, and unique paths — plus the most active hosts by mutation count (renames, chmods, unlinks).
+
+**How to read it:** Surfaces bulk file changes across the fleet. Spikes can indicate deployments, configuration updates, or destructive activity.
+
+**Navigates to:** Files.
+
+*Not in the default layout — add via **Add widget**.*
+
+---
+
+### Open anomalies
+
+**Shows:** Total anomaly count in the last 24 hours with a severity breakdown bar (critical, high, medium, low).
+
+**How to read it:** Your triage backlog indicator. If critical or high bars grow faster than your team resolves findings, prioritize those severities or review detection rule tuning.
+
+**Navigates to:** Anomalies.
+
+*Not in the default layout — add via **Add widget**.*
+
+---
+
+### Detection rules
+
+**Shows:** Count of enabled detection rules out of total configured, plus a scrollable list of rule names with enabled/disabled status.
+
+**How to read it:** Confirms your rule coverage is deployed and active. Useful when managing rules across environments.
+
+**Navigates to:** Detection Rules.
+
+*Not in the default layout — add via **Add widget**.*
+
+---
+
+## Tutorial walkthroughs
+
+In demo environments, three tutorial cards appear above the widget grid. Each card starts a guided walkthrough that highlights relevant parts of the dashboard and links you to the right page (for example, reviewing your first anomaly or exploring data lineage).
+
+Dismiss or complete a walkthrough to hide the cards. They do not appear in production deployments.
+
+## Where to go next
+
+| If you want to… | Go to |
+|-----------------|-------|
+| Check which hosts are offline | [Collectors](/dashboard/collectors) |
+| Triage security findings | [Anomalies](/dashboard/anomalies) |
+| Search raw telemetry | [Investigate](/dashboard/investigate) |
+| Trace data movement | [Data Lineage](/dashboard/data-lineage) |
