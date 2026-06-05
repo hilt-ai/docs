@@ -1,0 +1,37 @@
+---
+title: "Linux Collector"
+sidebarTitle: "Overview"
+description: "What the Hilt DMG Collector is, what it observes, and how to navigate this guide."
+---
+
+This guide describes the Hilt Data Movement Governance Collector: what it is, what it observes, how it's deployed on Kubernetes nodes and on plain Linux VMs, and how it integrates with the Hilt data-plane you received separately.
+
+A shorter quick-start also ships with every release tarball at `docs/client-deployment-guide.md` (and is uploaded as `README.md` per version); this guide is the long-form companion.
+
+## What is a collector
+
+The collector is a single static Linux binary (~5 MB, zero dependencies) plus an eBPF program that the binary loads into the kernel at startup. It attaches tracepoints to a narrow set of kernel entry points, derives an identity-aware event stream from them, filters out high-volume noise in userspace, and ships the results to your Hilt ingest endpoint. The program attaches to syscalls and kernel hooks to capture process execution, file operations, and network events.
+
+## What the collector does _not_ do
+
+The DMG Collector is strictly observational. It does **not**:
+
+- **Expose network services.** The agent only makes outbound HTTPS to your control plane defined as `DAG_SHIP_URL`. Nothing else opens a socket.
+- **Install kernel modules.** Everything rides CO-RE eBPF with BTF; there is no out-of-tree driver, no DKMS, no custom kernel build.
+- **Modify network traffic.** The agent observes; it never injects, drops, blocks, or alters packets. Quarantine (where used) is a separate control-plane action via AWS security groups, executed by the dashboard, not by the agent.
+- **Change host state.** No system modifications are made, aside from optionally writing a configuration file.
+- **Perform external callbacks.** No license checks, telemetry beacons, or "phone-home" behavior. The only outbound communication is the configured event stream.
+
+## In this guide
+
+- [System requirements](/linux-collector/system-requirements)
+- [Release artifacts](/linux-collector/release-artifacts)
+- [Deploy on Kubernetes](/linux-collector/deploy-kubernetes)
+- [Deploy on VMs](/linux-collector/deploy-vms)
+- [Configuration reference](/linux-collector/configuration)
+- [Networking and security](/linux-collector/networking-security)
+- [Event data model](/linux-collector/event-data-model)
+- [Sizing and capacity](/linux-collector/sizing-capacity)
+- [End-to-end data flow](/linux-collector/data-flow)
+- [Agent filtering](/linux-collector/agent-filtering)
+- [Troubleshooting](/linux-collector/troubleshooting)

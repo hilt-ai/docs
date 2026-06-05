@@ -1,0 +1,25 @@
+---
+title: "Sizing and capacity"
+description: "Measured resource usage by host type, default limits, and ring buffer tuning."
+---
+
+## Measured resource usage
+
+| Host type | RSS | CPU | Filtered noise | Events/s shipped |
+| :-- | :-- | :-- | :-- | :-- |
+| `m6i.large` general-purpose VM | 4–6 MB | \< 1% of 1 core | ~60–75% | 50–400 |
+| `r6i.xlarge` DB host | 6–8 MB | ~1% of 1 core | ~70–80% | 300–1,500 |
+| EKS worker (16 pods, busy) | 5–7 MB | \< 2% of 1 core | ~70% | 800–3,000 |
+
+## Defaults
+
+The collector ships with conservative defaults suitable for most environments:
+
+- **Kubernetes:** the DaemonSet requests `100m` CPU / `128Mi` memory with limits of `500m` / `512Mi`.
+- **VMs:** no hard limits are applied by default, though they can be enforced during installation (e.g., `CPUQuota=20%` and `MemoryMax=512M`) if a strict ceiling is required.
+
+## Ring buffer tuning
+
+The default ring buffer size is 1 MB per CPU, which is sufficient for workloads up to ~5,000 events/sec per CPU. For high-throughput systems, increasing this to 8–16 MB per CPU is recommended.
+
+The agent degrades gracefully under load: when userspace cannot drain the ring buffer fast enough, the eBPF side drops oldest events and emits a count of dropped events to the metrics stream (`metrics.c`). Dropped events never cause the agent to block the kernel.

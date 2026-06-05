@@ -1,0 +1,30 @@
+---
+title: "Event data model"
+description: "What the collector captures — and explicitly what it does not."
+---
+
+Each event captures execution and system metadata, including:
+
+- Timestamps
+- Process and user identifiers (PID / UID)
+- Command name, binary path, and arguments
+- File paths (for file events)
+- Network details such as the 5-tuple and byte counts (for network events)
+- Container and cgroup identifiers
+- The configured node label
+
+This allows activity to be correlated across hosts and workloads.
+
+## What the collector does not capture
+
+The collector does **not** capture sensitive content. This includes:
+
+- File contents
+- Packet payloads
+- Memory regions
+- Environment variables
+- Process memory
+- Credentials
+- Any user data beyond what standard system tools like `ps`, `lsof`, or `ss` would expose
+
+In other words, the agent observes system activity at the metadata level only — it is not a content inspection tool.

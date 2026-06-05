@@ -1,0 +1,36 @@
+---
+title: "Troubleshooting"
+description: "Common DMG Collector failures and how to resolve them."
+---
+
+## Missing BTF at install time
+
+If `/sys/kernel/btf/vmlinux` is missing at install time, the kernel was built without `CONFIG_DEBUG_INFO_BTF=y`. Upgrade to a newer kernel with BTF support enabled. For older distributions such as Amazon Linux 2, a matching external BTF bundle can be installed if needed.
+
+## DaemonSet CrashLoopBackOff with BPF load failure
+
+If the DaemonSet enters `CrashLoopBackOff` with a BPF program load failure, the issue is typically related to missing kernel mounts or insufficient privileges. Ensure that `/sys/kernel/btf` and `/sys/kernel/debug` are mounted inside the container and that the pod is running with `privileged: true`.
+
+Verify with:
+
+```bash
+kubectl describe pod -l app=dag-agent
+```
+
+And by checking filesystem access inside the container.
+
+## Agent in “Ship mode” but no events in the dashboard
+
+If the agent logs indicate “Ship mode” but events do not appear in the dashboard:
+
+1. Verify DNS resolution from the node using `getent hosts`. If the domain does not resolve, the Private Route 53 association may be missing.
+2. Confirm connectivity. If the request hangs, check that the PrivateLink security group allows traffic from the node’s security group.
+3. Ensure the configured URL is correct — only the base domain should be used, with no additional path.
+
+## High ring buffer drop counts
+
+If high ring buffer drop counts are observed on busy hosts, increase the configured `ringbuf_size` (for example to `8M` or `16M`) and restart the agent. Drops can be monitored via verbose mode (`-v`) or through the agent’s logs, and typically indicate sustained event throughput exceeding the current buffer capacity.
+
+## Logs remain after uninstall
+
+If `/var/log/dag-agent/events.jsonl` remains after uninstall, this is intentional. The uninstall process preserves logs to allow for post-removal analysis or handoff. If a clean host state is required, remove the directory manually.

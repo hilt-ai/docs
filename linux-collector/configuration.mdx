@@ -1,0 +1,18 @@
+---
+title: "Configuration reference"
+description: "CLI flags, environment variables, and config file keys for the DMG Collector."
+---
+
+The agent accepts configuration via (in order of precedence) CLI flags, environment variables, and `/etc/dag-agent/config.yaml`.
+
+| CLI | Env var | Config key | Default | Purpose |
+| :-- | :-- | :-- | :-- | :-- |
+| `-s` | `DAG_SHIP_URL` | `ship_url` | unset = file mode | HTTPS collector URL. |
+| `-o` | `DAG_OUTPUT_PATH` | `output_path` | `/var/log/dag-agent/events.jsonl` | JSONL output. Set to `-` for stdout explicitly. |
+| `-n` | `DAG_NODE_ID` | `node_id` | `$(hostname)` / `spec.nodeName` on K8s | String host label displayed on the dashboard. |
+| `-b` | — | — | off | Benchmark mode; ship only. |
+| `-v` | — | — | off | Verbose: mirror events to stderr. |
+| `-V` | — | — | — | Print version and exit. |
+| — | — | `cpu_limit` | no limit | Written as `CPUQuota=` in the systemd drop-in. |
+| — | — | `ram_limit` | no limit | Written as `MemoryMax=` in the systemd drop-in. |
+| — | — | `ringbuf_size` | `1M` | Per-CPU BPF ring buffer size. Increase on busy hosts (`8M`, `16M`). |

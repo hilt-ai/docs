@@ -1,0 +1,35 @@
+---
+title: "Release artifacts"
+description: "Tarball layout, container image, and the offline bundle for airgapped environments."
+---
+
+Every release of the collector ships as two static Linux tarballs — one for `aarch64` (ARM64 / Graviton) and one for `x86_64` (Intel / AMD) — plus a matching multi-arch container image.
+
+Use the tarball on VMs, and the container image on Kubernetes.
+
+## S3 layout
+
+```text
+s3://cybe-dag-agent/v<X>/
+├── dag-agent-v<X>-linux-aarch64.tar.gz   # ARM64 / Graviton
+├── dag-agent-v<X>-linux-x86_64.tar.gz    # x86_64
+└── README.md                              # version-specific deployment guide
+```
+
+## Tarball contents
+
+```text
+dag-agent-v<X>-linux-<arch>/
+├── dag-agent              # static binary
+├── dag-agent.service      # systemd unit
+├── install.sh             # interactive installer
+├── uninstall.sh           # stops service, removes binary
+└── k8s/
+    ├── Dockerfile
+    ├── daemonset.yaml     # Kubernetes DaemonSet
+    └── dag-agent
+```
+
+## Airgapped / offline bundle
+
+For fully airgapped environments, request the offline bundle. It is the same artifact set plus a `docker save`-ed tar of the container image, shipped as a single `dag-agent-v<X>-offline.tar.gz` you can copy to the target environment and `docker load` / `tar xzf` locally.

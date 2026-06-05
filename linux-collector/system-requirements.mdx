@@ -1,0 +1,43 @@
+---
+title: "System requirements"
+description: "Kernel, architecture, privileges, network, and resource requirements for the DMG Collector."
+---
+
+## Kernel
+
+Linux 5.8\+ with BTF (`CONFIG_DEBUG_INFO_BTF=y`). `/sys/kernel/btf/vmlinux` must exist, `install.sh` checks this and fails fast if missing.
+
+## Architecture
+
+`x86_64` or `aarch64` (Graviton). A separate tarball ships per architecture; the container image is multi-arch.
+
+## Privileges
+
+- **VMs:** root
+- **Kubernetes:** `privileged: true` containers
+
+## Outbound network
+
+HTTPS (443) to your `DAG_SHIP_URL` over AWS PrivateLink.
+
+## Memory
+
+Measured in production: 4–6 MB RSS steady state.
+
+## CPU
+
+\< 1% of a single core under typical workloads; ring buffer and userspace filtering smooth spikes.
+
+## Supported distributions
+
+BTF availability covers every major distribution in production:
+
+- Amazon Linux 2023
+- Ubuntu 20.04\+ (HWE) / 22.04 / 24.04
+- RHEL 9\+
+- Debian 11\+
+- Bottlerocket
+- Flatcar
+- EKS-optimized AMIs
+
+For AL2 (kernel 5.10 backport), Hilt ships a drop-in BTF tarball on request.

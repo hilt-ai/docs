@@ -1,0 +1,138 @@
+---
+title: "Deploy on VMs"
+description: "Install the DMG Collector on bare EC2 or on-prem Linux via systemd, including interactive and automated installs."
+---
+
+## Host resources
+
+The DMG Collector installs a small set of files on the host:
+
+| Path | Purpose |
+| :-- | :-- |
+| `/usr/local/bin/dag-agent` | Static collector binary |
+| `/etc/systemd/system/dag-agent.service` | systemd unit file |
+| `/etc/systemd/system/dag-agent.service.d/limits.conf` | Optional CPU / memory limits drop-in |
+| `/etc/dag-agent/config.yaml` | Configuration |
+| `/var/log/dag-agent/events.jsonl` | Event output file (if file mode) |
+
+## Installation
+
+The collector can be installed interactively (recommended for first setup) or non-interactively for automation.
+
+### Interactive install
+
+```bash
+tar xzf dag-agent-v<X>-linux-<arch>.tar.gz
+cd dag-agent-v<X>-linux-<arch>
+
+./dag-agent -V
+sudo ./install.sh
+```
+
+The installer runs a short configuration wizard:
+
+| Prompt | Typical answer |
+| :-- | :-- |
+| Ship URL | PrivateLink destination of control plane (empty for file mode) |
+| JSON output path | `/var/log/dag-agent/events.jsonl` (default), or empty if ship-only |
+| Node label | Defaults to `$(hostname)` |
+| CPU limit | e.g. `20%` — optional |
+| Memory limit | e.g. `512M` — optional |
+| Ring buffer size | `1M` (default) up to `16M` on busy hosts |
+
+On submission the installer:
+
+1. Verifies environment requirements (exits with a clear error otherwise).
+2. Validates connectivity to `SHIP_URL`.
+3. Installs the binary, writes the unit file \+ optional limits drop-in, creates the log directory, and starts the service.
+
+### Non-interactive / automation install
+
+For config management (Ansible, SSM, cloud-init, Packer), either pre-seed environment variables or install directly:
+
+```bash
+install -m 755 dag-agent /usr/local/bin/dag-agent
+install -m 644 dag-agent.service /etc/systemd/system/dag-agent.service
+
+mkdir -p /etc/dag-agent /var/log/dag-agent
+
+cat > /etc/dag-agent/config.yaml <<'YAML'
+ship_url: "https://<name>-ingest.hilt.ai"
+output_path: "/var/log/dag-agent/events.jsonl"
+node_id: "${NODE_ID}"
+YAML
+
+# Optional limits
+mkdir -p /etc/systemd/system/dag-agent.service.d
+cat > /etc/systemd/system/dag-agent.service.d/limits.conf <<'UNIT'
+[Service]
+CPUQuota=20%
+MemoryMax=512M
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now dag-agent
+```
+
+## Service configuration
+
+The systemd unit (`deploy/dag-agent.service`) is minimal:
+
+```ini
+[Unit]
+Description=Cybe DAG Agent - eBPF Telemetry Sensor
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/dag-agent
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+LimitMEMLOCK=infinity
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`LimitMEMLOCK=infinity` is required for BPF map allocations. If restricted by policy, set it to the expected total map size (~4 MB with default configuration).
+
+## Verification
+
+```bash
+sudo systemctl status dag-agent
+sudo journalctl -u dag-agent --no-pager -n 20
+```
+
+Expected output:
+
+```text
+dag-agent v<X> starting
+Ship mode: https://<name>-ingest.hilt.ai
+BPF object loaded; attached N programs
+```
+
+## Upgrade
+
+In-place upgrade consists of replacing the binary and restarting the service:
+
+```bash
+sudo install -m 755 dag-agent /usr/local/bin/dag-agent
+sudo systemctl restart dag-agent
+```
+
+For fleet upgrades, a shell script is included (`deploy/ci-install.sh`), which assumes a node has already been bootstrapped with `install.sh` once and only does the binary-swap \+ restart (no wizard). Typical wiring:
+
+- **AWS SSM Run Command:** Execute across a tag selector (`Role=agent`, `Env=prod`) with a one-liner that pulls the new tarball and runs the shell.
+- **Ansible / Salt:** Treat `/usr/local/bin/dag-agent` as a managed file sourced from your artifact cache.
+- **Packer / Image Builder:** Bake the agent into a base AMI and roll via your usual image replacement process.
+
+## Uninstall
+
+```bash
+sudo ./uninstall.sh
+```
+
+Removes service and binary, preserves logs. No reboot required.
