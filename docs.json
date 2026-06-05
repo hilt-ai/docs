@@ -49,12 +49,6 @@
                   "dashboard/investigate",
                   "dashboard/quarantine"
                 ]
-              },
-              {
-                "group": "Admin",
-                "pages": [
-                  "dashboard/reports"
-                ]
               }
             ]
           },
@@ -66,7 +60,8 @@
               "administration/user-management",
               "administration/teams",
               "administration/identity-mappings",
-              "administration/audit-log"
+              "administration/audit-log",
+              "administration/reports"
             ]
           },
           {
@@ -159,6 +154,11 @@
     {
       "source": "/platform/overview",
       "destination": "/platform/layout",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/reports",
+      "destination": "/administration/reports",
       "permanent": true
     },
     {
