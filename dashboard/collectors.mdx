@@ -4,9 +4,7 @@ sidebarTitle: "Collectors"
 description: "Viewing and managing deployed Hilt collectors across your fleet."
 ---
 
-The Collectors page is your fleet inventory. It lists every host running a Hilt collector, shows whether each one is reporting, and lets you drill into per-host telemetry.
-
-Open it from the sidebar (**Collectors**) or by clicking the **Monitored hosts** widget on Overview.
+Lists every host running a Hilt collector, shows whether each one is reporting, and lets you drill into per-host telemetry.
 
 ## Page layout
 
@@ -15,7 +13,7 @@ The page has two sections stacked vertically:
 1. **Fleet summary cards** — three filter cards at the top.
 2. **Host table** — searchable, sortable list of all matching hosts.
 
-Click any row to open that host's detail view at `/collectors/:hostId`.
+Click any row to open that host's detail view.
 
 ---
 
@@ -24,23 +22,21 @@ Click any row to open that host's detail view at `/collectors/:hostId`.
 Three cards act as both status indicators and table filters. Only one filter is active at a time — the selected card gets a green border.
 
 | Card | Value | What it filters |
-|------|-------|-----------------|
-| **All Hosts** | Total count, with tier usage if applicable (e.g. `12 / 50`) | Active and offline hosts |
+| --- | --- | --- |
+| **All Hosts** | Total count | Active and offline hosts |
 | **Active** | Hosts with alive status | Active hosts only |
-| **Offline** | Stale + dead hosts combined | Offline hosts only |
-
-The **All Hosts** card also shows your current deployment tier when a cap applies.
+| **Offline** | Stale \+ dead hosts combined | Offline hosts only |
 
 ### Host status
 
 Each host is classified by how recently its collector reported telemetry:
 
 | Status | Dot color | Meaning |
-|--------|-----------|---------|
+| --- | --- | --- |
 | **Alive** | Green | Collector shipped events within the expected heartbeat window |
-| **Stale** | Amber | No recent events, but still within the grace period — may be transient network issues or a sleeping host |
-| **Dead** | Red | No events for an extended period — collector stopped, host shut down, or network path broken |
-| **Deactivated** | Black | Manually deactivated — collector is installed but not expected to report |
+| **Stale** | Amber | No recent events, but still within the grace period, may be transient network issues or a sleeping host |
+| **Dead** | Red | No events for an extended period, collector stopped, host shut down, or network path broken |
+| **Deactivated** | Black | Manually deactivated, collector is installed but not expected to report |
 
 Hover any status dot in the table for the full legend.
 
@@ -53,22 +49,22 @@ The table lists every host matching the active filter from the summary cards abo
 ### Toolbar
 
 | Control | What it does |
-|---------|--------------|
-| **Search** | Filter by hostname, IP, instance ID, or tag. Results update as you type (300 ms debounce). |
+| --- | --- |
+| **Search** | Filter by hostname, IP, instance ID, or tag. |
 | **Pin order** | Save the current drag-and-drop row order as your default. Click again to revert to server sort. |
 
 ### Columns
 
 | Column | Description |
-|--------|-------------|
-| **Status** | Colored dot — alive, stale, dead, or deactivated |
+| --- | --- |
+| **Status** | Colored dot: alive, stale, dead, or deactivated |
 | **Host** | Display name, plus an environment tag pill when `env` is set (prod, staging, dev) |
-| **Type** | Infrastructure type — VM, Kubernetes node, etc. |
+| **Type** | Infrastructure type: VM, Kubernetes node, etc. |
 | **Last seen** | Relative time since the last event batch was received |
 | **Anomalies** | Count of open findings on this host, or "–" if none |
 | **Events** | Total events received |
 | **Users** | Distinct identities observed on this host |
-| **Actions** | Row menu — rename display name, deactivate/reactivate (where available) |
+| **Actions** | Row menu: rename display name, deactivate/reactivate (where available) |
 
 Click anywhere on a row (except the drag handle or actions menu) to open host detail.
 
@@ -80,19 +76,11 @@ Click anywhere on a row (except the drag handle or actions menu) to open host de
 - **Auto-refresh** — the table reloads every 30 seconds.
 - **Kubernetes grouping** — nodes in the same cluster collapse under a single expandable cluster row.
 
-### Empty states
-
-| Situation | What you see |
-|-----------|--------------|
-| No filter selected | Prompt to choose All Hosts, Active, or Offline |
-| No collectors deployed | "No collectors detected — Deploy the Hilt collector to start monitoring." |
-| Search with no matches | Empty table |
-
 ---
 
 ## Host detail
 
-Click a host row to open `/collectors/:hostId`. The page header shows the host name, status, and last-seen time. A **Collectors** back link returns you to the fleet table.
+Click a host row to open. The page header shows the host name, status, and last-seen time. A **Collectors** back link returns you to the fleet table.
 
 The detail page has four sections:
 
@@ -102,30 +90,28 @@ A card summarizing the host's current state:
 
 - Status badge and infrastructure type
 - Last seen timestamp
-- **Tags** — key/value metadata from the collector (e.g. `env`, `team`, cloud instance tags), with source and last-updated time when available
+- **Tags**: key/value metadata from the collector (e.g. `env`, `team`, cloud instance tags), with source and last-updated time when available
 
-Tags come from the collector's cloud metadata or configured tag sources. The `env` tag also drives the colored pill shown in the host table.
+Tags come from the collector's cloud metadata or configured tag sources. 
 
 ### Uptime timeline
 
 A horizontal bar showing collector availability over time. Each segment represents a time bucket:
 
 | Color | Meaning |
-|-------|---------|
+| --- | --- |
 | Green | Online — events received in this bucket |
 | Amber | Offline — no activity in this bucket |
 | Red | Quarantined — host was isolated during this period |
 
 Hover a segment for the exact timestamp and event count. A summary line above the bar shows total uptime percentage and active hours (e.g. "Online for 6d 14h · 98.2% uptime").
 
-Use this to spot patterns — nightly offline gaps may be auto-scaling; unexpected mid-day gaps warrant investigation.
-
 ### Metrics
 
 Three clickable cards scoped to this host and the current dashboard time window:
 
 | Card | Value | Navigates to |
-|------|-------|--------------|
+| --- | --- | --- |
 | **Events (24h)** | Event count | Investigate, filtered to this host |
 | **Anomalies active** | Open finding count | Anomalies, filtered to this host |
 | **Users active** | Distinct identities | User Timeline, filtered to this host |
@@ -137,31 +123,10 @@ An expandable tree showing what is running on this host, derived from cgroup inv
 Toggle between two views:
 
 | View | What it shows |
-|------|---------------|
+| --- | --- |
 | **Cgroups** | Full kernel cgroup hierarchy — host → runtime → pod → container. Default view. |
 | **Workloads** | Flat list grouped by logical workload — one row per Kubernetes pod or Docker Compose service. |
 
 Each node displays event counts, byte transfer, and lineage depth. Expand nodes to see child processes and workloads. Use this to understand which containers or services on a host are generating the most activity.
 
 ---
-
-## Common workflows
-
-### Find a specific host
-
-Type any part of the hostname, IP, or instance ID into the search bar. The table filters in real time.
-
-### Investigate offline hosts
-
-1. Click **Offline** in the fleet summary cards.
-2. Sort by **Last seen** to find the most recently disconnected hosts.
-3. Open a host row and check the uptime timeline for patterns.
-4. If the outage is unexpected, see [Troubleshooting](/linux-collector/troubleshooting) for connectivity checks.
-
-### Monitor tier usage
-
-The **All Hosts** card shows your current count against your license tier. If you are approaching the limit, deactivate hosts you no longer need or contact your Hilt account team.
-
-### Jump from Overview
-
-Click **Monitored hosts** on the Overview dashboard to land here with the full fleet visible. From a host's metrics cards, you can continue to Investigate, Anomalies, or User Timeline without returning to the sidebar.
