@@ -4,28 +4,13 @@ sidebarTitle: "Files"
 description: "Browsing file activity across hosts: opens, writes, renames, and deletions."
 ---
 
-Shows what's happening to files across the fleet — opens, deletes, permission changes, and renames — and lets you browse a host's filesystem the way the collector observed it.
+{/* TODO: Screenshot of the files page */}
 
-## Page layout
-
-The header adapts to your scope:
-
-- **Host selector** and **time range** (shared with the rest of the dashboard).
-- **Back link** — an **All hosts** link returns to the fleet view when a host is selected.
-- **Investigate events** — jumps to Investigate scoped to file activity for the current host.
-
-A **metric summary strip** sits below the header:
-
-| Mode | Cards |
-| --- | --- |
-| Fleet (no host) | Opens · Unlinks · Paths · Hosts |
-| Host | Events · Paths · Processes · Sessions |
+Shows what's happening to files across the fleet: opens, deletes, permission changes, and renames, and lets you browse a host's filesystem the way the collector observed it.
 
 ---
 
 ## Fleet overview
-
-With no host selected, the page shows **File Activity** across the fleet — one row per host.
 
 ### Search, selection, and compare
 
@@ -54,7 +39,7 @@ Selecting a host opens a three-part workspace: a **file explorer** on the left, 
 
 ### Search bar
 
-A search bar (placeholder *Search by file name or path...*) sits at the top of the host view. It debounces as you type and shows matching paths with a file-class badge, path bucket, and event count. Selecting a result navigates to the file's parent directory and opens its detail modal.
+A search bar (placeholder _Search by file name or path..._) sits at the top of the host view. It debounces as you type and shows matching paths with a file-class badge, path bucket, and event count. Selecting a result navigates to the file's parent directory and opens its detail modal.
 
 ### File explorer
 
@@ -71,7 +56,7 @@ The center pane shows one of three states depending on what you're doing:
 
 #### Landing
 
-Shown before you drill into a directory — a per-host summary:
+Shown before you drill into a directory, a per-host summary:
 
 | Section | Contents |
 | --- | --- |
@@ -93,7 +78,7 @@ When you select a directory:
 
 #### File list
 
-When a search is active, the pane shows **File paths** — one row per distinct path, using the same columns as the browse file table. Results are sorted by total events, highest first.
+When a search is active, the pane shows **File paths**, one row per distinct path, using the same columns as the browse file table. Results are sorted by total events, highest first.
 
 ### Mini terminal
 
@@ -102,6 +87,10 @@ A resizable panel at the bottom mirrors the explorer location and accepts a smal
 ---
 
 ## File detail
+
+{/* TODO: Describe the file browse panel — directory tree, search, filters */}
+
+{/* TODO: Describe the file detail modal — who accessed it, when, what operations */}
 
 Clicking a file opens the detail modal. The header shows the basename, full path, and a **Deleted** badge when applicable.
 
@@ -115,11 +104,19 @@ Clicking a file opens the detail modal. The header shows the basename, full path
 
 ### File open timeline
 
-The timeline chart plots open activity across time buckets (X axis) against open count (Y axis), split into **Read** and **Write** series. Badges summarize totals — Opens, whether activity is read- or write-leaning, and the peak bucket — and **View matching events in Investigate** carries the scope over to Investigate.
+{/* TODO: Describe the timeline chart showing file open activity over time */}
+
+The timeline chart plots open activity across time buckets (X axis) against open count (Y axis), split into **Read** and **Write** series. Badges summarize totals Opens, whether activity is read- or write-leaning, and the peak bucket, and **View matching events in Investigate** carries the scope over to Investigate.
 
 ---
 
 ## Host comparison
+
+{/* TODO: Describe the per-host file activity view */}
+
+{/* TODO: Describe fleet-wide file activity summary */}
+
+{/* TODO: Describe comparing file activity between hosts */}
 
 The **Compare Hosts** modal (opened from the fleet overview) lines up the selected hosts across three tabs:
 
@@ -128,11 +125,3 @@ The **Compare Hosts** modal (opened from the fleet overview) lines up the select
 | **Activity Overview** | A per-host metric table (Opens, Deletes, Chmods, Unique Paths, Sensitive) plus a File Types by Host breakdown |
 | **Shared Files** | Paths seen on more than one host — Path · Hosts · Total Events · Accessed By, sortable |
 | **Directories** | A cross-host heatmap of the top directories |
-
-If no files are common to the selected hosts, the Shared Files tab reports that none were detected.
-
----
-
-## Refresh behavior
-
-File data is query-cached and refreshes when you change scope or time range — there is no background auto-polling, and the file list/search returns the full result set for the current scope rather than paginating.

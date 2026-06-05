@@ -4,7 +4,7 @@ sidebarTitle: "Networks"
 description: "Monitoring network connections, destinations, and data transfer across your fleet."
 ---
 
-Shows where your hosts are talking on the network — which processes connect to which destinations, how much data moves, and which connections are new or abnormal.
+Shows where your hosts are talking on the network, which processes connect to which destinations, how much data moves, and which connections are new or abnormal.
 
 ## Page layout
 
@@ -34,13 +34,25 @@ With no host selected, the page shows cross-host network activity: a host roster
 
 ### Compared Hosts sidebar
 
-Lists the hosts in scope — `N hosts · click to spotlight · again to clear`. It has its own search (press `/` to focus), and each row shows the host label, status, signal count, and flow count. Clicking a host spotlights it and centers the graph; clicking again clears the spotlight.
+Lists the hosts in scope, click to spotlight, again to clear. It has its own search (press `/` to focus), and each row shows the host label, status, signal count, and flow count. Clicking a host spotlights it and centers the graph; clicking again clears the spotlight.
 
 ### Connections graph
 
-The graph plots hosts and the destinations they share, with a toolbar summary (`N hosts · N destination addresses · N cross-host connections`). On large fleets you can toggle between **Overview** and **Show destinations**. The legend distinguishes **Host**, **Destination**, and **Shared** (edge) elements, and a navigation panel offers **Fit all** and **Active host** when a host is spotlighted.
+{/* TODO: Describe the network graph — nodes (hosts, destinations), edges (connections), layout */}
 
-If there are no correlated internal flows, the graph shows **No cross-host connections**.
+{/* TODO: Describe the geographic map overlay showing destination locations */}
+
+{/* TODO: Describe the fleet-wide network summary — top destinations, bytes transferred */}
+
+{/* TODO: Describe the per-host network view */}
+
+{/* TODO: Describe the detail panel — bytes sent/recv, port, process, timeline */}
+
+{/* TODO: Describe the byte transfer chart and what it shows over time */}
+
+{/* TODO: Describe comparing network activity across multiple hosts */}
+
+The graph plots hosts and the destinations they share, with a toolbar summary (`N hosts · N destination addresses · N cross-host connections`). On large fleets you can toggle between **Overview** and **Show destinations**. The legend distinguishes **Host**, **Destination**, and **Shared** (edge) elements, and a navigation panel offers **Fit all** and **Active host** when a host is spotlighted.
 
 ### Detail panels
 
@@ -64,7 +76,7 @@ The default per-host view. Each row is a process (`comm`), sorted by activity du
 
 - The **Y axis** lists processes; the **X axis** is the selected time range.
 - Each row draws an activity bar (first seen to last seen) with destination markers.
-- **Signal markers** flag events on the timeline — New Process, New Destination, and Volume Spike.
+- **Signal markers** flag events on the timeline, New Process, New Destination, and Volume Spike.
 - Click a row to open the process detail panel; click a marker to open it with that destination preselected.
 
 If all traffic is within normal patterns (or there are no flow events in range), the view shows an empty state.
@@ -96,7 +108,3 @@ Shared by the Timeline and Graph views, the process detail panel breaks down a s
 | **Destinations table** | Destination (flag, hostname, geo), port (with service), Out, In, Flows, and the **Signal** (New Process / New Destination / Volume Spike) |
 
 ---
-
-## Refresh behavior
-
-Network data is query-cached and refreshes when you change the host, scope, time range, or view — there is no background auto-polling. The summary query reaches slightly before the start of your time window so baselines line up.

@@ -4,6 +4,8 @@ sidebarTitle: "Data Lineage"
 description: "Visualizing how data moves across hosts, processes, and network connections."
 ---
 
+{/* TODO: Screenshot of the data lineage page */}
+
 Traces process relationships and execution sessions for a host: which processes spawn which, what they run, and where anomalies surface in the chain.
 
 ## Page layout
@@ -15,12 +17,7 @@ The page header carries the controls and adapts to what you're looking at:
 - **View toggle** — appears once a host is selected: **Data Flow** / **Sessions**.
 - **Investigate events** — jumps to Investigate scoped to the current host and time window.
 
-A **metric summary strip** sits below the header. Its cards change with the mode:
-
-| Mode | Cards |
-| --- | --- |
-| Fleet (no host) | Processes · Binaries · Relationships · Anomalies |
-| Host | Processes · Binaries · Relationships · Identities · Anomalies |
+A **metric summary strip** sits below the header with number of processes, network connections and file accesses along with identities and anomalies.
 
 The Processes, Relationships, and Anomalies cards are clickable and deep-link into Investigate or Anomalies for the same scope.
 
@@ -28,32 +25,23 @@ The Processes, Relationships, and Anomalies cards are clickable and deep-link in
 
 ## Fleet overview
 
-With no host selected, the page shows **Process Activity** across the fleet — one row per host.
-
-### Search and columns
-
-Search filters hosts by name. The table is sortable by clicking column headers:
-
-| Column | Description |
-| --- | --- |
-| **Host** | Display name |
-| **Processes** | Total processes observed |
-| **Binaries** | Distinct executables run |
-| **Relationships** | Unique parent→child process edges |
-| **Anomalies** | Open findings on the host |
+With no host selected, the page shows **Process Activity** across the fleet.
 
 ### Behavior
 
 - **Default sort** — Processes, highest first.
 - **Click a row** to drill into that host's Data Flow view.
 - **Kubernetes grouping** — nodes in the same cluster collapse under one expandable cluster row showing the node count.
-- **Pinned host order** — if you've pinned an order on the Collectors page, column sort is disabled (the table respects your pinned arrangement).
 
 If there's no activity, the table prompts you to expand the time window.
 
 ---
 
 ## Data Flow view
+
+{/* TODO: Describe the main flow graph visualization — nodes, edges, what they represent */}
+
+{/* TODO: Describe the main flow graph visualization — nodes, edges, what they represent */}
 
 The default per-host view. A flow graph (built on React Flow) lays out **parent → child process relationships** for the selected host and time range.
 
@@ -70,11 +58,17 @@ Processes that are evidence for an anomaly are outlined with a red ring.
 ### Navigating the graph
 
 - **Zoom in / out** and **Fit view** controls sit on the canvas; a minimap is pinned to the top-right.
-- **Cluster nodes** group related processes — click to expand. Expanded parents offer **Collapse children**, and a global **Collapse all** appears whenever any cluster is open.
-
-If there are no relationships in range, the canvas shows an empty state; while loading it reads **Loading data flow…**.
+- **Cluster nodes** group related processes, click to expand. Expanded parents offer **Collapse children**, and a global **Collapse all** appears whenever any cluster is open.
 
 ### Flow detail panel
+
+{/* TODO: Describe the data flow view — file → process → network chains */}
+
+{/* TODO: Describe the data flow view — file → process → network chains */}
+
+{/* TODO: Describe the process topology view — process trees and their relationships */}
+
+{/* TODO: Describe the process topology view — process trees and their relationships */}
 
 Click a process node (other than the root or a cluster) to slide in a detail panel from the right:
 
@@ -83,7 +77,7 @@ Click a process node (other than the root or a cluster) to slide in a detail pan
 | **Header** | Process command, labeled "Process" |
 | **Identity** | The identity that ran it |
 | **Activity** | Executions, events, PIDs, and active duration |
-| **Risk signals** | Badges such as *dominant*, *high fan-out*, *root activity*, *persistent*, *brief*, *singleton*, *high churn* |
+| **Risk signals** | Badges such as _dominant_, _high fan-out_, _root activity_, _persistent_, _brief_, _singleton_, _high churn_ |
 | **Spawns** | Clickable links to downstream child processes |
 | **Footer** | **Investigate events**, filtered to this process |
 
@@ -93,7 +87,15 @@ The detail panel describes the selected **process node**, not graph edges.
 
 ## Sessions view
 
-Switch the per-host toggle to **Sessions** to inspect execution sessions — recurring shapes of process activity, with the ability to load any individual run.
+{/* TODO: Describe the network view — network connections in the lineage context */}
+
+{/* TODO: Describe the network view — network connections in the lineage context */}
+
+{/* TODO: Describe the enrichment view — how ML enrichment is visualized */}
+
+{/* TODO: Describe the enrichment view — how ML enrichment is visualized */}
+
+Switch the per-host toggle to **Sessions** to inspect execution sessions, recurring shapes of process activity, with the ability to load any individual run.
 
 ### Choosing a session
 
@@ -107,9 +109,19 @@ Each grouping (cluster) row shows the command chain (`parent_comm → comm`), a 
 
 Low-signal groupings are tucked away as **background patterns** (single exec, single run). Use **Show background pattern(s)** to reveal them and **Hide background** to collapse them again.
 
-If no session is loaded yet, the view points you to the groupings control to pick a run. When you open Sessions on a host without a chosen session, a default session is loaded automatically.
-
 ### Session detail
+
+{/* TODO: Describe how sessions are surfaced in the lineage view */}
+
+{/* TODO: Describe how sessions are surfaced in the lineage view */}
+
+{/* TODO: Describe the fleet-wide lineage overview */}
+
+{/* TODO: Describe the fleet-wide lineage overview */}
+
+{/* TODO: Describe the detail panel that appears when clicking a flow edge or node */}
+
+{/* TODO: Describe the detail panel that appears when clicking a flow edge or node */}
 
 Once a session is selected, the view splits:
 
@@ -119,7 +131,3 @@ Once a session is selected, the view splits:
 The events panel lists process events with **Time**, **Type**, **Detail**, and **UID** columns, loading more as you scroll (infinite scroll). The session header shows the command chain, exec count, duration, identity, and container, along with **Selected from graph · reset** and an **Investigate** link.
 
 ---
-
-## Refresh behavior
-
-Lineage data is query-cached and refreshes when you change the host, time range, or view — there is no background auto-polling. Session groupings load incrementally as you scroll.

@@ -36,7 +36,6 @@
                   "dashboard/networks",
                   "dashboard/files",
                   "dashboard/users",
-                  "dashboard/sessions",
                   "dashboard/query"
                 ]
               },
