@@ -4,26 +4,58 @@ sidebarTitle: "Query"
 description: "Natural language and structured queries against your Hilt telemetry."
 ---
 
-<Warning>
-  Under construction — check again in 24h.
-</Warning>
+Ask natural-language questions about your telemetry — events, processes, file access, and network flows — and get answers back in a chat interface. Access requires the **run queries** permission.
 
-{/* TODO: Screenshot of the query page */}
+## Page layout
 
-## Chat interface
+The page is a chat workspace: a **chat history** sidebar on the left (on medium and larger screens) and the **conversation area** on the right, with the message input pinned to the bottom. There are no host or time filters on this page.
 
-{/* TODO: Describe the chat interface — how to ask questions, example queries */}
+---
 
-{/* TODO: Describe the chat interface — how to ask questions, example queries */}
+## Chat history
 
-## Query history
+The left sidebar lists your past conversations under a **Recents** heading.
 
-{/* TODO: Describe the chat history sidebar — previous conversations, search */}
+- **New chat** starts a fresh conversation.
+- Each row shows the conversation title (new conversations are titled automatically from your first question).
+- The **⋯** row menu offers **Rename** (inline, up to 80 characters — Enter to save, Escape to cancel) and **Delete**.
+- **Collapse sidebar** / **Open sidebar** toggles a narrow rail; your preference is remembered.
 
-{/* TODO: Describe the chat history sidebar — previous conversations, search */}
+Before you've started anything, the sidebar reads **"No chats yet — Start a conversation to see it here."**
 
-## Example queries
+Conversations are saved to your account when signed in; in demo or auth-disabled sessions they're kept locally in the browser instead. The history sidebar is hidden on mobile.
 
-{/* TODO: Provide example queries users can try */}
+---
 
-{/* TODO: Provide example queries users can try */}
+## Asking a question
+
+When a conversation is empty, the main area shows **Query your telemetry** with the prompt *"Ask natural language questions about events, processes, file access, and network flows."* and four suggested questions you can click to drop into the input (they don't send automatically):
+
+- *Are any hosts showing signs of data exfiltration?*
+- *Which hosts had the most activity in the last 24 hours?*
+- *What did user jmartin do in the last hour?*
+- *Show me the most recent anomaly alert and what triggered it.*
+
+Type into the input bar (placeholder *"Ask a question about your telemetry..."*) and send with the **Send** button or **Enter** (**Shift+Enter** inserts a newline). The **Clear** (trash) control discards the current conversation and starts a new one.
+
+### How answers come back
+
+1. Your message appears immediately, followed by an assistant bubble.
+2. While the answer is being prepared, the bubble cycles through status messages (e.g. *Analyzing your query...*, *Pulling the relevant data...*, *Reviewing the telemetry...*).
+3. The completed answer is then revealed with a brief typewriter animation and rendered as formatted Markdown — paragraphs, lists, tables, code blocks, headings, and quotes.
+
+A new conversation is created on your first message, and its title is generated from that question.
+
+### Message styles
+
+| Role | Appearance |
+| --- | --- |
+| **You** | Right-aligned bubble with a user avatar |
+| **Assistant** | Hilt avatar, Markdown-formatted answer |
+| **Error** | Red alert icon with the error message |
+
+---
+
+## What this page does not do
+
+To set expectations, the Query page is natural-language chat only. It does not expose a structured query builder, show the underlying SQL or tool calls, search across history, or export conversations. (AI-assisted rule drafting lives on the Detection Rules page, not here.)
