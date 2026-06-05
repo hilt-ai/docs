@@ -39,6 +39,13 @@
               "linux-collector/data-flow",
               "linux-collector/troubleshooting"
             ]
+          },
+          {
+            "tab": "Auto-update agent",
+            "pages": [
+              "auto-update-agent",
+              "untitled-page"
+            ]
           }
         ]
       }

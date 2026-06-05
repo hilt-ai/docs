@@ -1,0 +1,387 @@
+---
+title: "Auto-update agent"
+sidebarTitle: "Overview"
+description: "Kubernetes CronJob that mirrors new Hilt release images and rolls out updates automatically."
+---
+
+This guide describes the design and implementation of the auto-update agent that runs inside customer on-prem deployments, periodically checks the Hilt release ECR for minor/patch updates, and applies them automatically without operator intervention.
+
+## Overview
+
+The auto-update agent is a lightweight container deployed as a Kubernetes CronJob on the existing EKS cluster. It:
+
+1. Polls the Hilt release ECR (`297433793776`) for new image tags matching a configured version policy.
+2. Mirrors new images to the customer's ECR repositories.
+3. Forces ECS service redeployments and EKS rollout restarts.
+4. Verifies health after rollout.
+5. Reports status to a configurable webhook (Slack, email, etc.).
+
+## Version policy
+
+Release tags follow the format `vMAJOR.MINOR.PATCH` (e.g. `v1.04.27`). The agent uses a **prefix-based minor update policy**:
+
+| Current tag | Auto-update scope | Example match |
+| :-- | :-- | :-- |
+| `v1.04.27` | Same `vMAJOR.MINOR.*` prefix | `v1.04.28`, `v1.04.30` |
+| `v1.04.27` | Blocked | `v1.05.01` (minor bump) |
+| `v1.04.27` | Blocked | `v2.01.01` (major bump) |
+
+The scope is configurable. An operator can set `UPDATE_POLICY=patch` (default), `UPDATE_POLICY=minor`, or `UPDATE_POLICY=any` (any newer tag). Major version jumps always require explicit operator action unless `UPDATE_POLICY=any`.
+
+## Architecture
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  Customer AWS Account                                           │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ EKS Cluster                                              │   │
+│  │                                                          │   │
+│  │  ┌──────────────────────┐                                │   │
+│  │  │ CronJob:             │     1. list tags               │   │
+│  │  │ dag-auto-update      │────────────────────────┐       │   │
+│  │  │ (every 30m)          │                        │       │   │
+│  │  └──────┬───────────────┘                        ▼       │   │
+│  │         │                              ┌─────────────┐   │   │
+│  │         │ 4. kubectl rollout restart   │ Hilt ECR    │   │   │
+│  │         │    enrichment + classification│ 297433..   │   │   │
+│  │         │                              │ (us-east-1) │   │   │
+│  │         │                              └──────┬──────┘   │   │
+│  │         │                                     │          │   │
+│  │  ┌──────▼───────────────┐              2. pull│          │   │
+│  │  │ Deployments:         │                     │          │   │
+│  │  │ enrichment-app       │                     │          │   │
+│  │  │ dag-classification   │              ┌──────▼──────┐   │   │
+│  │  └──────────────────────┘              │ Customer    │   │   │
+│  │                                        │ ECR repos   │   │   │
+│  └────────────────────────────────────────┤             │   │   │
+│                                           │  3. push    │   │   │
+│  ┌────────────────────────────────────────┤             │   │   │
+│  │ ECS Clusters                           └─────────────┘   │   │
+│  │  collector-service          ▲                            │   │
+│  │  dashboard-frontend-service │ 4. force-new-deployment    │   │
+│  │  dashboard-backend-service  │                            │   │
+│  │  dashboard-query-service    │                            │   │
+│  └─────────────────────────────┘                            │   │
+│                                                             │   │
+│  5. GET /healthz on dashboard-backend, dashboard-query      │   │
+│  6. POST webhook notification                               │   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Prerequisites
+
+### Image account access
+
+The deployment account must already have ECR pull access to the release registry. This is the standard grant from `scripts/authorize-customer-ecr-pull.sh`:
+
+```bash
+AWS_PROFILE=artifact-user ./scripts/authorize-customer-ecr-pull.sh \
+  --principal <CUSTOMER_ACCOUNT_ID>
+```
+
+### Customer-side IAM
+
+The auto-update agent runs as a Kubernetes ServiceAccount with IRSA (IAM Roles for Service Accounts). The role needs:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PullFromHiltECR",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:GetAuthorizationToken"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ReadHiltReleaseImages",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchGetImage",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:DescribeImages",
+        "ecr:ListImages"
+      ],
+      "Resource": [
+        "arn:aws:ecr:us-east-1:297433793776:repository/controlplane",
+        "arn:aws:ecr:us-east-1:297433793776:repository/enrichment",
+        "arn:aws:ecr:us-east-1:297433793776:repository/dag/detection",
+        "arn:aws:ecr:us-east-1:297433793776:repository/dashboard-frontend",
+        "arn:aws:ecr:us-east-1:297433793776:repository/dashboard-backend",
+        "arn:aws:ecr:us-east-1:297433793776:repository/dashboard-query"
+      ]
+    },
+    {
+      "Sid": "PushToCustomerECR",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchGetImage",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload",
+        "ecr:PutImage",
+        "ecr:DescribeRepositories"
+      ],
+      "Resource": "arn:aws:ecr:*:<CUSTOMER_ACCOUNT_ID>:repository/*"
+    },
+    {
+      "Sid": "ECSRollout",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:UpdateService",
+        "ecs:DescribeServices"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "ecs:cluster": [
+            "arn:aws:ecs:*:<CUSTOMER_ACCOUNT_ID>:cluster/collector",
+            "arn:aws:ecs:*:<CUSTOMER_ACCOUNT_ID>:cluster/dashboard"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "ECSWait",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:DescribeServices"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+The ServiceAccount also needs a Kubernetes `ClusterRole` granting `apps/deployments: patch` in the `default` namespace for `kubectl rollout restart`.
+
+## Update agent script logic
+
+The agent container runs a script with the following flow:
+
+<Steps>
+  <Step title="Read current image_tag">
+    From Terraform state or a ConfigMap (`dag-release` in the `default` namespace, key `image_tag`).
+  </Step>
+  <Step title="List available tags from the Hilt release ECR">
+    ```bash
+    aws ecr describe-images --repository-name dashboard-backend \
+      --registry-id 297433793776 --region us-east-1 \
+      --query 'imageDetails[*].imageTags[]'
+    ```
+  </Step>
+  <Step title="Filter tags by UPDATE_POLICY">
+    - `patch`: same `vMAJOR.MINOR.*` prefix, higher `PATCH`
+    - `minor`: same `vMAJOR.*` prefix, higher `MINOR.PATCH`
+    - `any`: any tag \> current (lexicographic on `vMAJOR.MINOR.PATCH`)
+  </Step>
+  <Step title="No eligible update?">
+    Exit 0 (nothing to do).
+  </Step>
+  <Step title="Verify the candidate tag exists in ALL 6 repositories">
+    Ensures Hilt published a complete release, not a partial push.
+  </Step>
+  <Step title="Mirror images">
+    Same logic as `scripts/mirror-images.sh`. For each repo in `controlplane`, `enrichment`, `dag/detection`, `dashboard-frontend`, `dashboard-backend`, `dashboard-query`:
+
+    ```bash
+    docker pull 297433793776.dkr.ecr.us-east-1.amazonaws.com/${repo}:${NEW_TAG}
+    docker tag  ... ${CUSTOMER_ECR}/${prefix}${repo}:${NEW_TAG}
+    docker push ${CUSTOMER_ECR}/${prefix}${repo}:${NEW_TAG}
+    ```
+  </Step>
+  <Step title="Update ECS task definitions">
+    Register new task def revisions with the updated image tag (or rely on Terraform state if running `terraform apply`).
+  </Step>
+  <Step title="Force ECS redeployments">
+    ```bash
+    aws ecs update-service --cluster collector \
+      --service collector-service --force-new-deployment
+    aws ecs update-service --cluster dashboard \
+      --service dashboard-frontend-service --force-new-deployment
+    aws ecs update-service --cluster dashboard \
+      --service dashboard-backend-service --force-new-deployment
+    aws ecs update-service --cluster dashboard \
+      --service dashboard-query-service --force-new-deployment
+    ```
+  </Step>
+  <Step title="Restart EKS deployments">
+    ```bash
+    kubectl rollout restart deployment/enrichment-app \
+      deployment/dag-classification -n default
+    ```
+  </Step>
+  <Step title="Wait for stability">
+    ```bash
+    aws ecs wait services-stable --cluster collector --services collector-service
+    aws ecs wait services-stable --cluster dashboard \
+      --services dashboard-frontend-service dashboard-backend-service \
+                 dashboard-query-service
+    kubectl rollout status deployment/enrichment-app --timeout=300s
+    kubectl rollout status deployment/dag-classification --timeout=300s
+    ```
+  </Step>
+  <Step title="Health check">
+    ```bash
+    curl -sf http://dashboard-backend-service:8080/healthz
+    curl -sf http://dashboard-query-service:8080/healthz
+    ```
+  </Step>
+  <Step title="Update ConfigMap with the new tag">
+    ```bash
+    kubectl patch configmap dag-release -p '{"data":{"image_tag":"NEW_TAG"}}'
+    ```
+  </Step>
+  <Step title="Send webhook notification">
+    `POST $WEBHOOK_URL` with JSON payload:
+
+    ```json
+    {
+      "text": "DAG auto-update: v2026.04.27 → v2026.04.28 applied successfully",
+      "previous_tag": "v2026.04.27",
+      "new_tag": "v2026.04.28",
+      "services_updated": [
+        "collector",
+        "enrichment",
+        "classification",
+        "dashboard-frontend",
+        "dashboard-backend",
+        "dashboard-query"
+      ],
+      "status": "success"
+    }
+    ```
+  </Step>
+  <Step title="On failure after mirroring">
+    - Send failure webhook.
+    - Do **not** update the ConfigMap (next run will retry).
+    - Exit 1 (CronJob records failure in Kubernetes events).
+  </Step>
+</Steps>
+
+## Rollback
+
+If an update causes issues, operators can manually revert:
+
+```bash
+# Point back to the previous tag
+kubectl patch configmap dag-release -n default \
+  -p '{"data":{"image_tag":"v2026.04.27"}}'
+
+# Force rollout to previous images (already in customer ECR)
+./scripts/rollout-services.sh
+
+# Or roll back Kubernetes deployments
+kubectl rollout undo deployment/enrichment-app
+kubectl rollout undo deployment/dag-classification
+```
+
+The auto-update agent will not re-apply the problematic tag on the next run because it only moves forward. If the operator sets the ConfigMap tag back, the agent will see the "new" tag again and attempt the update. To prevent this, set `auto_update_enabled = false` or `auto_update_dry_run = true` in `terraform.tfvars` and re-apply.
+
+## Operational considerations
+
+### Network requirements
+
+The agent needs outbound access to the Hilt release ECR (`297433793776.dkr.ecr.us-east-1.amazonaws.com`). In air-gapped deployments without NAT or VPN back to Hilt, the auto-update agent cannot function — use the standard manual mirror \+ rollout workflow instead.
+
+Required VPC endpoints (already provisioned):
+
+- `com.amazonaws.<region>.ecr.api`
+- `com.amazonaws.<region>.ecr.dkr`
+- `com.amazonaws.<region>.s3` (gateway, for ECR layer storage)
+- `com.amazonaws.<region>.ecs` (for ECS `update-service` calls)
+
+Cross-region ECR pull works over the internet or cross-region VPC peering. The agent authenticates to both registries independently.
+
+### Docker-in-Docker
+
+The agent needs Docker to pull/push images. Two approaches:
+
+1. **crane / skopeo (preferred):** use `gcr.io/go-containerregistry/crane` or `skopeo` to copy images between registries without a Docker daemon. This avoids DinD complexity entirely. The copy is registry-to-registry and does not require local layer storage.
+   ```bash
+   crane copy \
+     297433793776.dkr.ecr.us-east-1.amazonaws.com/enrichment:v1.04.28 \
+     <customer>.dkr.ecr.<region>.amazonaws.com/<prefix>enrichment:v1.04.28
+   ```
+2. **DinD sidecar:** run a `docker:dind` sidecar in the CronJob pod. Heavier, but mirrors the existing `mirror-images.sh` flow exactly.
+
+### Schema migrations
+
+The auto-update agent handles image rollouts only. ClickHouse and Postgres schema migrations (`scripts/migrate-clickhouse.sh`, `schema/migrations/`) are **not** run automatically. If a minor release includes schema changes, the update will deploy new code against the old schema. Releases requiring schema changes should be documented in the release notes and applied manually by the operator before or after the image update.
+
+A future enhancement could add a pre-update hook that checks whether the new release requires migrations (e.g. by reading a `migrations-required` label on the image or a sidecar manifest).
+
+### Monitoring
+
+Beyond webhook notifications, the CronJob exposes standard Kubernetes observability:
+
+```bash
+# Check recent runs
+kubectl get jobs -l app=dag-auto-update --sort-by=.status.startTime
+
+# Check logs from the last run
+kubectl logs job/dag-auto-update-<timestamp>
+
+# Check for failures
+kubectl get events --field-selector reason=BackoffLimitExceeded
+```
+
+### Security
+
+- The agent never stores AWS credentials on disk. IRSA injects short-lived STS tokens via the projected service account token volume.
+- The agent only needs `ecr:ListImages` / `ecr:DescribeImages` read access to the Hilt release ECR and is unable to push to it.
+- ECS `UpdateService` is scoped to the `collector` and `dashboard` clusters only.
+- The webhook URL is stored as a Kubernetes Secret, not in the CronJob spec directly.
+
+## Enabling auto-update
+
+<Steps>
+  <Step title="Set variables in terraform.tfvars">
+    ```hcl
+    auto_update_enabled     = true
+    auto_update_schedule    = "*/30 * * * *"   # every 30 minutes
+    auto_update_policy      = "patch"          # only same-month updates
+    auto_update_webhook_url = "https://hooks.slack.com/services/T.../B.../xxx"
+    auto_update_dry_run     = false
+    ```
+  </Step>
+  <Step title="Apply Terraform">
+    ```bash
+    terraform -chdir=envs/app apply
+    ```
+  </Step>
+  <Step title="Verify the CronJob is scheduled">
+    ```bash
+    kubectl get cronjobs -n default
+    # NAME              SCHEDULE       SUSPEND   ACTIVE   LAST SCHEDULE
+    # dag-auto-update   */30 * * * *   False     0        <none>
+    ```
+  </Step>
+  <Step title="Trigger a manual test run">
+    ```bash
+    kubectl create job --from=cronjob/dag-auto-update dag-auto-update-test
+    kubectl logs -f job/dag-auto-update-test
+    ```
+  </Step>
+</Steps>
+
+## Disabling auto-update
+
+```hcl
+auto_update_enabled = false
+```
+
+Then `terraform apply`. The CronJob and associated IRSA role are removed. The last-applied image tag remains in the `dag-release` ConfigMap for reference.
+
+## Future enhancements
+
+- **Approval gate:** instead of applying immediately, the agent posts a pending update to a Slack channel and waits for an operator reaction (thumbs-up) before proceeding. Useful for `minor` or `any` policies.
+- **Canary rollout:** update one ECS task or one K8s pod replica first, run health checks for N minutes, then proceed with the full rollout.
+- **Schema migration support:** detect and run ClickHouse / Postgres migrations as part of the update pipeline.
+- **Terraform-driven updates:** instead of directly calling ECS / K8s APIs, the agent updates `image_tag` in a remote tfvars store and triggers a Terraform apply via a CI webhook. This keeps the Terraform state as the single source of truth.
+- **Digest pinning:** use immutable `@sha256:...` references from `bundle-manifest.json` instead of mutable tags, preventing tag-rewrite attacks on the release ECR.

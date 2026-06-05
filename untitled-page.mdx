@@ -1,0 +1,297 @@
+---
+title: "Anonymized data export for model training"
+sidebarTitle: "Anonymized data export"
+description: "Anonymizing telemetry from on-prem deployments for Hilt model training while preserving the statistical structure ML models need."
+---
+
+## Why we need customer data
+
+Hilt ships four ML model families that learn normal host behavior and flag anomalies:
+
+| Model | What it learns | Why customer data helps |
+| :-- | :-- | :-- |
+| **TS-VAE** | Temporal patterns in host activity epochs | Real workload diversity (CI, web, batch, GPU) that synthetic data cannot replicate |
+| **Isolation Forest** | Outlier boundaries on VAE-enriched features | Calibrated decision thresholds across heterogeneous fleets |
+| **TRACE** | Token-sequence patterns across security-relevant operations | Ground-truth attack traces interleaved with real operational noise |
+| **HDBSCAN clusters** | Behavioral archetypes across hosts | Stable cluster geometry that transfers to new deployments |
+
+## Safe for export (what models consume)
+
+| Data | Examples | Why it's safe |
+| :-- | :-- | :-- |
+| **24 raw numeric features** | `exec_count`, `bytes_sent`, `unique_dest_ips`, `sensitive_path_hits` | Aggregate counts per 5-minute epoch — no raw values |
+| **32 derived features** | `exec_intensity`, `dest_spread`, `epoch_entropy`, `wavelet_exec_s6`, `fork_burst_max` | Ratios, entropies, wavelet coefficients, session statistics — mathematical transforms |
+| **Token ID sequences** | `[FILE:read_sensitive, NET:connect_external, EXEC:shell]` | Closed vocabulary (~80 tokens); filenames / IPs already abstracted away |
+| **Token side features** | `token_sub_epochs`, `token_depths`, `token_roles`, `token_counts`, `token_importances` | Structural metadata about token sequences |
+| **Labels** | `ml_label`, `is_anomaly`, `ml_source`, `phase` | Attack-phase annotations (from HITL or synthetic injection) |
+| **Anomaly scores** | `composite_score`, `z_exec`, `mahal_distance`, `topk_sum` | Numerical outputs of the scoring pipeline |
+| **Temporal keys** | `epoch_ts` (5-min bucket timestamp) | Preserves temporal ordering |
+
+## Will be anonymized before export
+
+| Data | Risk | Anonymization |
+| :-- | :-- | :-- |
+| `host_id` | Correlates to a specific machine | Deterministic remap: `host-<sequential-id>` per export |
+| `uid` / `euid` | Unix user IDs, correlatable | Remap to sequential integers |
+| `owner` / `identity` | Human-readable identity strings | Drop entirely |
+
+## Must never be exported
+
+| Data | Why |
+| :-- | :-- |
+| `token_evidence_json` | Contains raw `filename`, `argv`, `dst_addr`, `comm`, `tree_path` |
+| `evidence`, `reason`, `drivers` | Free-text explanations that echo raw event context |
+| `matched_conditions` | Detection rule match descriptions that echo field values (e.g. "filename contains .pem") |
+| `rule_name`, `rule_label` | Customer-defined detection rule names — may reveal security posture |
+| `src_addr`, `dst_addr`, ports | Customer network topology |
+| `filename`, `argv`, `old_name`, `new_name` | File paths, command lines — direct PII / infra leakage |
+| `ssh_identity`, `ssh_source_ip` | Credential and network identity |
+| `username`, `teleport_owner`, `teleport_node_name` | Human / machine identity |
+| `instance_id`, `iam_role`, `region` | AWS account fingerprinting |
+| `container_id`, `pod_uid`, `pod_name`, `pod_namespace` | Kubernetes topology |
+| `comm`, `parent_comm`, `binary_build_id` | Can reveal proprietary software |
+| `dag_network_dns.hostname` | Internal DNS names |
+| `dag_alert_narratives.*` | LLM text that may echo sensitive event context |
+| `dag_entity_snapshots.*` | Serialized scorer state — contains baseline vectors tied to specific hosts |
+| Detection rule definitions | `detection_rules` Postgres table — customer security logic |
+| Postgres auth tables | `users`, `sessions`, `okta_users`, `audit_log` |
+
+## Export pipeline architecture
+
+## Export schema (Parquet)
+
+The exported Parquet file contains exactly these columns and no others. Anything not listed here is excluded at the query level. 
+
+### Temporal and grouping
+
+| Column | Type | Notes |
+| :-- | :-- | :-- |
+| `epoch_ts` | `String` | 5-minute bucket timestamp; offset by a random per-export shift (±0–48h) to prevent calendar correlation |
+| `host_id_anon` | `String` | Deterministic remap: `host-0001`, `host-0002`, etc. Consistent within one export so temporal models work |
+| `uid_anon` | `UInt32` | Sequential remap: 0, 1, 2, ... per host |
+| `phase` | `String` | Scoring phase label (e.g. `cold_start`, `baseline`, `scoring`) |
+| `is_active` | `UInt8` | Whether the epoch had meaningful activity |
+| `is_anomaly` | `UInt8` | Binary anomaly flag from the scorer |
+| `topk_sum` | `Float64` | Sum of top-K anomaly channel scores |
+| `volume_topk` | `Float64` | Volume-weighted top-K score |
+
+### Raw features (24 columns)
+
+From the canonical feature table,`file_open_cusum_drift` is a removed slot kept for index stability, it is always zero and excluded from the export.
+
+```text
+exec_count, file_open_count, destructive_file_ops, net_flow_count,
+bytes_sent, bytes_recv,
+unique_pids, unique_binaries, unique_dest_ips,
+novel_binary_exec, novel_parent_child,
+unique_dest_ports, sensitive_path_hits,
+write_open_count, sensitive_write_opens,
+exfil_novelty_bytes, new_dest_port,
+read_then_send_count, sensitive_read_send_count, unique_read_send_processes,
+fork_count, new_peer_site_count, cross_cluster_bytes_sent
+```
+
+### Derived features (32 columns)
+
+From the canonical derived table. Pure algebra on raw features, no new state or raw values.
+
+```text
+exec_intensity, dest_spread, novelty_byte_share, log_ratio,
+proc_share, file_share, net_share,
+new_bins_2h, new_ext_dests_2h,
+parent_child_trans_surprisal, epoch_state_trans_surprisal,
+epoch_entropy, dest_entropy,
+wavelet_exec_s1, wavelet_exec_s3, wavelet_exec_s6,
+wavelet_bytes_s1, wavelet_bytes_s3, wavelet_bytes_s6,
+wavelet_net_s1, wavelet_net_s3, wavelet_net_s6,
+hour_sin, hour_cos,
+session_fan_out, session_comm_entropy,
+session_lifetime_sec, session_net_dest_card, session_bytes_out,
+fork_exec_ratio, fork_burst_max, fork_exec_latency_mean_ms
+```
+
+### Numeric and derived feature vectors
+
+Rather than individual columns, the Parquet file stores features as packed Arrow List columns:
+
+| Column | Type | Notes |
+| :-- | :-- | :-- |
+| `numeric_features` | `List(Float64)` | 24-element vector of raw features (indices match `features.go`; index 9 is always zero) |
+| `derived_features` | `List(Float64)` | 32-element vector of derived features |
+
+### Token sequences (for TRACE)
+
+| Column | Type | Notes |
+| :-- | :-- | :-- |
+| `token_ids` | `List(UInt16)` | Closed vocabulary IDs only — no raw strings |
+| `token_sub_epochs` | `List(UInt8)` | Sub-epoch index per token |
+| `token_counts` | `List(UInt16)` | Occurrence count per token |
+| `token_importances` | `List(Float32)` | Per-token anomaly importance weight |
+| `token_depths` | `List(UInt8)` | Process tree depth |
+| `token_roles` | `List(UInt8)` | Token role enum |
+| `total_events` | `UInt32` | Total raw events in the epoch (before tokenization) |
+| `tokens_before_topk` | `UInt16` | Token count before top-K pruning |
+
+### Labels (when available)
+
+| Column | Type | Notes |
+| :-- | :-- | :-- |
+| `ml_label` | `String` | Attack phase label or empty |
+| `ml_source` | `String` | Label provenance (`hitl`, `synthetic`, `replay`) |
+
+### Explicitly excluded
+
+Every column not in the allowlist above is excluded from the query. The export job does not have access to `dag_events` or any Postgres table. It queries only:
+
+- `dag_anomaly_scores WHERE group = 'EPOCH'`
+- `dag_epoch_tokens` (joined by `host_id` \+ `epoch_ts`)
+
+The following columns from these tables are explicitly dropped before export:
+
+- `token_evidence_json` — contains raw filenames, argv, addresses
+- `evidence`, `reason`, `drivers` — free-text scorer explanations
+- `owner`, `identity` — human identity strings
+- `host_id` — replaced with `host_id_anon`
+- `boot_id` — correlatable host lifecycle identifier
+- `alert_source`, `rule_id`, `rule_name`, `rule_label`, `rule_severity`, `matched_conditions` — detection rule provenance columns that can leak customer-defined rule logic and matched field values
+
+## Anonymization rules
+
+### Host ID remapping
+
+```text
+Original:  a3f8c2e1-7b4d-4a9e-b6f3-2c8d1e5a7f90
+Exported:  host-0001
+```
+
+A deterministic mapping is built at export time: hosts are sorted by first appearance and assigned sequential IDs. The mapping is stored in a separate `host_map.json` that stays on the deployment's S3 bucket (never exported to Hilt) so they can correlate back if needed.
+
+### Temporal jitter
+
+The entire dataset is shifted by a uniform random offset between 0 and 48 hours. This prevents Hilt from correlating export timestamps with known customer events (outages, incidents, press releases). The offset is recorded in the export manifest for the customer's records.
+
+### UID remapping
+
+Unix UIDs are remapped to sequential integers per host. UID 0 (root) is preserved as 0 since it carries security semantics relevant to the model.
+
+### Column pruning
+
+The export query selects only allowlisted columns. No `SELECT *`. Specifically:
+
+- `token_evidence_json` is never selected from `dag_epoch_tokens`
+- `evidence`, `reason`, `drivers`, `owner`, `identity` are never selected from `dag_anomaly_scores`
+- `host_id` is selected but remapped before writing to Parquet
+
+### Dead epoch filtering
+
+Rows where `exec_count + file_open_count + net_flow_count == 0` are dropped.
+
+### Minimum host threshold
+
+Exports with fewer than 5 distinct hosts are rejected. This prevents exports from highly specialized single-host environments where the feature distribution alone could identify the workload.
+
+## Implementation
+
+The export runs as a one-shot Kubernetes Job on the existing EKS cluster, using the same ClickHouse credentials as the enrichment service.
+
+### Running an export
+
+<Steps>
+  <Step title="Enable the export capability">
+    ```bash
+    terraform -chdir=envs/app apply -var data_export_enabled=true
+    ```
+  </Step>
+  <Step title="Trigger the export job">
+    ```bash
+    kubectl create job --from=cronjob/dag-data-export dag-data-export-$(date +%s)
+    ```
+  </Step>
+  <Step title="Monitor progress">
+    ```bash
+    kubectl logs -f job/dag-data-export-<id>
+    ```
+  </Step>
+  <Step title="Review the manifest and sample">
+    Written to the S3 bucket.
+
+    ```bash
+    aws s3 cp s3://<bucket>/exports/latest/manifest.json -
+    aws s3 cp s3://<bucket>/exports/latest/sample.parquet ./sample.parquet
+    python3 -c "import pandas as pd; print(pd.read_parquet('sample.parquet').head(20))"
+    ```
+  </Step>
+  <Step title="Approve the export">
+    Only required if `data_export_require_approval=true`. The job polls for this ConfigMap and proceeds once found.
+
+    ```bash
+    kubectl create configmap dag-export-approval --from-literal=approved=true
+    ```
+  </Step>
+  <Step title="Verify the final archive">
+    ```bash
+    aws s3 ls s3://<bucket>/exports/latest/
+    # export-2026-06-05.parquet.zst        (compressed Parquet)
+    # export-2026-06-05.parquet.zst.sha256 (integrity hash)
+    # manifest.json                        (schema, row count, date range, host count)
+    # host_map.json                        (host ID mapping — stays in customer bucket)
+    ```
+  </Step>
+</Steps>
+
+### Export manifest (`manifest.json`)
+
+```json
+{
+  "schema_version": 1,
+  "export_id": "exp-20260605-a8c3f2",
+  "created_at": "2026-06-05T12:00:00Z",
+  "date_range": {
+    "start": "2026-05-06T00:00:00Z",
+    "end": "2026-06-05T00:00:00Z"
+  },
+  "temporal_jitter_hours": 17.3,
+  "row_count": 1482937,
+  "host_count": 47,
+  "columns": [
+    "epoch_ts", "host_id_anon", "uid_anon", "phase", "is_active", "is_anomaly",
+    "topk_sum", "volume_topk", "numeric_features", "derived_features",
+    "token_ids", "token_sub_epochs", "token_counts", "token_importances",
+    "token_depths", "token_roles", "total_events", "tokens_before_topk",
+    "ml_label", "ml_source"
+  ],
+  "excluded_columns_note": "token_evidence_json, evidence, reason, drivers, owner, identity, host_id, boot_id, alert_source, rule_id, rule_name, rule_label, rule_severity, matched_conditions, all dag_events columns, all Postgres tables",
+  "file_size_bytes": 284729384,
+  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "format": "parquet+zstd",
+  "approved": false,
+  "approved_by": "",
+  "approved_at": ""
+}
+```
+
+## Customer controls
+
+### Review before transfer
+
+When `data_export_require_approval = true` (default), the export produces a manifest and a 20-row sample Parquet file. The full archive is encrypted and staged but not transferred until the customer creates the approval ConfigMap. The user can:
+
+- Inspect the manifest to see exactly which columns are included.
+- Load the sample Parquet to verify anonymization.
+- Reject by deleting the staged files from their S3 bucket.
+
+### Date range control
+
+The user controls how much history to export via `data_export_date_range_days`. They can also run exports for specific windows by overriding the Job's `DATE_START` and `DATE_END` environment variables.
+
+### Deletion
+
+The user can delete exported data from their S3 bucket at any time.
+
+### Audit trail
+
+Every export creates a Kubernetes Event and (if a webhook is configured) a notification with the export ID, row count, date range, and approval status. The `host_map.json` stays exclusively in the customer's bucket.
+
+## What Hilt sees
+
+No filenames, IP addresses, hostnames, usernames, cloud resource IDs, detection rule names or match descriptions. Just behavioral feature vectors and abstracted security token sequences.
