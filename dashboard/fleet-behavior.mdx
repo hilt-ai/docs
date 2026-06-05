@@ -4,56 +4,85 @@ sidebarTitle: "Fleet Behavior"
 description: "Cluster analysis and behavioral modeling across your host fleet."
 ---
 
-<Warning>
-  Under construction — check again in 24h.
-</Warning>
+Groups your hosts by how they behave and shows how those groups shift over time. Hosts with similar activity form **clusters** (behavior groups); as behavior changes between periodic **refits**, hosts move between clusters. This page visualizes both the current grouping and the movement.
 
-{/* TODO: Screenshot of the fleet behavior page */}
+## Page layout
+
+- **Header** — title, the subtitle *"How hosts group and shift over time"*, and a `{N} clusters · {M} hosts` summary.
+- **Insight strip** — a card summarizing the most notable change (e.g. *"3 hosts moved into {cluster}"*), with a top driver metric and an **Investigate Event** button when relevant.
+- **Canvas** (left) — the fleet visualization, with a refit timeline beneath it.
+- **Evidence rail** (right) — context panel that changes with your selection.
+
+Data is cached and refreshes when you change selection or refit — there's no background polling.
+
+---
 
 ## Fleet canvas
 
-{/* TODO: Describe the main canvas visualization — cluster bubbles, host positions */}
+The canvas plots the current snapshot:
 
-{/* TODO: Describe the main canvas visualization — cluster bubbles, host positions */}
+- **Cluster bubbles** — one per behavior group, sized by host count and colored per cluster, with the label and host count shown. Large bubbles may include a short narrative. Emptied-but-referenced clusters appear as dimmed "ghost" bubbles.
+- **Idle** and **Returned** pools — special groupings (bottom corners) for hosts with insufficient telemetry and hosts that have reappeared.
+- **Movement arrows** — curved flows between clusters, with width scaled to the number of hosts and labeled `{N} hosts`.
+- **Host dots** — individual hosts inside their bubble (when the Hosts layer is on).
 
-## Clusters
+### Layers
 
-{/* TODO: Describe what a cluster represents and how hosts are assigned */}
+A small toolbar (top-left of the canvas) toggles overlays. Clusters are always shown; you can turn **Movements** and **Hosts** on or off. Movements are unavailable on the very first refit (there's no previous snapshot to compare). On very large fleets, enabling Hosts focuses you into a cluster (host dots are only drawn within a selected cluster).
 
-{/* TODO: Describe what a cluster represents and how hosts are assigned */}
+### Navigating
 
-### Cluster detail panel
+- **Scroll** to zoom and **drag** to pan; a **Reset view** control re-centers.
+- **Click a cluster bubble** to open its detail (click again to deselect).
+- **Click a movement arrow** to inspect that flow.
+- **Click a host dot** to open that host's trajectory.
+- **Click the Idle or Returned pool** for its detail panel.
+- **Click the background** to clear selections.
 
-{/* TODO: Describe the cluster detail panel — member hosts, behavioral summary */}
+---
 
-{/* TODO: Describe the cluster detail panel — member hosts, behavioral summary */}
+## Refit timeline
 
-## Movement tracking
+Beneath the canvas (when there's more than one refit), a **Timeline** control scrubs through snapshots over time. Drag or click the track to jump to a refit, or use **Play** to replay the snapshots in sequence. Changing the refit clears the current selection.
 
-{/* TODO: Describe host movement between clusters — what it means, how to interpret */}
+A refit is a periodic re-clustering of the fleet — each point on the timeline is one snapshot of how hosts were grouped at that time. (This control moves through time; it does not change clustering parameters.)
 
-{/* TODO: Describe host movement between clusters — what it means, how to interpret */}
+---
 
-### Top movers
+## Evidence rail
 
-{/* TODO: Describe the top movers list — hosts with the most behavioral change */}
+The right rail shows different content depending on what's selected.
 
-{/* TODO: Describe the top movers list — hosts with the most behavioral change */}
+### Activity summary (default)
 
-### Movement detail panel
+With nothing selected, the rail shows **Activity summary** — the recent shifts (up to three flows, e.g. *"{N} hosts → {cluster}"* with a driver) and the main **behavior groups** with their host counts. If nothing moved since the previous refit, it says so.
 
-{/* TODO: Describe the detail panel for a specific movement event */}
+### Cluster detail
 
-{/* TODO: Describe the detail panel for a specific movement event */}
+Selecting a cluster shows its label and host count, an **Investigate Event** button, an optional narrative, a **Cluster Profile** (metric bars grouped into Network, Process, and File), and the member **Hosts** list. The host list can be filtered to **Moved** hosts (which carry a *from {cluster}* badge) and paginates after the first 10.
 
-## Host trajectory
+### Movement detail
 
-{/* TODO: Describe the host trajectory panel — a single host's cluster history over time */}
+Selecting a flow shows **{N} hosts moved**, the *from → to* clusters, the refit time range, and a confidence level (high/medium/low). **Behavior Shifts** summarizes the typical change across the moved hosts with signed percentage bars, and an expandable **Hosts** list breaks down each host's deltas.
 
-{/* TODO: Describe the host trajectory panel — a single host's cluster history over time */}
+### Host trajectory
 
-## Refit controls
+Selecting a host (or arriving with a host deep-link) shows its **current cluster**, an optional narrative, its **recent trajectory** across the last few refits as a color strip, and its **most recent move** with the top metric deltas that drove it.
 
-{/* TODO: Describe the refit slider and how to adjust clustering parameters */}
+### Pool detail
 
-{/* TODO: Describe the refit slider and how to adjust clustering parameters */}
+Selecting the **Idle** or **Returned** pool explains what the pool means and lists its hosts (returned hosts show the cluster they rejoined).
+
+---
+
+## Terminology
+
+| Term | Meaning |
+| --- | --- |
+| **Cluster / behavior group** | A set of hosts with similar activity, with a label, narrative, and profile metrics |
+| **Refit** | A periodic re-clustering snapshot; the timeline steps through these |
+| **Movement / flow / shift** | Hosts moving from one cluster to another between refits |
+| **Idle** | Hosts with insufficient telemetry to place |
+| **Returned** | Hosts that disappeared and later reappeared |
+| **Ghost cluster** | An emptied cluster still shown as a movement endpoint |
+| **Confidence** | How strongly a movement is supported (high/medium/low) |

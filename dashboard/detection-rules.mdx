@@ -4,52 +4,124 @@ sidebarTitle: "Detection Rules"
 description: "Creating and managing custom detection rules for your environment."
 ---
 
-<Warning>
-  Under construction — check again in 24h.
-</Warning>
+Custom *if-this-then-alert* rules over live telemetry. When a rule's condition matches, it raises a finding on the Anomalies page. In the app this page is labeled **Rules**.
 
-{/* TODO: Screenshot of the detection rules page */}
+## Permissions
+
+Two permissions govern this page:
+
+- **Manage alerts** — required to see the page at all (in the nav and by URL). Without it the page is hidden.
+- **Manage rules** — required to create, edit, delete, enable/disable, use the AI builder, or save drafts. With view-only access, the list is read-only: the toggles are disabled and the create/edit/delete controls are hidden.
+
+---
 
 ## Rule list
 
-{/* TODO: Describe the rule list — name, status, trigger count, schedule */}
+The page header carries the title, a **Search rules...** box (matching name, label, and description), and — for users who can manage rules — **Drafts**, **Create with AI**, and **New Rule** buttons.
 
-{/* TODO: Describe the rule list — name, status, trigger count, schedule */}
+The list is a table:
+
+| Column | Content |
+| --- | --- |
+| **On** | Enable/disable toggle (green when enabled) |
+| **Name** | Rule name, with its label in monospace beneath |
+| **Severity** | Badge — high, medium, or low |
+| **Fires** | How many times the rule has fired |
+| **Last** | When it last fired (*Never*, *Just now*, *Xm ago*, …) |
+| **Action** | View anomalies, Edit, Delete |
+
+The **View anomalies** action jumps to the Anomalies page scoped to that rule. There's no pagination or auto-refresh. When there are no rules yet, the page reads **"No rules yet — Create a rule to alert when telemetry matches a condition you care about."**
+
+Deleting a rule asks for confirmation and notes that anomalies it already created are kept.
+
+---
 
 ## Creating a rule
 
-### Expression builder
+**New Rule** opens the rule form drawer. It's organized into sections.
 
-{/* TODO: Describe the expression builder — field selection, operators, conditions */}
+### Identity
 
-{/* TODO: Describe the expression builder — field selection, operators, conditions */}
+A **Name** and a **Description** for the rule.
 
-### Aggregation builder
+### Trigger
 
-{/* TODO: Describe aggregation options — count, threshold, time window */}
+A toggle between two modes:
 
-{/* TODO: Describe aggregation options — count, threshold, time window */}
+- **Per event** — the rule evaluates each event against a condition (built below).
+- **Time aggregate** — the rule counts or sums over a rolling window.
 
-### Schedule builder
+#### Aggregation builder
 
-{/* TODO: Describe scheduling — how often rules run, evaluation windows */}
+In **Time aggregate** mode you configure:
 
-{/* TODO: Describe scheduling — how often rules run, evaluation windows */}
+| Control | Options |
+| --- | --- |
+| **Function** | Count of events · Sum of {field} · Average of {field} |
+| **Event type / Field** | The event type to count, or the numeric field to sum/average |
+| **Over the last** | A window — seconds, minutes, or hours |
+| **Trigger when** | A comparison: >, ≥, <, ≤, =, ≠ |
+| **Threshold** | The value to compare against (byte fields offer B/KB/MB/GB/TB units) |
+
+The builder summarizes the result in plain English — e.g. *"Fires when {function} over the window is {op} the threshold."*
+
+### Condition (expression builder)
+
+The condition section is where you build the matching logic (it's labeled *"Condition (build the equation)"* for per-event rules, or *"Filter (optional)"* for aggregates — i.e. which events count).
+
+The expression builder works in **AND groups** joined by **OR**:
+
+- Each condition has a **Field**, an **Op** (e.g. *equals*, *in (CIDR list)*), and a value.
+- Add conditions with **+ AND condition**, and additional groups with **+ OR group**.
+- A live preview shows the assembled expression.
+
+Available fields come from the telemetry registry — destination address, bytes sent/received, source port, file path, process name, and more.
+
+### Scope
+
+Choose **All hosts** or **Selected hosts**. With selected hosts you pick the hosts, and can optionally narrow further to specific **workloads** (Kubernetes namespaces/pods or Docker containers). Leaving workloads unchecked applies the rule to the whole host.
+
+### Schedule
+
+Choose **Always on** or **Time windows**. Time windows let you define recurring day/time windows in a chosen timezone, set to either **Suppress during** or **Active only during** those windows. (There's no run-frequency setting — rules evaluate continuously, subject to these windows.)
+
+### Response
+
+| Field | Purpose |
+| --- | --- |
+| **Severity** | High / Medium / Low |
+| **Cooldown (min)** | Minimum gap between repeat fires (default 10) |
+| **Label** | A short identifier (e.g. `suspicious_upload`) |
+
+### Saving
+
+The footer offers **Save draft** (when creating), **Cancel**, **Test (24h)**, and **Create rule** / **Save changes**. Validation errors (missing name, no conditions, no hosts, etc.) appear in red. If you close with unsaved edits, you're prompted to **Save as draft**, **Keep editing**, or **Discard**.
+
+### Drafts
+
+Drafts are saved locally (per user) via **Save draft** and reopened from the **Drafts** menu. They're a convenience for work-in-progress rules — distinct from a rule's enabled/disabled state.
+
+---
 
 ## AI rule builder
 
-{/* TODO: Describe the AI-assisted rule builder — natural language to rule conversion */}
+**Create with AI** opens a chat-style modal (*"Describe the rule in plain English. Review, then create."*). Type a description — or pick a suggestion such as *"Alert when a host sends more than 1 GB outbound in 5 minutes"* — and the assistant proposes a rule.
 
-{/* TODO: Describe the AI-assisted rule builder — natural language to rule conversion */}
+The proposal appears under **Proposed rule**, summarizing the name, description, trigger, condition, scope, schedule, and response. From there you can:
 
-## Rule preview
+- **Create rule** — save it immediately, or
+- **Edit in full editor** — hand the draft off to the rule form drawer to fine-tune before saving.
 
-{/* TODO: Describe the preview feature — testing a rule against historical data */}
+---
 
-{/* TODO: Describe the preview feature — testing a rule against historical data */}
+## Testing a rule
+
+**Test (24h)** in the form drawer runs a backtest — replaying the rule against the last 24 hours of events without saving it. The results modal shows how many events would have matched out of those scanned, in a table of Time, Host, what matched, and the event summary. If the scan hits its event limit, a banner notes the results are partial.
+
+---
 
 ## Managing rules
 
-{/* TODO: Describe enabling, disabling, editing, and deleting rules */}
-
-{/* TODO: Describe enabling, disabling, editing, and deleting rules */}
+- **Enable / disable** — the **On** toggle in the list activates or pauses a rule without deleting it.
+- **Edit** — reopens the rule in the form drawer.
+- **Delete** — removes the rule (with confirmation); findings it already produced remain on the Anomalies page.
