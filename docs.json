@@ -26,6 +26,7 @@
           {
             "tab": "Dashboard",
             "pages": [
+              "dashboard/layout",
               "dashboard/overview",
               "dashboard/collectors",
               {
@@ -60,7 +61,7 @@
           {
             "tab": "Administration",
             "pages": [
-              "administration/overview",
+              "administration/layout",
               "administration/settings",
               "administration/user-management",
               "administration/teams",
@@ -71,7 +72,7 @@
           {
             "tab": "Platform",
             "pages": [
-              "platform/overview",
+              "platform/layout",
               "platform/collector-ingest",
               "platform/enrichment-pipeline",
               "platform/ml-models",
@@ -81,7 +82,7 @@
           {
             "tab": "Linux Collector",
             "pages": [
-              "linux-collector/overview",
+              "linux-collector/layout",
               "linux-collector/system-requirements",
               "linux-collector/release-artifacts",
               "linux-collector/deploy-kubernetes",
@@ -98,7 +99,7 @@
           {
             "tab": "On-Prem Operations",
             "pages": [
-              "on-prem/overview",
+              "on-prem/layout",
               {
                 "group": "Auto-update agent",
                 "pages": [
@@ -137,17 +138,37 @@
   "redirects": [
     {
       "source": "/linux-collector",
-      "destination": "/linux-collector/overview",
+      "destination": "/linux-collector/layout",
+      "permanent": true
+    },
+    {
+      "source": "/linux-collector/overview",
+      "destination": "/linux-collector/layout",
+      "permanent": true
+    },
+    {
+      "source": "/on-prem/overview",
+      "destination": "/on-prem/layout",
+      "permanent": true
+    },
+    {
+      "source": "/administration/overview",
+      "destination": "/administration/layout",
+      "permanent": true
+    },
+    {
+      "source": "/platform/overview",
+      "destination": "/platform/layout",
       "permanent": true
     },
     {
       "source": "/auto-update-agent",
-      "destination": "/on-prem/overview",
+      "destination": "/on-prem/layout",
       "permanent": true
     },
     {
       "source": "/untitled-page",
-      "destination": "/on-prem/overview",
+      "destination": "/on-prem/layout",
       "permanent": true
     }
   ]
