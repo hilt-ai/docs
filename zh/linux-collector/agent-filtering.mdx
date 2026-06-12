@@ -1,0 +1,253 @@
+---
+title: "代理过滤"
+sidebarTitle: "代理过滤"
+description: "采集器如何借助内核态与用户态过滤器，将原始系统调用量缩减为一条与安全相关的事件流。"
+---
+
+代理（Agent）通过 eBPF 捕获内核级遥测数据（文件访问、进程执行、网络流）。在繁忙的主机上，原始系统调用量可能超过 **10 万事件/秒**，而其中绝大多数都是治理价值很低的操作系统日常噪声。过滤系统通过双层架构将其缩减为一条可控的、与安全相关的事件流：**内核态**过滤器在事件离开 eBPF 环形缓冲区之前就将其丢弃，**用户态**过滤器则在事件到达代理进程后施加更丰富的逻辑。
+
+## 架构概览
+
+经受住两层过滤的事件会被序列化为 JSON，然后写入磁盘或发送到采集器。
+
+## 第 1 层：内核态过滤器
+
+内核态过滤器在挂载到系统调用 tracepoint 的 eBPF 程序内部执行。它们会在**每一次**系统调用时运行，因此必须足够快；其回报是被丢弃的事件永远不会占用环形缓冲区容量，也不会唤醒用户态代理。
+
+### 自过滤（`is_self`）
+
+每个 BPF 程序的第一道检查。将调用进程的 TGID 与代理自身的 PID（启动时存入 `self_tgid_map`）进行比较。若没有这道检查，代理自身的文件 I/O 和网络流量将形成反馈回路。
+
+### Comm 过滤（`is_comm_filtered`）
+
+丢弃那些 `comm`（任务名，16 字节）匹配预填充 BPF 哈希表的进程所产生的事件。
+
+**默认被过滤的 comm：**
+
+| 进程 | 原因 |
+| :-- | :-- |
+| `irqbalance` | IRQ 分发守护进程——持续读取 `/proc` |
+| `gssproxy` | Kerberos / GSSAPI 代理——大量 socket \+ 文件 I/O |
+| `sleep` | Shell `sleep` 内建命令——毫无安全相关性 |
+
+该过滤器应用于 `openat`、`openat2`、`unlinkat`、`renameat2`、`fchmodat` 和 `sched_process_fork` 这些 tracepoint。它**不**应用于 `sched_process_exec`（我们始终想看到执行了什么），也不应用于 `inet_sock_set_state`（它运行在 softirq 上下文中，此时 `current->comm` 并不可靠）。
+
+### 路径前缀过滤（`is_path_filtered`）
+
+一个快速、逻辑固定的前缀匹配器，在事件到达环形缓冲区之前，丢弃针对已知噪声路径的只读文件打开操作。它消除了绝大多数无害的本地化、库以及伪文件系统读取。
+
+**被过滤的前缀：**
+
+| 前缀 | 拦截内容 |
+| :-- | :-- |
+| `/proc/` | procfs 读取（按 PID 的 stat、status、mountinfo） |
+| `/dev/` | 设备文件访问（null、tty、urandom） |
+| `/sys/` | sysfs / cgroup 控制器读取 |
+| `/usr/lib/` | 共享库加载 |
+| `/usr/share/` | 本地化数据、共享资源 |
+| `/etc/l` | `ld.so.cache`、`localtime` |
+
+**写操作旁路：** 对于 `openat`，如果标志位中包含任何写标志（`O_WRONLY | O_RDWR | O_CREAT | O_TRUNC | O_APPEND`），则完全跳过路径过滤。对 `/proc`、`/dev` 或 `/sys` 的写操作始终与安全相关。
+
+## 第 2 层：用户态过滤器
+
+用户态过滤器在代理从环形缓冲区轮询事件时运行。它们可以访问完整的事件结构体，并能执行那些在 BPF 中无法实现或不切实际的操作（字符串匹配、trie 查找、CIDR 运算）。
+
+### 自过滤（用户态）
+
+捕获任何漏过内核自过滤的事件（例如在 `main_bpf__attach()` 与 `self_tgid_map` 填充之间的短暂窗口期内）。
+
+### 进程 comm 过滤（用户态）
+
+作为纵深防御的兜底机制，镜像内核 comm 过滤器。进程列表完全相同：`irqbalance`、`gssproxy`、`sleep`。
+
+### Kubernetes 基础设施过滤
+
+在 Kubernetes 节点上，系统组件会针对非敏感路径产生巨量的文件打开操作。该过滤器会丢弃来自 K8s 基础设施进程的只读文件打开操作，**除非**其路径匹配敏感路径白名单。
+
+**被过滤的 K8s comm：**
+
+| 进程 | 角色 |
+| :-- | :-- |
+| `kubelet` | 节点代理 |
+| `containerd-shim` | 容器运行时 shim |
+| `eks-node-monito` | EKS 节点监控 |
+| `eks-healthchec` | EKS 健康检查 |
+| `eks-pod-identit` | EKS Pod 身份代理 |
+| `eks-ebs-csi-dri` | EKS EBS CSI 驱动 |
+| `coredns` | 集群 DNS |
+| `systemd` | Init 系统 |
+| `systemctl` | systemd CLI |
+
+**敏感路径白名单**，如果上述进程的文件打开操作所涉路径包含以下内容，则会被**保留**：
+
+| 模式 | 重要性 |
+| :-- | :-- |
+| `token` | 服务账户令牌、API 令牌 |
+| `ca.crt` | 证书颁发机构证书 |
+| `secret` | Kubernetes secret |
+| `Corefile` | CoreDNS 配置 |
+| `resolv.conf` | DNS 解析器配置 |
+| `kubeconfig` | Kubernetes 凭据 |
+
+如果 `comm` 是 K8s 基础设施进程，且文件打开操作不含写标志，且路径不匹配敏感白名单 → 过滤。来自 K8s 基础设施进程的所有写操作始终放行。
+
+### Auxv 噪声过滤
+
+丢弃来自 `uptime` 和 `free` 的 `/proc/self/auxv` 读取——这些是无害的 ELF 辅助向量读取，不会带来任何治理信号。
+
+### 路径过滤 trie（`path_filter_match`）
+
+一个用户态 trie 数据结构，用于高保真路径匹配，支持精确匹配、前缀匹配、后缀匹配和通配符。它处理那些通过了内核过滤但仍属噪声的路径。
+
+#### 系统库与本地化
+
+| 路径 | 模式 | 后缀 |
+| :-- | :-- | :-- |
+| `/usr/lib/locale` | prefix | — |
+| `/usr/share/locale` | prefix | — |
+| `/usr/share/locale-langpack` | prefix | — |
+| `/usr/lib64/gconv` | prefix | — |
+| `/usr/lib/gconv` | prefix | — |
+| `/lib64` | prefix | `.so` |
+| `/lib` | prefix | `.so` |
+
+#### 系统配置
+
+| 路径 | 模式 |
+| :-- | :-- |
+| `/etc/ld.so.cache` | exact |
+| `/etc/localtime` | exact |
+| `/etc/nsswitch.conf` | exact |
+| `/etc/hostname` | exact |
+| `/etc/os-release` | exact |
+| `/etc/pki` | prefix |
+| `/etc/crypto-policies` | prefix |
+
+#### Procfs（全局）
+
+| 路径 | 模式 |
+| :-- | :-- |
+| `/proc/stat` | exact |
+| `/proc/uptime` | exact |
+| `/proc/meminfo` | exact |
+| `/proc/filesystems` | exact |
+| `/proc/loadavg` | exact |
+| `/proc/tty/drivers` | exact |
+| `/proc/sys/kernel/osrelease` | exact |
+| `/proc/sys/kernel/pid_max` | exact |
+| `/proc/sys/kernel/threads-max` | exact |
+| `/proc/sys/crypto/fips_enabled` | exact |
+| `/proc/self/mountinfo` | exact |
+| `/proc/self/oom_score_adj` | exact |
+| `/proc/self/coredump_filter` | exact |
+
+#### Procfs（按 PID，通配符）
+
+| 路径 | 模式 |
+| :-- | :-- |
+| `/proc/*/stat` | exact |
+| `/proc/*/status` | exact |
+| `/proc/*/wchan` | exact |
+| `/proc/*/statm` | exact |
+| `/proc/*/loginuid` | exact |
+| `/proc/*/cmdline` | exact |
+| `/proc/*/cgroup` | exact |
+| `/proc/*/fd` | exact |
+| `/proc/*/limits` | exact |
+| `/proc/*/net/dev` | exact |
+
+#### 设备文件
+
+| 路径 | 模式 |
+| :-- | :-- |
+| `/dev/null` | exact |
+| `/dev/tty` | exact |
+| `/dev/urandom` | exact |
+
+#### Kubernetes / systemd 噪声
+
+| 路径 | 模式 |
+| :-- | :-- |
+| `/var/lib/kubelet/pods` | prefix |
+| `/run/systemd/transient` | prefix |
+| `/run/systemd/units` | prefix |
+| `/run/udev/links` | prefix |
+| `/var/log/messages` | exact |
+| `/var/log/cron.log` | exact |
+| `/var/run/utmp` | exact |
+| `/var/lib/sss` | prefix |
+| `/sys/fs/cgroup` | prefix |
+
+#### 其他
+
+| 路径 | 模式 |
+| :-- | :-- |
+| `/aarch64-bottlerocket-linux-gnu` | prefix |
+
+**匹配模式：**
+
+- **Exact**（`is_exact = 1`）：完整路径必须完全一致。
+- **Prefix**（`is_exact = 0`）：任何以规则路径开头的路径均匹配。
+- **Suffix**（`check_suffix = 1`）：前缀匹配，再加上完整的原始路径必须包含指定的后缀字符串。
+- **Wildcard**（`*`）：一个 `*` 段匹配任意单个路径段。
+
+**Trie 结构：**
+
+```text
+root
+├── usr
+│   ├── lib
+│   │   ├── locale [prefix]
+│   │   └── gconv [prefix]
+│   └── share
+│       ├── locale [prefix]
+│       └── locale-langpack [prefix]
+├── proc
+│   ├── stat [exact]
+│   ├── uptime [exact]
+│   ├── * (wildcard)
+│   │   ├── stat [exact]
+│   │   ├── status [exact]
+│   │   └── ...
+│   └── ...
+└── ...
+```
+
+Trie 查找的复杂度为 O(d)，其中 d 是路径的深度（以 `/` 分隔的段数），每个节点上的子节点搜索为 O(c)，其中 c ≤ 16（`MAX_CHILDREN`）。
+
+## 过滤旁路：cgroup 生命周期事件
+
+`CGROUP_MKDIR` 和 `CGROUP_RMDIR` 事件会**绕过所有过滤**，无论是内核还是用户态。这些事件对于维护容器身份缓存和 `workload_by_cgroup_id` BPF map 至关重要。一旦遗漏某次 cgroup 创建事件，该容器后续的所有事件都将无法被打上标签。
+
+## 指标与可观测性
+
+代理会跟踪各类别的过滤计数器，并在关闭时以及每隔约 10 秒向一个指标文件上报：
+
+| 指标 | 说明 |
+| :-- | :-- |
+| `events_total` | 从环形缓冲区接收到的事件总数 |
+| `filtered_self` | 因事件来自代理自身而被丢弃 |
+| `filtered_comm` | 被进程名（内核或用户态 comm 过滤器）丢弃 |
+| `filtered_path` | 被路径过滤器（内核前缀或用户态 trie）丢弃 |
+| `filtered_net` | 被网络 CIDR 过滤器丢弃 |
+| `passed` | 经受住所有过滤并被输出的事件 |
+| `ringbuf_drops` | 内核无法提交的事件（环形缓冲区已满） |
+
+关闭时，会向 stderr 打印一份摘要：
+
+```text
+--- Event Stats ---
+Total: 482031, Filtered: 459218 (95.3%), Passed: 22813
+  By self (agent): 1204, By process (userspace): 38201, By path: 419102, By net dest: 711
+  Note: process-filtered events in kernel not counted above
+```
+
+## 配置参考
+
+| 变量 | 默认值 | 说明 |
+| :-- | :-- | :-- |
+| `DAG_EXCLUDE_NET_CIDRS` | _(无)_ | 以逗号分隔的 CIDR，用于从 `NET_FLOW` 事件中排除 |
+| `DAG_DISABLE_DEFAULT_LOCALHOST_FILTER` | `0` | 设为 `1` 可保留环回与链路本地流量 |
+
+comm 过滤器和路径过滤器规则已编译进代理二进制文件中，运行时不可由用户配置。

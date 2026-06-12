@@ -1,0 +1,100 @@
+---
+title: "在 Kubernetes 上部署"
+description: "将 DMG 采集器部署为 DaemonSet，涵盖 RBAC、运行时配置、主机挂载、安装、升级与卸载。"
+---
+
+## 集群资源
+
+DMG 采集器部署为单个 DaemonSet，每个节点一个 pod。该清单（manifest）还会创建运行所需的最小 RBAC 资源。
+
+| 对象 | 名称 | 用途 |
+| :-- | :-- | :-- |
+| ServiceAccount | `dag-agent` | DaemonSet pod 的身份 |
+| ClusterRole | `dag-agent-node-reader` | 获取节点以解析节点元数据 |
+| ClusterRoleBinding | — | 将 SA 绑定到该 ClusterRole |
+| DaemonSet | `dag-agent` | 在每个节点上运行一个采集器 pod |
+
+该 DaemonSet 不会创建 Service 或 Ingress——代理没有监听端口。唯一的网络路径是从每个 pod 出站到 `DAG_SHIP_URL` 的 HTTPS 连接。
+
+## 运行时配置
+
+该 DaemonSet 配置如下：
+
+- **`privileged: true`** —— `bpf(2)` 和 perf 环形缓冲区访问所必需。否则内核将拒绝加载这些程序。
+- **`hostPID: true`** —— 确保事件中的 `pid` 字段映射到真实的主机 PID，而非容器作用域内的 PID。否则仪表盘无法将代理上报的事件与你的运维人员实际通过 `ps`、`crictl` 或 `kubectl exec` 看到的进程相关联。
+- **`hostNetwork: true`** —— 允许在主机命名空间中进行网络观测。
+- **`dnsPolicy: ClusterFirstWithHostNet`** —— 确保正确的 DNS 解析（例如通过 VPC 的私有 Route 53）。
+
+## 主机挂载
+
+采集器使用三个**只读**主机挂载。不使用任何可写主机挂载。
+
+| 挂载 | 用途 |
+| :-- | :-- |
+| `/sys/kernel/debug` | 访问 tracefs 以挂载 tracepoint。 |
+| `/sys/kernel/btf` | 用于 CO-RE 重定位的 BTF 数据。 |
+| `/etc/machine-id` | 稳定的节点标识符兜底方案。 |
+
+## 安装
+
+该清单使用三个占位符，由你在 apply 时进行替换。Kubernetes 清单包含在每个版本的 `deploy/k8s/daemonset.yaml` 中。
+
+<Steps>
+  <Step title="解压发布 tarball">
+    ```bash
+    tar xzf dag-agent-v<X>-linux-aarch64.tar.gz
+    cd dag-agent-v<X>-linux-aarch64/k8s
+    ```
+  </Step>
+  <Step title="替换占位符并应用">
+    ```bash
+    sed -e 's|__REGISTRY__|<your-account>.dkr.ecr.<region>.amazonaws.com|' \
+        -e 's|__TAG__|v1.8.0|' \
+        -e 's|__SHIP_URL__|https://<name>-ingest.hilt.ai|' \
+        -e 's|__CPU_REQUEST__|100m|' -e 's|__MEMORY_REQUEST__|128Mi|' \
+        -e 's|__CPU_LIMIT__|500m|' -e 's|__MEMORY_LIMIT__|512Mi|' \
+        daemonset.yaml | kubectl apply -f -
+    ```
+  </Step>
+  <Step title="验证部署">
+    ```bash
+    kubectl get daemonset dag-agent -o wide
+    kubectl get pods -l app=dag-agent -o wide
+    kubectl logs -l app=dag-agent --tail=20
+    ```
+  </Step>
+</Steps>
+
+## 容忍度（Tolerations）与节点选择
+
+随附的清单会容忍标准的 `CriticalAddonsOnly` 污点（taint）。如果你的集群使用了专用节点池、带污点的系统池，或 GPU / 特殊硬件污点，请在 apply 前向 DaemonSet spec 中添加相应的 tolerations。该代理足够轻量，可以运行在集群中的每一个节点上——包括控制面节点和专用节点池。若某个污点未被容忍，将造成检测流水线无法填补的可见性缺口。
+
+如果你想排除特定节点，请添加 `nodeAffinity`。请确保将这些排除项记录在案，因为它们会造成明确的盲区。
+
+## 升级
+
+Hilt 会同时以 `v1.<new>.<patch>` 形式推送新镜像；在持续部署场景下，还会推送一个浮动标签（视你的通道而定，如 `dev-latest`、`prod-latest` 等）。
+
+**使用不可变标签升级：**
+
+```bash
+kubectl set image daemonset/dag-agent agent=<registry>/dag-agent:v1.9.0
+kubectl rollout status daemonset/dag-agent
+```
+
+**使用浮动标签升级：**
+
+```bash
+kubectl rollout restart daemonset/dag-agent
+kubectl rollout status daemonset/dag-agent
+```
+
+DaemonSet 滚动更新每次替换每个节点上的一个 pod；每个节点的事件流中断时间约为 1–2 秒。
+
+## 卸载
+
+```bash
+kubectl delete -f daemonset.yaml
+```
+
+无需重启节点，也不会残留任何主机制品。

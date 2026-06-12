@@ -1,0 +1,35 @@
+---
+title: "发布制品"
+description: "Tarball 结构、容器镜像，以及面向气隙（airgapped）环境的离线包。"
+---
+
+采集器的每个版本都以两个静态 Linux tarball 形式交付——一个面向 `aarch64`（ARM64 / Graviton），一个面向 `x86_64`（Intel / AMD）——并附带一个配套的多架构容器镜像。
+
+在 VM 上使用 tarball，在 Kubernetes 上使用容器镜像。
+
+## S3 结构
+
+```text
+s3://cybe-dag-agent/v<X>/
+├── dag-agent-v<X>-linux-aarch64.tar.gz   # ARM64 / Graviton
+├── dag-agent-v<X>-linux-x86_64.tar.gz    # x86_64
+└── README.md                              # version-specific deployment guide
+```
+
+## Tarball 内容
+
+```text
+dag-agent-v<X>-linux-<arch>/
+├── dag-agent              # static binary
+├── dag-agent.service      # systemd unit
+├── install.sh             # interactive installer
+├── uninstall.sh           # stops service, removes binary
+└── k8s/
+    ├── Dockerfile
+    ├── daemonset.yaml     # Kubernetes DaemonSet
+    └── dag-agent
+```
+
+## 气隙 / 离线包
+
+对于完全气隙的环境，请索取离线包。它包含同一套制品，外加一个经 `docker save` 导出的容器镜像 tar 包，整体打包为单个 `dag-agent-v<X>-offline.tar.gz`，你可以将其拷贝到目标环境，并在本地执行 `docker load` / `tar xzf`。

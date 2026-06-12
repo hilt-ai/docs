@@ -1,0 +1,84 @@
+---
+title: "运维指南"
+sidebarTitle: "运维"
+description: "网络要求、监控、安全，以及启用或禁用自动更新代理。"
+---
+
+## 网络要求
+
+代理需要具备到 Hilt 发布 ECR（`297433793776.dkr.ecr.us-east-1.amazonaws.com`）的出站访问权限。
+
+所需的 VPC 端点（已预置）：
+
+- `com.amazonaws.<region>.ecr.api`
+- `com.amazonaws.<region>.ecr.dkr`
+- `com.amazonaws.<region>.s3`（网关型，用于 ECR 层存储）
+- `com.amazonaws.<region>.ecs`（用于 ECS `update-service` 调用）
+
+跨区域 ECR 拉取可通过公网或跨区域 VPC 对等连接完成。代理会分别独立地对两个镜像仓库进行身份验证。
+
+## 模式迁移
+
+自动更新代理仅负责镜像的滚动发布。ClickHouse 与 Postgres 的模式迁移**不会**自动执行。
+
+## 监控
+
+除 webhook 通知外，该 CronJob 还提供标准的 Kubernetes 可观测性：
+
+```bash
+# Check recent runs
+kubectl get jobs -l app=dag-auto-update --sort-by=.status.startTime
+
+# Check logs from the last run
+kubectl logs job/dag-auto-update-<timestamp>
+
+# Check for failures
+kubectl get events --field-selector reason=BackoffLimitExceeded
+```
+
+## 安全
+
+- 代理绝不会将 AWS 凭证存储在磁盘上。IRSA 通过投射的服务账户令牌卷注入短期有效的 STS 令牌。
+- 代理对 Hilt 发布 ECR 只需 `ecr:ListImages` / `ecr:DescribeImages` 读取权限，无法向其推送镜像。
+- ECS `UpdateService` 的作用范围仅限于 `collector` 和 `dashboard` 集群。
+- webhook URL 以 Kubernetes Secret 的形式存储，而非直接写在 CronJob 规约中。
+
+## 启用自动更新
+
+<Steps>
+  <Step title="在 terraform.tfvars 中设置变量">
+    ```hcl
+    auto_update_enabled     = true
+    auto_update_schedule    = "*/30 * * * *"   # every 30 minutes
+    auto_update_policy      = "patch"          # only same-month updates
+    auto_update_webhook_url = "https://hooks.slack.com/services/T.../B.../xxx"
+    auto_update_dry_run     = false
+    ```
+  </Step>
+  <Step title="应用 Terraform">
+    ```bash
+    terraform -chdir=envs/app apply
+    ```
+  </Step>
+  <Step title="验证 CronJob 已被调度">
+    ```bash
+    kubectl get cronjobs -n default
+    # NAME              SCHEDULE       SUSPEND   ACTIVE   LAST SCHEDULE
+    # dag-auto-update   */30 * * * *   False     0        <none>
+    ```
+  </Step>
+  <Step title="触发一次手动测试运行">
+    ```bash
+    kubectl create job --from=cronjob/dag-auto-update dag-auto-update-test
+    kubectl logs -f job/dag-auto-update-test
+    ```
+  </Step>
+</Steps>
+
+## 禁用自动更新
+
+```hcl
+auto_update_enabled = false
+```
+
+然后执行 `terraform apply`。CronJob 及其关联的 IRSA 角色将被移除。最后一次应用的镜像标签仍会保留在 `dag-release` ConfigMap 中以供参考。

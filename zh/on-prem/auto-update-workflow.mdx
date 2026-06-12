@@ -1,0 +1,117 @@
+---
+title: "更新工作流"
+sidebarTitle: "更新工作流"
+description: "自动更新代理的分步更新流程与回滚步骤。"
+---
+
+## 更新代理脚本逻辑
+
+代理容器运行的脚本遵循以下流程：
+
+<Steps>
+  <Step title="读取当前的 image_tag">
+  </Step>
+  <Step title="从 Hilt 发布 ECR 列出可用标签">
+  </Step>
+  <Step title="按 UPDATE_POLICY 过滤标签">
+  </Step>
+  <Step title="没有符合条件的更新？">
+    Exit 0（无需执行任何操作）。
+  </Step>
+  <Step title="验证候选标签在全部 6 个仓库中均存在">
+    确保 Hilt 发布的是完整版本，而非部分推送。
+  </Step>
+  <Step title="镜像同步">
+
+    ```bash
+    docker pull 297433793776.dkr.ecr.us-east-1.amazonaws.com/${repo}:${NEW_TAG}
+    docker tag  ... ${CUSTOMER_ECR}/${prefix}${repo}:${NEW_TAG}
+    docker push ${CUSTOMER_ECR}/${prefix}${repo}:${NEW_TAG}
+    ```
+  </Step>
+  <Step title="更新 ECS 任务定义">
+  </Step>
+  <Step title="强制 ECS 重新部署">
+    ```bash
+    aws ecs update-service --cluster collector \
+      --service collector-service --force-new-deployment
+    aws ecs update-service --cluster dashboard \
+      --service dashboard-frontend-service --force-new-deployment
+    aws ecs update-service --cluster dashboard \
+      --service dashboard-backend-service --force-new-deployment
+    aws ecs update-service --cluster dashboard \
+      --service dashboard-query-service --force-new-deployment
+    ```
+  </Step>
+  <Step title="重启 EKS 部署">
+    ```bash
+    kubectl rollout restart deployment/enrichment-app \
+      deployment/dag-classification -n default
+    ```
+  </Step>
+  <Step title="等待稳定">
+    ```bash
+    aws ecs wait services-stable --cluster collector --services collector-service
+    aws ecs wait services-stable --cluster dashboard \
+      --services dashboard-frontend-service dashboard-backend-service \
+                 dashboard-query-service
+    kubectl rollout status deployment/enrichment-app --timeout=300s
+    kubectl rollout status deployment/dag-classification --timeout=300s
+    ```
+  </Step>
+  <Step title="健康检查">
+    ```bash
+    curl -sf http://dashboard-backend-service:8080/healthz
+    curl -sf http://dashboard-query-service:8080/healthz
+    ```
+  </Step>
+  <Step title="用新标签更新 ConfigMap">
+    ```bash
+    kubectl patch configmap dag-release -p '{"data":{"image_tag":"NEW_TAG"}}'
+    ```
+  </Step>
+  <Step title="发送 webhook 通知">
+    向 `POST $WEBHOOK_URL` 发送 JSON 负载：
+
+    ```json
+    {
+      "text": "DAG auto-update: v2026.04.27 → v2026.04.28 applied successfully",
+      "previous_tag": "v2026.04.27",
+      "new_tag": "v2026.04.28",
+      "services_updated": [
+        "collector",
+        "enrichment",
+        "classification",
+        "dashboard-frontend",
+        "dashboard-backend",
+        "dashboard-query"
+      ],
+      "status": "success"
+    }
+    ```
+  </Step>
+  <Step title="镜像同步后发生失败时">
+    - 发送失败 webhook。
+    - **不要**更新 ConfigMap（下次运行将重试）。
+    - Exit 1（CronJob 会在 Kubernetes 事件中记录失败）。
+  </Step>
+</Steps>
+
+## 回滚
+
+如果某次更新引发问题，运维人员可以手动回退：
+
+```bash
+# Point back to the previous tag
+kubectl patch configmap dag-release -n default \
+  -p '{"data":{"image_tag":"v2026.04.27"}}'
+
+# Force rollout to previous images (already in customer ECR)
+./scripts/rollout-services.sh
+
+# Or roll back Kubernetes deployments
+kubectl rollout undo deployment/enrichment-app
+kubectl rollout undo deployment/dag-classification
+```
+
+自动更新代理在下次运行时不会重新应用有问题的标签，因为它只会向前推进。如果运维人员将 ConfigMap 标签改回旧值，代理会再次将其视为“新”标签并尝试更新。为防止这种情况，请在 `terraform.tfvars` 中设置 `auto_update_enabled = false` 或 `auto_update_dry_run = true` 并重新应用。

@@ -16,85 +16,182 @@
     "timestamp": true
   },
   "contextual": {
-    "options": ["copy", "view", "assistant", "mcp", "add-mcp"]
+    "options": [
+      "copy",
+      "view",
+      "assistant",
+      "mcp",
+      "add-mcp"
+    ]
   },
   "navigation": {
-    "products": [
+    "languages": [
       {
-        "product": "Hilt",
-        "tabs": [
+        "language": "en",
+        "products": [
           {
-            "tab": "Dashboard",
-            "pages": [
-              "dashboard/layout",
-              "dashboard/overview",
-              "dashboard/collectors",
+            "product": "Hilt",
+            "tabs": [
               {
-                "group": "Data Flow",
+                "tab": "Dashboard",
                 "pages": [
-                  "dashboard/data-lineage",
-                  "dashboard/networks",
-                  "dashboard/files",
-                  "dashboard/users",
-                  "dashboard/query"
+                  "dashboard/layout",
+                  "dashboard/overview",
+                  "dashboard/collectors",
+                  {
+                    "group": "Data Flow",
+                    "pages": [
+                      "dashboard/data-lineage",
+                      "dashboard/networks",
+                      "dashboard/files",
+                      "dashboard/users",
+                      "dashboard/query"
+                    ]
+                  },
+                  {
+                    "group": "Security",
+                    "pages": [
+                      "dashboard/anomalies",
+                      "dashboard/detection-rules",
+                      "dashboard/fleet-behavior",
+                      "dashboard/investigate"
+                    ]
+                  }
                 ]
               },
               {
-                "group": "Security",
+                "tab": "Administration",
                 "pages": [
-                  "dashboard/anomalies",
-                  "dashboard/detection-rules",
-                  "dashboard/fleet-behavior",
-                  "dashboard/investigate"
+                  "administration/layout",
+                  "administration/user-management",
+                  "administration/teams",
+                  "administration/reports"
+                ]
+              },
+              {
+                "tab": "Linux Collector",
+                "pages": [
+                  "linux-collector/layout",
+                  "linux-collector/system-requirements",
+                  "linux-collector/release-artifacts",
+                  "linux-collector/deploy-kubernetes",
+                  "linux-collector/deploy-vms",
+                  "linux-collector/configuration",
+                  "linux-collector/networking-security",
+                  "linux-collector/event-data-model",
+                  "linux-collector/agent-filtering",
+                  "linux-collector/sizing-capacity",
+                  "linux-collector/data-flow",
+                  "linux-collector/troubleshooting"
+                ]
+              },
+              {
+                "tab": "On-Prem Operations",
+                "pages": [
+                  "on-prem/layout",
+                  {
+                    "group": "Auto-update agent",
+                    "pages": [
+                      "on-prem/auto-update-overview",
+                      "on-prem/auto-update-prerequisites",
+                      "on-prem/auto-update-workflow",
+                      "on-prem/auto-update-operations"
+                    ]
+                  },
+                  {
+                    "group": "Anonymized data export",
+                    "pages": [
+                      "on-prem/data-export-overview",
+                      "on-prem/data-export-schema",
+                      "on-prem/data-export-implementation"
+                    ]
+                  }
                 ]
               }
             ]
-          },
+          }
+        ]
+      },
+      {
+        "language": "zh",
+        "products": [
           {
-            "tab": "Administration",
-            "pages": [
-              "administration/layout",
-              "administration/user-management",
-              "administration/teams",
-              "administration/reports"
-            ]
-          },
-          {
-            "tab": "Linux Collector",
-            "pages": [
-              "linux-collector/layout",
-              "linux-collector/system-requirements",
-              "linux-collector/release-artifacts",
-              "linux-collector/deploy-kubernetes",
-              "linux-collector/deploy-vms",
-              "linux-collector/configuration",
-              "linux-collector/networking-security",
-              "linux-collector/event-data-model",
-              "linux-collector/agent-filtering",
-              "linux-collector/sizing-capacity",
-              "linux-collector/data-flow",
-              "linux-collector/troubleshooting"
-            ]
-          },
-          {
-            "tab": "On-Prem Operations",
-            "pages": [
-              "on-prem/layout",
+            "product": "Hilt",
+            "tabs": [
               {
-                "group": "Auto-update agent",
+                "tab": "仪表盘",
                 "pages": [
-                  "on-prem/auto-update-overview",
-                  "on-prem/auto-update-prerequisites",
-                  "on-prem/auto-update-workflow",
-                  "on-prem/auto-update-operations"
+                  "zh/dashboard/layout",
+                  "zh/dashboard/overview",
+                  "zh/dashboard/collectors",
+                  {
+                    "group": "数据流",
+                    "pages": [
+                      "zh/dashboard/data-lineage",
+                      "zh/dashboard/networks",
+                      "zh/dashboard/files",
+                      "zh/dashboard/users",
+                      "zh/dashboard/query"
+                    ]
+                  },
+                  {
+                    "group": "安全",
+                    "pages": [
+                      "zh/dashboard/anomalies",
+                      "zh/dashboard/detection-rules",
+                      "zh/dashboard/fleet-behavior",
+                      "zh/dashboard/investigate"
+                    ]
+                  }
                 ]
               },
               {
-                "group": "Anonymized data export",
+                "tab": "系统管理",
                 "pages": [
-                  "on-prem/data-export-overview",
-                  "on-prem/data-export-schema",
-                  "on-prem/data-export-implementation"
+                  "zh/administration/layout",
+                  "zh/administration/user-management",
+                  "zh/administration/teams",
+                  "zh/administration/reports"
+                ]
+              },
+              {
+                "tab": "Linux 采集器",
+                "pages": [
+                  "zh/linux-collector/layout",
+                  "zh/linux-collector/system-requirements",
+                  "zh/linux-collector/release-artifacts",
+                  "zh/linux-collector/deploy-kubernetes",
+                  "zh/linux-collector/deploy-vms",
+                  "zh/linux-collector/configuration",
+                  "zh/linux-collector/networking-security",
+                  "zh/linux-collector/event-data-model",
+                  "zh/linux-collector/agent-filtering",
+                  "zh/linux-collector/sizing-capacity",
+                  "zh/linux-collector/data-flow",
+                  "zh/linux-collector/troubleshooting"
+                ]
+              },
+              {
+                "tab": "本地部署运维",
+                "pages": [
+                  "zh/on-prem/layout",
+                  {
+                    "group": "自动更新代理",
+                    "pages": [
+                      "zh/on-prem/auto-update-overview",
+                      "zh/on-prem/auto-update-prerequisites",
+                      "zh/on-prem/auto-update-workflow",
+                      "zh/on-prem/auto-update-operations"
+                    ]
+                  },
+                  {
+                    "group": "匿名化数据导出",
+                    "pages": [
+                      "zh/on-prem/data-export-overview",
+                      "zh/on-prem/data-export-schema",
+                      "zh/on-prem/data-export-implementation"
+                    ]
+                  }
                 ]
               }
             ]

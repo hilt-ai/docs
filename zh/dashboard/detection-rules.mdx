@@ -1,0 +1,115 @@
+---
+title: "检测规则"
+sidebarTitle: "检测规则"
+description: "为你的环境创建并管理自定义检测规则。"
+---
+
+针对实时遥测数据的自定义 _如果发生这个就告警（if-this-then-alert）_ 规则。当某条规则的条件匹配时，它会在「异常」页面触发一个发现项。在应用中，此页面被标记为 **Rules**。
+
+## 权限
+
+两项权限管控此页面：
+
+- **Manage alerts** —— 查看此页面所必需（无论是在导航中还是通过 URL）。没有它，此页面会被隐藏。
+- **Manage rules** —— 创建、编辑、删除、启用/禁用、使用 AI 构建器或保存草稿所必需。仅有查看权限时，列表为只读：开关被禁用，创建/编辑/删除控件被隐藏。
+
+---
+
+## 规则列表
+
+页面标头包含标题、一个 **Search rules...** 搜索框（匹配名称、标签和描述），并为可管理规则的用户提供 **Drafts**、**Create with AI** 和 **New Rule** 按钮。
+
+该列表是一张表格：
+
+| 列 | 内容 |
+| --- | --- |
+| **On** | 启用/禁用开关（启用时为绿色） |
+| **Name** | 规则名称，其下方以等宽字体显示标签 |
+| **Severity** | 徽章 —— high、medium 或 low |
+| **Fires** | 该规则已触发的次数 |
+| **Last** | 上次触发的时间（_Never_、_Just now_、_Xm ago_，……） |
+| **Action** | 查看异常、编辑、删除 |
+
+**View anomalies** 操作会跳转到范围限定为该规则的「异常」页面。
+
+---
+
+## 创建规则
+
+**New Rule** 会打开规则表单抽屉。它按区块组织。
+
+### 身份
+
+规则的 **Name**（名称）和 **Description**（描述）。
+
+### 触发
+
+在两种模式之间切换：
+
+- **Per event** —— 该规则针对某个条件（在下方构建）逐个评估每个事件。
+- **Time aggregate** —— 该规则在一个滚动窗口内进行计数或求和。
+
+#### 聚合构建器
+
+在 **Time aggregate** 模式下，你可以配置：
+
+| 控件 | 选项 |
+| --- | --- |
+| **Function** | Count of events · Sum of a field · Average of a field |
+| **Event type / Field** | 要计数的事件类型，或要求和/求平均的数值字段 |
+| **Over the last** | 一个窗口 —— 秒、分或小时 |
+| **Trigger when** | 一个比较：`>`、`≥`、`<`、`≤`、`=`、`≠` |
+| **Threshold** | 用于比较的值（字节字段提供 B/KB/MB/GB/TB 单位） |
+
+### 条件（表达式构建器）
+
+条件区块是你构建匹配逻辑的地方（对于逐事件规则，它标记为 _“Condition (build the equation)”_；对于聚合，则标记为 _“Filter (optional)”_ —— 即哪些事件参与计数）。
+
+### 范围
+
+选择 **All hosts** 或 **Selected hosts**。选择主机时，你挑选具体主机，并可选择进一步缩小到特定的 **workloads**（Kubernetes 命名空间/Pod 或 Docker 容器）。不勾选工作负载时，该规则将应用于整台主机。
+
+### 排期
+
+选择 **Always on** 或 **Time windows**。时间窗口可让你在所选时区定义周期性的日期/时间窗口，并设为在这些窗口期间 **Suppress during**（抑制）或 **Active only during**（仅在此期间生效）。（没有运行频率设置 —— 规则会持续评估，但受这些窗口的约束。）
+
+### 响应
+
+| 字段 | 用途 |
+| --- | --- |
+| **Severity** | High / Medium / Low |
+| **Cooldown (min)** | 重复触发之间的最小间隔（默认 10） |
+| **Label** | 一个简短标识符（例如 `suspicious_upload`） |
+
+### 保存
+
+页脚提供 **Save draft**（创建时）、**Cancel**、**Test (24h)** 和 **Create rule** / **Save changes**。校验错误（缺少名称、无条件、无主机等）会以红色显示。如果你在有未保存的编辑时关闭，系统会提示你 **Save as draft**、**Keep editing** 或 **Discard**。
+
+### 草稿
+
+草稿通过 **Save draft** 保存在本地（按用户区分），并可从 **Drafts** 菜单重新打开。
+
+---
+
+## AI 规则构建器
+
+**Create with AI** 会打开一个聊天式弹窗（_“Describe the rule in plain English. Review, then create.”_）。输入一段描述，或选择一条建议，例如 _“Alert when a host sends more than 1 GB outbound in 5 minutes”_，助手便会提议一条规则。
+
+提议会出现在 **Proposed rule** 下，概述名称、描述、触发、条件、范围、排期和响应。从那里你可以：
+
+- **Create rule** —— 立即保存，或
+- **Edit in full editor** —— 将草稿交给规则表单抽屉，在保存前进一步微调。
+
+---
+
+## 测试规则
+
+表单抽屉中的 **Test (24h)** 会运行一次回测，针对过去 24 小时的事件重放该规则而不保存它。结果弹窗会显示在扫描的事件中有多少会匹配，以一张包含 Time、Host、匹配内容和事件摘要的表格呈现。如果扫描达到其事件上限，会有一条横幅提示结果是部分的。
+
+---
+
+## 管理规则
+
+- **启用 / 禁用** —— 列表中的 **On** 开关可在不删除规则的情况下激活或暂停它。
+- **编辑** —— 在规则表单抽屉中重新打开该规则。
+- **删除** —— 移除该规则（需确认）；它已产生的发现项仍会保留在「异常」页面上。

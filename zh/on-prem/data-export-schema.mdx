@@ -1,0 +1,100 @@
+---
+title: "导出模式"
+sidebarTitle: "导出模式"
+description: "匿名化数据导出所用的 Parquet 导出模式。"
+---
+
+导出的 Parquet 文件仅包含以下这些列，不含其他任何列。未在此列出的任何内容都会在查询层面被排除。
+
+## 时间与分组
+
+| 列 | 类型 | 说明 |
+| :-- | :-- | :-- |
+| `epoch_ts` | `String` | 5 分钟分桶时间戳；按每次导出随机偏移量（±0–48 小时）进行平移，以防止日历关联 |
+| `host_id_anon` | `String` | 确定性重映射：`host-0001`、`host-0002` 等。在单次导出内保持一致，以便时序模型正常工作 |
+| `uid_anon` | `UInt32` | 顺序重映射：每台主机 0、1、2、…… |
+| `phase` | `String` | 评分阶段标签（例如 `cold_start`、`baseline`、`scoring`） |
+| `is_active` | `UInt8` | 该时段（epoch）是否存在有意义的活动 |
+| `is_anomaly` | `UInt8` | 来自评分器的二元异常标记 |
+| `topk_sum` | `Float64` | top-K 异常通道评分之和 |
+| `volume_topk` | `Float64` | 按流量加权的 top-K 评分 |
+
+## 原始特征（24 列）
+
+在规范特征表中，`file_open_cusum_drift` 是一个为保持索引稳定性而保留的已移除槽位，其值始终为零，并被排除在导出之外。
+
+```text
+exec_count, file_open_count, destructive_file_ops, net_flow_count,
+bytes_sent, bytes_recv,
+unique_pids, unique_binaries, unique_dest_ips,
+novel_binary_exec, novel_parent_child,
+unique_dest_ports, sensitive_path_hits,
+write_open_count, sensitive_write_opens,
+exfil_novelty_bytes, new_dest_port,
+read_then_send_count, sensitive_read_send_count, unique_read_send_processes,
+fork_count, new_peer_site_count, cross_cluster_bytes_sent
+```
+
+## 派生特征（32 列）
+
+来自规范派生表。对原始特征进行的纯代数运算，不引入新状态或原始值。
+
+```text
+exec_intensity, dest_spread, novelty_byte_share, log_ratio,
+proc_share, file_share, net_share,
+new_bins_2h, new_ext_dests_2h,
+parent_child_trans_surprisal, epoch_state_trans_surprisal,
+epoch_entropy, dest_entropy,
+wavelet_exec_s1, wavelet_exec_s3, wavelet_exec_s6,
+wavelet_bytes_s1, wavelet_bytes_s3, wavelet_bytes_s6,
+wavelet_net_s1, wavelet_net_s3, wavelet_net_s6,
+hour_sin, hour_cos,
+session_fan_out, session_comm_entropy,
+session_lifetime_sec, session_net_dest_card, session_bytes_out,
+fork_exec_ratio, fork_burst_max, fork_exec_latency_mean_ms
+```
+
+## 数值与派生特征向量
+
+Parquet 文件并不将特征存为单独的列，而是以打包的 Arrow List 列形式存储：
+
+| 列 | 类型 | 说明 |
+| :-- | :-- | :-- |
+| `numeric_features` | `List(Float64)` | 24 元素的原始特征向量（索引与 `features.go` 一致；索引 9 始终为零） |
+| `derived_features` | `List(Float64)` | 32 元素的派生特征向量 |
+
+## Token 序列（供 TRACE 使用）
+
+| 列 | 类型 | 说明 |
+| :-- | :-- | :-- |
+| `token_ids` | `List(UInt16)` | 仅封闭词表 ID —— 不含原始字符串 |
+| `token_sub_epochs` | `List(UInt8)` | 每个 token 的子时段索引 |
+| `token_counts` | `List(UInt16)` | 每个 token 的出现次数 |
+| `token_importances` | `List(Float32)` | 每个 token 的异常重要性权重 |
+| `token_depths` | `List(UInt8)` | 进程树深度 |
+| `token_roles` | `List(UInt8)` | Token 角色枚举 |
+| `total_events` | `UInt32` | 该时段（epoch）内的原始事件总数（tokenization 之前） |
+| `tokens_before_topk` | `UInt16` | top-K 剪枝之前的 token 数量 |
+
+## 标签（可用时）
+
+| 列 | 类型 | 说明 |
+| :-- | :-- | :-- |
+| `ml_label` | `String` | 攻击阶段标签，或为空 |
+| `ml_source` | `String` | 标签来源（`hitl`、`synthetic`、`replay`） |
+
+## 显式排除
+
+凡未在上述白名单中的列，都会被排除在查询之外。导出作业无权访问 `dag_events` 或任何 Postgres 表。它仅查询：
+
+- `dag_anomaly_scores WHERE group = 'EPOCH'`
+- `dag_epoch_tokens`（通过 `host_id` \+ `epoch_ts` 联接）
+
+在导出前，会从这些表中显式丢弃以下列：
+
+- `token_evidence_json` —— 包含原始文件名、argv、地址
+- `evidence`、`reason`、`drivers` —— 评分器的自由文本说明
+- `owner`、`identity` —— 人员身份字符串
+- `host_id` —— 替换为 `host_id_anon`
+- `boot_id` —— 可关联的主机生命周期标识符
+- `alert_source`、`rule_id`、`rule_name`、`rule_label`、`rule_severity`、`matched_conditions` —— 检测规则来源列，可能泄露客户自定义的规则逻辑与匹配的字段值

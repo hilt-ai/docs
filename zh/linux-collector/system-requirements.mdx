@@ -1,0 +1,43 @@
+---
+title: "系统要求"
+description: "DMG 采集器对内核、架构、特权、网络及资源的要求。"
+---
+
+## 内核
+
+Linux 5.8\+ 且启用 BTF（`CONFIG_DEBUG_INFO_BTF=y`）。`/sys/kernel/btf/vmlinux` 必须存在，`install.sh` 会检查这一点，若缺失则会立即失败退出。
+
+## 架构
+
+`x86_64` 或 `aarch64`（Graviton）。每种架构各自交付一个 tarball；容器镜像则为多架构（multi-arch）。
+
+## 特权
+
+- **VM：** root
+- **Kubernetes：** `privileged: true` 容器
+
+## 出站网络
+
+通过 AWS PrivateLink 向你的 `DAG_SHIP_URL` 发起 HTTPS（443）连接。
+
+## 内存
+
+生产环境实测：稳态下 4–6 MB RSS。
+
+## CPU
+
+在典型工作负载下\< 单核的 1%；环形缓冲区与用户态过滤可平滑峰值。
+
+## 支持的发行版
+
+BTF 的可用性覆盖了生产环境中的每一个主流发行版：
+
+- Amazon Linux 2023
+- Ubuntu 20.04\+（HWE）/ 22.04 / 24.04
+- RHEL 9\+
+- Debian 11\+
+- Bottlerocket
+- Flatcar
+- EKS 优化版 AMI
+
+对于 AL2（内核 5.10 回移植版本），Hilt 可应请求提供一个开箱即用的 BTF tarball。

@@ -1,0 +1,57 @@
+---
+title: "匿名化数据导出"
+sidebarTitle: "概览"
+description: "如何在保留 ML 模型所需统计结构的前提下，对本地部署的遥测数据进行匿名化，供 Hilt 模型训练使用。"
+---
+
+## 为什么我们需要客户数据
+
+Hilt 提供四个 ML 模型族，它们学习正常的主机行为并标记异常：
+
+| 模型 | 学习内容 | 客户数据的价值 |
+| :-- | :-- | :-- |
+| **TS-VAE** | 主机活动时段（epoch）中的时序模式 | 合成数据无法复现的真实工作负载多样性（CI、Web、批处理、GPU） |
+| **Isolation Forest** | 基于 VAE 增强特征的离群边界 | 在异构主机群之间校准的决策阈值 |
+| **TRACE** | 跨安全相关操作的 token 序列模式 | 与真实运营噪声交织在一起的真实攻击轨迹（ground truth） |
+| **HDBSCAN clusters** | 跨主机的行为原型 | 可迁移到新部署的稳定聚类几何结构 |
+
+## 可安全导出（模型所消费的数据）
+
+| 数据 | 示例 | 为什么安全 |
+| :-- | :-- | :-- |
+| **24 个原始数值特征** | `exec_count`、`bytes_sent`、`unique_dest_ips`、`sensitive_path_hits` | 每 5 分钟时段（epoch）的聚合计数 —— 不含原始值 |
+| **32 个派生特征** | `exec_intensity`、`dest_spread`、`epoch_entropy`、`wavelet_exec_s6`、`fork_burst_max` | 比率、熵值、小波系数、会话统计量 —— 均为数学变换 |
+| **Token ID 序列** | `[FILE:read_sensitive, NET:connect_external, EXEC:shell]` | 封闭词表（约 80 个 token）；文件名 / IP 已被抽象剥离 |
+| **Token 附属特征** | `token_sub_epochs`、`token_depths`、`token_roles`、`token_counts`、`token_importances` | 关于 token 序列的结构性元数据 |
+| **标签** | `ml_label`、`is_anomaly`、`ml_source`、`phase` | 攻击阶段标注（来自 HITL 或合成注入） |
+| **异常评分** | `composite_score`、`z_exec`、`mahal_distance`、`topk_sum` | 评分流水线的数值输出 |
+| **时间键** | `epoch_ts`（5 分钟分桶时间戳） | 保留时间顺序 |
+
+## 导出前将被匿名化
+
+| 数据 | 风险 | 匿名化方式 |
+| :-- | :-- | :-- |
+| `host_id` | 可关联到特定机器 | 确定性重映射：每次导出生成 `host-<sequential-id>` |
+| `uid` / `euid` | Unix 用户 ID，可被关联 | 重映射为顺序整数 |
+| `owner` / `identity` | 可读的身份字符串 | 完全丢弃 |
+
+## 永远不会导出
+
+| 数据 | 原因 |
+| :-- | :-- |
+| `token_evidence_json` | 包含原始的 `filename`、`argv`、`dst_addr`、`comm`、`tree_path` |
+| `evidence`、`reason`、`drivers` | 会回显原始事件上下文的自由文本说明 |
+| `matched_conditions` | 会回显字段值的检测规则匹配描述（例如 "filename contains .pem"） |
+| `rule_name`、`rule_label` | 客户自定义的检测规则名称 —— 可能泄露安全态势 |
+| `src_addr`、`dst_addr`、端口 | 客户网络拓扑 |
+| `filename`、`argv`、`old_name`、`new_name` | 文件路径、命令行 —— 直接的 PII / 基础设施泄露 |
+| `ssh_identity`、`ssh_source_ip` | 凭证与网络身份 |
+| `username`、`teleport_owner`、`teleport_node_name` | 人员 / 机器身份 |
+| `instance_id`、`iam_role`、`region` | AWS 账户指纹信息 |
+| `container_id`、`pod_uid`、`pod_name`、`pod_namespace` | Kubernetes 拓扑 |
+| `comm`、`parent_comm`、`binary_build_id` | 可能泄露专有软件 |
+| `dag_network_dns.hostname` | 内部 DNS 名称 |
+| `dag_alert_narratives.*` | 可能回显敏感事件上下文的 LLM 文本 |
+| `dag_entity_snapshots.*` | 序列化的评分器状态 —— 包含与特定主机绑定的基线向量 |
+| 检测规则定义 | `detection_rules` Postgres 表 —— 客户的安全逻辑 |
+| Postgres 认证相关表 | `users`、`sessions`、`okta_users`、`audit_log` |
