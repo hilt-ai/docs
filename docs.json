@@ -102,6 +102,7 @@
                     "group": "Anonymized data export",
                     "pages": [
                       "on-prem/data-export-overview",
+                      "on-prem/data-catalog",
                       "on-prem/data-export-schema",
                       "on-prem/data-export-implementation"
                     ]
@@ -188,6 +189,7 @@
                     "group": "匿名化数据导出",
                     "pages": [
                       "zh/on-prem/data-export-overview",
+                      "zh/on-prem/data-catalog",
                       "zh/on-prem/data-export-schema",
                       "zh/on-prem/data-export-implementation"
                     ]
