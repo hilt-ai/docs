@@ -1,0 +1,89 @@
+---
+title: "前置条件"
+sidebarTitle: "前置条件"
+description: "自动更新代理所需的 IAM 角色和访问权限。"
+---
+
+## 镜像账户访问权限
+
+部署账户必须已经拥有对发布镜像仓库（registry）的 ECR 拉取权限。
+
+## 客户侧 IAM
+
+自动更新代理以 Kubernetes ServiceAccount 的形式运行，并使用 IRSA（IAM Roles for Service Accounts）。该角色需要：
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PullFromHiltECR",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:GetAuthorizationToken"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ReadHiltReleaseImages",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchGetImage",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:DescribeImages",
+        "ecr:ListImages"
+      ],
+      "Resource": [
+        "arn:aws:ecr:us-east-1:297433793776:repository/controlplane",
+        "arn:aws:ecr:us-east-1:297433793776:repository/enrichment",
+        "arn:aws:ecr:us-east-1:297433793776:repository/dag/detection",
+        "arn:aws:ecr:us-east-1:297433793776:repository/dashboard-frontend",
+        "arn:aws:ecr:us-east-1:297433793776:repository/dashboard-backend",
+        "arn:aws:ecr:us-east-1:297433793776:repository/dashboard-query"
+      ]
+    },
+    {
+      "Sid": "PushToCustomerECR",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchGetImage",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload",
+        "ecr:PutImage",
+        "ecr:DescribeRepositories"
+      ],
+      "Resource": "arn:aws:ecr:*:<CUSTOMER_ACCOUNT_ID>:repository/*"
+    },
+    {
+      "Sid": "ECSRollout",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:UpdateService",
+        "ecs:DescribeServices"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "ecs:cluster": [
+            "arn:aws:ecs:*:<CUSTOMER_ACCOUNT_ID>:cluster/collector",
+            "arn:aws:ecs:*:<CUSTOMER_ACCOUNT_ID>:cluster/dashboard"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "ECSWait",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:DescribeServices"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+该 ServiceAccount 还需要一个 Kubernetes `ClusterRole`，以在 `default` 命名空间中授予 `apps/deployments: patch` 权限，供 `kubectl rollout restart` 使用。

@@ -1,0 +1,26 @@
+---
+title: "端到端数据流"
+description: "事件如何从采集器传输到仪表盘。"
+---
+
+由采集器生成的事件遵循一条从主机到仪表盘的简单管道。
+
+<Steps>
+  <Step title="采集器">
+    生成事件，并将其批量发送至控制平面。
+  </Step>
+  <Step title="接入服务">
+    该端点通过 PrivateLink 解析到位于你的 VPC 中、为某个 ECS 服务提供前端的内部 NLB。每条事件都会发布到 Amazon MSK（Kafka）进行缓冲。
+  </Step>
+  <Step title="富化层">
+    一个 EKS 部署消费该 MSK 主题，对事件进行富化，并将规范化后的数据写入 ClickHouse。
+  </Step>
+  <Step title="分类与漂移检测">
+    对事件进行评分，并由定时作业基于 ClickHouse 中的历史数据评估模型漂移。
+  </Step>
+  <Step title="仪表盘">
+    通过内部 ALB 访问。
+  </Step>
+</Steps>
+
+如需完整的基础设施细节，请参阅 Hilt 提供的《DMG 控制平面文档》。

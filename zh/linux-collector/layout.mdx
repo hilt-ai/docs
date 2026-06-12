@@ -1,0 +1,37 @@
+---
+title: "Linux 采集器"
+sidebarTitle: "结构"
+description: "Hilt DMG 采集器是什么、它观测哪些内容，以及如何使用本指南进行导航。"
+---
+
+本指南介绍 Hilt 数据流转治理（Data Movement Governance）采集器：它是什么、观测哪些内容、如何部署到 Kubernetes 节点和普通 Linux VM 上，以及如何与单独交付给你的 Hilt 数据面（data-plane）集成。
+
+每个发布的 tarball 中还随附了一份更简短的快速上手指南，位于 `docs/client-deployment-guide.md`（并按版本以 `README.md` 形式上传）；本指南则是它的长篇配套文档。
+
+## 什么是采集器
+
+采集器是一个独立的静态 Linux 二进制文件（约 5 MB，零依赖），外加一个由该二进制文件在启动时加载进内核的 eBPF 程序。它将 tracepoint 挂载到一小组内核入口点上，从中派生出具备身份感知能力的事件流，在用户态过滤掉高频噪声，并将结果发送到你的 Hilt 摄取端点。该程序挂载到系统调用和内核钩子上，以捕获进程执行、文件操作和网络事件。
+
+## 采集器_不会_做的事
+
+DMG 采集器严格只做观测。它**不会**：
+
+- **暴露网络服务。** 代理（Agent）只会向你的控制面发起出站 HTTPS 连接，目标由 `DAG_SHIP_URL` 定义。除此之外不会打开任何套接字。
+- **安装内核模块。** 一切都基于带 BTF 的 CO-RE eBPF 运行；没有树外（out-of-tree）驱动、没有 DKMS、也没有自定义内核构建。
+- **修改网络流量。** 代理只做观测；它绝不会注入、丢弃、阻断或更改数据包。隔离（在使用时）是通过 AWS 安全组进行的独立控制面操作，由仪表盘执行，而非由代理执行。
+- **更改主机状态。** 除可选地写入一个配置文件外，不做任何系统修改。
+- **执行外部回调。** 没有许可证检查、遥测信标，也没有任何"phone-home"行为。唯一的出站通信就是已配置的事件流。
+
+## 本指南内容
+
+- [系统要求](/zh/linux-collector/system-requirements)
+- [发布制品](/zh/linux-collector/release-artifacts)
+- [在 Kubernetes 上部署](/zh/linux-collector/deploy-kubernetes)
+- [在 VM 上部署](/zh/linux-collector/deploy-vms)
+- [配置参考](/zh/linux-collector/configuration)
+- [网络与安全](/zh/linux-collector/networking-security)
+- [事件数据模型](/zh/linux-collector/event-data-model)
+- [规模与容量](/zh/linux-collector/sizing-capacity)
+- [端到端数据流](/zh/linux-collector/data-flow)
+- [代理过滤](/zh/linux-collector/agent-filtering)
+- [故障排查](/zh/linux-collector/troubleshooting)

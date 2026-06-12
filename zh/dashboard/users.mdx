@@ -1,0 +1,110 @@
+---
+title: "用户"
+sidebarTitle: "用户"
+description: "跨主机追踪用户身份与活动。"
+---
+
+展示基础设施中哪些用户处于活跃状态，凸显存在风险的身份，并支持下钻查看单个用户的活动与取证时间线。
+
+---
+
+## 主机群汇总栏
+
+在用户列表上方，有三个统计标签（pill）汇总当前范围：
+
+| 标签 | 含义 |
+| --- | --- |
+| **活跃用户** | 在此时间范围内有活动的用户 |
+| **存在风险** | 被标记为异常或严重风险的用户 |
+| **严重** | 处于严重风险的用户 |
+
+---
+
+## 用户列表
+
+{/* TODO: Describe user cards — identity, activity summary, risk indicators */}
+
+{/* TODO: Describe user cards — identity, activity summary, risk indicators */}
+
+### 过滤与搜索
+
+- **分段切换** —— **全部** 或 **存在风险**（风险级别为 _异常_ 或 _严重_ 的用户）。
+- **搜索** —— 按身份、身份来源，或 Okta 名称/邮箱进行过滤。
+
+用户先按风险排序（严重 → 异常 → 正常），再按身份来源优先级，最后按事件数排序。
+
+### 用户卡片
+
+每个用户都是一张可点击的卡片，展示：
+
+- **头像** —— 姓名缩写；存在风险时着色为红色（严重）或琥珀色（异常）。
+- **显示名称** —— 已知时显示 Okta 全名，否则显示原始身份。
+- **事件数**，并在存在异常时附带 **· N 条告警**。
+- **次要行** —— 原始身份（当其不同时）、相对的最近一次出现时间，以及身份来源提示，例如 **Okta verified**、**Teleport**、**Verified chain**、**Linux**、**Owner** 或 **SSH / IP**。
+- **类型徽章** —— 针对非个人账户的 **Shared**（共享）或 **Service**（服务）。
+
+被选中的卡片会带有轮廓（正常风险为绿色，存在风险为红色/琥珀色）。
+
+---
+
+## 用户详情
+
+{/* TODO: Describe the user timeline view — chronological activity per user */}
+
+{/* TODO: Describe the user timeline view — chronological activity per user */}
+
+{/* TODO: Describe the insight cards — behavioral patterns, access anomalies */}
+
+{/* TODO: Describe the insight cards — behavioral patterns, access anomalies */}
+
+{/* TODO: Describe the process list within a user's timeline */}
+
+{/* TODO: Describe the process list within a user's timeline */}
+
+右侧面板有两个子视图：**摘要**（默认）和 **完整时间线**。
+
+### 摘要标头
+
+- 用户的 **名称** 以绿色显示，并附带 **风险徽章**（_严重_ / _异常_），在适用时还有 **Shared** / **Service** 徽章。
+- 一行元数据：身份、邮箱、部门、身份来源、事件数、主机数，以及当异常告警数大于零时的告警数。
+
+### 洞察卡片
+
+一段简短的行为叙述。
+
+### 活动明细
+
+用户事件的环形图，中心显示总数。图例各行可点击，并按事件类型深度链接到「调查」：
+
+| 图例 | 事件类型 |
+| --- | --- |
+| **Files** | 文件打开 |
+| **Network** | 网络流 |
+| **Exec** | 进程执行 |
+| **Exec trace** | Exec enter 事件 |
+
+### 关键事件
+
+最多五条与该用户行为标记相匹配的近期事件。每行显示时间戳、事件类型徽章、详情、一个标记标签（例如 **Sensitive files**、**Data exfiltration**、**Credential access**），以及一段简短的原因说明。
+
+### 取证时间线预览
+
+按进程分组的精简预览，最多三个进程、每个进程最多三条事件，随后是 **查看完整时间线** 链接和一段 `N events across N process(es)` 摘要。
+
+### 跳转导航
+
+通过轮廓按钮跳转到其他位置，并携带当前用户的范围：
+
+| 按钮 | 跳转至 |
+| --- | --- |
+| **调查事件** | 「调查」，范围限定为该用户 |
+| **异常告警** | 当前时间范围的「异常」 |
+| **进程树** | 「进程」（当主机已知时） |
+
+---
+
+## 完整时间线
+
+选择 **查看完整时间线**（或时间线子视图）后，摘要会被替换为该用户活动的按时间排序的 **泳道（swimlane）**。**返回摘要** 按钮可回到概览，副标题会显示身份及其事件数和进程数。
+
+每行排布了时间戳、彩色的进程线程泳道、命令、事件类型徽章和详情。行可展开以显示取证字段、文件路径、命令行、流、用户/属主/血缘/UID 以及跳转链接，并通过 **More** / **Less** 显示更多字段。页脚汇总了事件数和峰值并发进程数。

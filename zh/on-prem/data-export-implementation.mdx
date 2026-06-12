@@ -1,0 +1,144 @@
+---
+title: "运行导出"
+sidebarTitle: "运行导出"
+description: "匿名化规则、运行导出流水线，以及客户可用的控制项。"
+---
+
+## 匿名化规则
+
+### 主机 ID 重映射
+
+```text
+Original:  a3f8c2e1-7b4d-4a9e-b6f3-2c8d1e5a7f90
+Exported:  host-0001
+```
+
+会在导出时构建一个确定性映射：主机按首次出现的顺序排序，并依次分配顺序 ID。该映射存储在单独的 `host_map.json` 中，保留在该部署的 S3 存储桶内（绝不导出到 Hilt），以便在需要时反向关联。
+
+### 时间抖动
+
+整个数据集会按 0 到 48 小时之间的均匀随机偏移量进行平移。这可以防止 Hilt 将导出时间戳与已知的客户事件（故障、事故、新闻发布）相关联。该偏移量会记录在导出清单中，供客户存档备查。
+
+### UID 重映射
+
+Unix UID 会按每台主机重映射为顺序整数。UID 0（root）保留为 0，因为它带有与模型相关的安全语义。
+
+### 列剪裁
+
+导出查询仅选取白名单内的列，不使用 `SELECT *`。具体而言：
+
+- 绝不从 `dag_epoch_tokens` 中选取 `token_evidence_json`
+- 绝不从 `dag_anomaly_scores` 中选取 `evidence`、`reason`、`drivers`、`owner`、`identity`
+- 会选取 `host_id`，但在写入 Parquet 之前会对其重映射
+
+### 死时段过滤
+
+满足 `exec_count + file_open_count + net_flow_count == 0` 的行会被丢弃。
+
+### 最小主机数阈值
+
+主机数少于 5 台的导出会被拒绝。这可以防止从高度专门化的单主机环境导出数据 —— 在那种环境下，仅凭特征分布本身就可能识别出该工作负载。
+
+## 运行一次导出
+
+导出以一次性 Kubernetes Job 的形式在现有 EKS 集群上运行，使用与 enrichment 服务相同的 ClickHouse 凭证。
+
+<Steps>
+  <Step title="启用导出能力">
+    ```bash
+    terraform -chdir=envs/app apply -var data_export_enabled=true
+    ```
+  </Step>
+  <Step title="触发导出作业">
+    ```bash
+    kubectl create job --from=cronjob/dag-data-export dag-data-export-$(date +%s)
+    ```
+  </Step>
+  <Step title="监控进度">
+    ```bash
+    kubectl logs -f job/dag-data-export-<id>
+    ```
+  </Step>
+  <Step title="查看清单与样本">
+    写入到 S3 存储桶。
+
+    ```bash
+    aws s3 cp s3://<bucket>/exports/latest/manifest.json -
+    aws s3 cp s3://<bucket>/exports/latest/sample.parquet ./sample.parquet
+    python3 -c "import pandas as pd; print(pd.read_parquet('sample.parquet').head(20))"
+    ```
+  </Step>
+  <Step title="批准导出">
+    仅当 `data_export_require_approval=true` 时才需要。作业会轮询该 ConfigMap，一旦找到便继续执行。
+
+    ```bash
+    kubectl create configmap dag-export-approval --from-literal=approved=true
+    ```
+  </Step>
+  <Step title="验证最终归档">
+    ```bash
+    aws s3 ls s3://<bucket>/exports/latest/
+    # export-2026-06-05.parquet.zst        (compressed Parquet)
+    # export-2026-06-05.parquet.zst.sha256 (integrity hash)
+    # manifest.json                        (schema, row count, date range, host count)
+    # host_map.json                        (host ID mapping — stays in customer bucket)
+    ```
+  </Step>
+</Steps>
+
+### 导出清单（`manifest.json`）
+
+```json
+{
+  "schema_version": 1,
+  "export_id": "exp-20260605-a8c3f2",
+  "created_at": "2026-06-05T12:00:00Z",
+  "date_range": {
+    "start": "2026-05-06T00:00:00Z",
+    "end": "2026-06-05T00:00:00Z"
+  },
+  "temporal_jitter_hours": 17.3,
+  "row_count": 1482937,
+  "host_count": 47,
+  "columns": [
+    "epoch_ts", "host_id_anon", "uid_anon", "phase", "is_active", "is_anomaly",
+    "topk_sum", "volume_topk", "numeric_features", "derived_features",
+    "token_ids", "token_sub_epochs", "token_counts", "token_importances",
+    "token_depths", "token_roles", "total_events", "tokens_before_topk",
+    "ml_label", "ml_source"
+  ],
+  "excluded_columns_note": "token_evidence_json, evidence, reason, drivers, owner, identity, host_id, boot_id, alert_source, rule_id, rule_name, rule_label, rule_severity, matched_conditions, all dag_events columns, all Postgres tables",
+  "file_size_bytes": 284729384,
+  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "format": "parquet+zstd",
+  "approved": false,
+  "approved_by": "",
+  "approved_at": ""
+}
+```
+
+## 客户可用的控制项
+
+### 传输前审查
+
+当 `data_export_require_approval = true`（默认值）时，导出会生成一份清单和一个 20 行的样本 Parquet 文件。完整归档会被加密并暂存，但在客户创建批准 ConfigMap 之前不会传输。用户可以：
+
+- 检查清单，准确了解包含了哪些列。
+- 加载样本 Parquet 以验证匿名化效果。
+- 通过从其 S3 存储桶中删除暂存文件来拒绝导出。
+
+### 日期范围控制
+
+用户可通过 `data_export_date_range_days` 控制要导出多少历史数据。他们也可以通过覆盖 Job 的 `DATE_START` 和 `DATE_END` 环境变量，针对特定时间窗运行导出。
+
+### 删除
+
+用户可以随时从其 S3 存储桶中删除已导出的数据。
+
+### 审计轨迹
+
+每次导出都会创建一个 Kubernetes 事件，并且（如果配置了 webhook）发送一条通知，其中包含导出 ID、行数、日期范围和批准状态。`host_map.json` 仅保留在客户自己的存储桶中。
+
+## Hilt 能看到什么
+
+不含任何文件名、IP 地址、主机名、用户名、云资源 ID、检测规则名称或匹配描述。只有行为特征向量和经过抽象的安全 token 序列。

@@ -1,0 +1,138 @@
+---
+title: "在 VM 上部署"
+description: "通过 systemd 在裸 EC2 或本地部署的 Linux 上安装 DMG 采集器，涵盖交互式与自动化安装。"
+---
+
+## 主机资源
+
+DMG 采集器会在主机上安装一小组文件：
+
+| 路径 | 用途 |
+| :-- | :-- |
+| `/usr/local/bin/dag-agent` | 静态采集器二进制文件 |
+| `/etc/systemd/system/dag-agent.service` | systemd unit 文件 |
+| `/etc/systemd/system/dag-agent.service.d/limits.conf` | 可选的 CPU / 内存限制 drop-in |
+| `/etc/dag-agent/config.yaml` | 配置 |
+| `/var/log/dag-agent/events.jsonl` | 事件输出文件（若为文件模式） |
+
+## 安装
+
+采集器既可以交互式安装（推荐用于首次设置），也可以非交互式安装以用于自动化。
+
+### 交互式安装
+
+```bash
+tar xzf dag-agent-v<X>-linux-<arch>.tar.gz
+cd dag-agent-v<X>-linux-<arch>
+
+./dag-agent -V
+sudo ./install.sh
+```
+
+安装程序会运行一个简短的配置向导：
+
+| 提示 | 典型回答 |
+| :-- | :-- |
+| Ship URL | 控制面的 PrivateLink 目标地址（文件模式下留空） |
+| JSON output path | `/var/log/dag-agent/events.jsonl`（默认），若仅发送（ship-only）则留空 |
+| Node label | 默认为 `$(hostname)` |
+| CPU limit | 例如 `20%` —— 可选 |
+| Memory limit | 例如 `512M` —— 可选 |
+| Ring buffer size | `1M`（默认），在繁忙主机上最高可达 `16M` |
+
+提交后，安装程序会：
+
+1. 验证环境要求（否则会带着清晰的错误信息退出）。
+2. 验证到 `SHIP_URL` 的连通性。
+3. 安装二进制文件，写入 unit 文件\+可选的限制 drop-in，创建日志目录，并启动服务。
+
+### 非交互式 / 自动化安装
+
+对于配置管理（Ansible、SSM、cloud-init、Packer），可以预先注入环境变量，或直接安装：
+
+```bash
+install -m 755 dag-agent /usr/local/bin/dag-agent
+install -m 644 dag-agent.service /etc/systemd/system/dag-agent.service
+
+mkdir -p /etc/dag-agent /var/log/dag-agent
+
+cat > /etc/dag-agent/config.yaml <<'YAML'
+ship_url: "https://<name>-ingest.hilt.ai"
+output_path: "/var/log/dag-agent/events.jsonl"
+node_id: "${NODE_ID}"
+YAML
+
+# Optional limits
+mkdir -p /etc/systemd/system/dag-agent.service.d
+cat > /etc/systemd/system/dag-agent.service.d/limits.conf <<'UNIT'
+[Service]
+CPUQuota=20%
+MemoryMax=512M
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now dag-agent
+```
+
+## 服务配置
+
+systemd unit（`deploy/dag-agent.service`）非常精简：
+
+```ini
+[Unit]
+Description=Cybe DAG Agent - eBPF Telemetry Sensor
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/dag-agent
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+LimitMEMLOCK=infinity
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`LimitMEMLOCK=infinity` 是 BPF map 分配所必需的。如果受策略限制，请将其设置为预期的 map 总大小（默认配置下约 4 MB）。
+
+## 验证
+
+```bash
+sudo systemctl status dag-agent
+sudo journalctl -u dag-agent --no-pager -n 20
+```
+
+预期输出：
+
+```text
+dag-agent v<X> starting
+Ship mode: https://<name>-ingest.hilt.ai
+BPF object loaded; attached N programs
+```
+
+## 升级
+
+原地升级包括替换二进制文件并重启服务：
+
+```bash
+sudo install -m 755 dag-agent /usr/local/bin/dag-agent
+sudo systemctl restart dag-agent
+```
+
+对于主机群升级，随附了一个 shell 脚本（`deploy/ci-install.sh`），它假定节点此前已用 `install.sh` 完成过一次引导，因此只执行二进制替换\+重启（无向导）。典型的对接方式：
+
+- **AWS SSM Run Command：** 跨标签选择器（`Role=agent`、`Env=prod`）执行，用一行命令拉取新 tarball 并运行该 shell。
+- **Ansible / Salt：** 将 `/usr/local/bin/dag-agent` 视为一个来源于你的制品缓存的受管文件。
+- **Packer / Image Builder：** 将代理烘焙进基础 AMI，并通过你惯用的镜像替换流程进行滚动更新。
+
+## 卸载
+
+```bash
+sudo ./uninstall.sh
+```
+
+移除服务和二进制文件，保留日志。无需重启。

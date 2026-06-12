@@ -1,0 +1,27 @@
+---
+title: "网络与安全"
+description: "出站网络态势、隔离网络（airgapped）运行、特权模型以及数据驻留。"
+---
+
+## 出站
+
+- 只有一个目的地：`DAG_SHIP_URL`（即你账户中的 Hilt 接入 PrivateLink 端点）。流量为 HTTPS 并使用你的 CA 证书链；该端点出示一张针对你的私有区域签发的 ACM 证书。
+- 无需向公共解析器泄露任何 DNS——接入域名位于与你的 VPC 关联的私有 Route 53 区域中，因此解析在你的 VPC 内部完成，TCP 路径经由 PrivateLink 端点服务到达接入 NLB。
+- **防火墙规则：** 允许代理（Agent）的源 CIDR 通过 TCP/443 访问 PrivateLink 端点。对于跨 VPC 的部署，PrivateLink 消费端端点即为网关；对于同 VPC 的部署，流量完全在 VPC 内部流转。
+
+## 隔离网络 / 离线
+
+- 发布包中包含一个静态二进制文件以及一个可通过 `docker save` 导出的镜像；运行时不会拉取任何更新。
+- 在文件模式下（未设置 `DAG_SHIP_URL`），代理会在本地写入 JSONL，之后由你现有的日志转发器接管处理。
+
+## 特权模型
+
+| 路径 | 要求 |
+| :-- | :-- |
+| VM / systemd | 必须以 root 身份运行；systemd 单元使用默认特权 \+ `LimitMEMLOCK=infinity` |
+| Kubernetes DaemonSet | `securityContext.privileged: true` \+ `hostPID` \+ `hostNetwork` |
+| Docker 独立运行 | `--privileged` \+ `--pid=host` |
+
+## 数据驻留
+
+事件永远不会离开你的 AWS 账户。Hilt 不会接收、镜像代理事件，也无法以任何带外方式访问这些事件。

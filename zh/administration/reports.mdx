@@ -1,0 +1,40 @@
+---
+title: "报告"
+sidebarTitle: "报告"
+description: "基于 Hilt 发现项生成并导出安全报告。"
+---
+
+基于遥测数据和发现项生成基础设施与安全报告，可导出为 PDF。提供两种报告类型：面向高管的 **Overview**（概览）报告，以及更为深入的 **Process Intel**（进程情报）拆解报告。
+
+---
+
+## Overview 报告
+
+一份覆盖所选时间段的单页高管摘要：
+
+- **Risk identified**（已识别风险）——一个按类别划分检测结果的环形图，中心显示异常总数。
+- **Detection funnel**（检测漏斗）——从 _anomalies flagged_（标记的异常）经 _analyst reviewed_（分析师已审查）、_validated threats_（已验证的威胁）、_hosts quarantined_（已隔离的主机）到 _hosts restored_（已恢复的主机）的各个阶段，并附带准确率 KPI。
+- **ROI 卡片**——采集器覆盖情况（活跃/离线/用户）、被拦截的出站请求，以及被阻止的敏感文件活动。
+- **图表**——该时间段内的传输量（随时间变化的字节数）和文件活动。
+
+如果该时间段内没有任何检测结果，风险环形图会做出相应说明。
+
+---
+
+## Process Intel 报告
+
+一份针对该时间段、按主机划分的进程情报拆解报告，以一条 KPI 横条开头（主机数、不同程序数、进程总数、派生链、网络进程数、被访问的文件数）。随后详细列出：
+
+1. **Top spawn chains**（主要派生链）——父进程 → 子进程的启动情况，以图表和表格呈现。
+2. **Process network activity**（进程网络活动）——每个进程的网络流、收发字节数、目的地以及涉及的主机。
+3. **Process file activity**（进程文件活动）——按事件量排序的主要目录。
+4. **File classification breakdown**（文件分类拆解）——按类别分组的文件。
+5. **Flagged files**（被标记的文件）——值得关注的文件，附带其类别、事件数、进程及原因。
+
+---
+
+## 导出为 PDF
+
+**Export PDF** 会在服务端渲染当前视图和时间段，并打开一个全屏的 **PDF preview**（PDF 预览），其中带有 **Download** 按钮。文件以报告类型、时间段和日期命名（例如 `Hilt-Overview-Past-7-Days-2026-06-05.pdf`）。
+
+导出仅生成 PDF，本页面不提供 CSV、邮件或分享链接等选项。

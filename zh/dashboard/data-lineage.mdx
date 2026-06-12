@@ -1,0 +1,133 @@
+---
+title: "数据血缘"
+sidebarTitle: "数据血缘"
+description: "可视化数据在主机、进程与网络连接之间的流动方式。"
+---
+
+{/* TODO: Screenshot of the data lineage page */}
+
+追踪某台主机的进程关系与执行会话：哪些进程派生出哪些进程、它们运行了什么，以及链路中何处浮现出异常。
+
+## 页面布局
+
+页面标题栏承载各项控件，并会根据你正在查看的内容自适应：
+
+- **主机选择器** 和 **时间范围**（与仪表盘其余部分共享）。
+- **返回链接** — 当选中某台主机时，会出现一个 **所有主机** 链接，可让你回到主机群视图。
+- **视图切换** — 在选中某台主机后出现：**数据流** / **会话**。
+- **调查事件** — 跳转到调查页面，范围限定为当前主机与时间窗口。
+
+标题栏下方有一条 **指标概要带**，展示进程数、网络连接数、文件访问数，以及身份数与异常数。
+
+进程、关系与异常卡片均可点击，并会针对相同范围深度链接到调查或异常页面。
+
+---
+
+## 主机群概览
+
+在未选中任何主机时，页面会展示全主机群范围的 **进程活动**。
+
+### 行为
+
+- **默认排序** — 进程数，由高到低。
+- **点击某一行** 可深入查看该主机的数据流视图。
+- **Kubernetes 分组** — 同一集群中的节点会折叠到一个可展开的集群行下，并显示节点数量。
+
+如果没有任何活动，表格会提示你扩大时间窗口。
+
+---
+
+## 数据流视图
+
+{/* TODO: Describe the main flow graph visualization — nodes, edges, what they represent */}
+
+{/* TODO: Describe the main flow graph visualization — nodes, edges, what they represent */}
+
+默认的单主机视图。一张流图（基于 React Flow 构建）为所选主机和时间范围布局出 **父进程 → 子进程的关系**。
+
+### 节点
+
+每个节点都是一张进程卡片，展示：
+
+- 命令（`comm`）以及运行它的身份。
+- 一个行为分组徽章。
+- 活动概要 — `N events · N execs`。
+
+作为某个异常证据的进程会以红色描边圈出。
+
+### 浏览图
+
+- **放大 / 缩小** 和 **适应视图** 控件位于画布上；小地图固定在右上角。
+- **集群节点** 将相关进程分组，点击可展开。已展开的父节点提供 **折叠子项**，并且只要有任意集群处于展开状态，就会出现一个全局的 **全部折叠**。
+
+### 流详情面板
+
+{/* TODO: Describe the data flow view — file → process → network chains */}
+
+{/* TODO: Describe the data flow view — file → process → network chains */}
+
+{/* TODO: Describe the process topology view — process trees and their relationships */}
+
+{/* TODO: Describe the process topology view — process trees and their relationships */}
+
+点击某个进程节点（根节点或集群节点除外），会从右侧滑入一个详情面板：
+
+| 部分 | 内容 |
+| --- | --- |
+| **标题** | 进程命令，标注为 "Process" |
+| **身份** | 运行它的身份 |
+| **活动** | 执行次数、事件数、PID 以及活跃时长 |
+| **风险信号** | 诸如 _dominant_、_high fan-out_、_root activity_、_persistent_、_brief_、_singleton_、_high churn_ 之类的徽章 |
+| **派生** | 指向下游子进程的可点击链接 |
+| **页脚** | **调查事件**，按该进程过滤 |
+
+该详情面板描述的是所选的 **进程节点**，而非图中的边。
+
+---
+
+## 会话视图
+
+{/* TODO: Describe the network view — network connections in the lineage context */}
+
+{/* TODO: Describe the network view — network connections in the lineage context */}
+
+{/* TODO: Describe the enrichment view — how ML enrichment is visualized */}
+
+{/* TODO: Describe the enrichment view — how ML enrichment is visualized */}
+
+将单主机切换开关切到 **会话**，即可检查执行会话——即进程活动反复出现的形态，并可加载任意单次运行。
+
+### 选择会话
+
+会话按 **分组**（反复出现的 exec 形态）进行组织。使用分组控件来查找并加载某次运行：
+
+- **已分组会话** — 此时间范围内反复出现的形态。
+- **在此分组中选择会话** — 挑选某一次具体运行加载到图中。
+- 分组弹出框（**此范围内的分组**）允许你展开某一行以查看示例会话，然后从中选择一个。
+
+每个分组（集群）行会显示命令链（`parent_comm → comm`）、用于多次运行分组的会话计数徽章，以及诸如 exec 次数和时长（或反复出现的运行之间相隔多远）之类的统计信息。展开某个多次运行的分组，会显示带有会话 id、exec 次数、时长、身份和容器的 **示例会话**。
+
+低信号的分组会作为 **背景模式**（单次 exec、单次运行）被收起。使用 **显示背景模式** 将其展开，使用 **隐藏背景** 将其重新折叠。
+
+### 会话详情
+
+{/* TODO: Describe how sessions are surfaced in the lineage view */}
+
+{/* TODO: Describe how sessions are surfaced in the lineage view */}
+
+{/* TODO: Describe the fleet-wide lineage overview */}
+
+{/* TODO: Describe the fleet-wide lineage overview */}
+
+{/* TODO: Describe the detail panel that appears when clicking a flow edge or node */}
+
+{/* TODO: Describe the detail panel that appears when clicking a flow edge or node */}
+
+一旦选中某个会话，视图便会分为两栏：
+
+- **左侧** — 会话执行图，其下方为分组选择器。
+- **右侧** — 该会话的 **事件** 面板。
+
+事件面板列出进程事件，包含 **Time**、**Type**、**Detail** 和 **UID** 列，并随你滚动而加载更多（无限滚动）。会话标题栏显示命令链、exec 次数、时长、身份和容器，以及 **已从图中选择 · 重置** 和一个 **调查** 链接。
+
+---
