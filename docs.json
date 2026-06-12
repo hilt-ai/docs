@@ -45,7 +45,8 @@
                       "dashboard/networks",
                       "dashboard/files",
                       "dashboard/users",
-                      "dashboard/query"
+                      "dashboard/query",
+                      "dashboard/mcp-server"
                     ]
                   },
                   {
