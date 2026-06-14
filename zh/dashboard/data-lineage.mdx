@@ -4,8 +4,6 @@ sidebarTitle: "数据血缘"
 description: "可视化数据在主机、进程与网络连接之间的流动方式。"
 ---
 
-{/* TODO: Screenshot of the data lineage page */}
-
 追踪某台主机的进程关系与执行会话：哪些进程派生出哪些进程、它们运行了什么，以及链路中何处浮现出异常。
 
 ## 页面布局
@@ -39,10 +37,6 @@ description: "可视化数据在主机、进程与网络连接之间的流动方
 
 ## 数据流视图
 
-{/* TODO: Describe the main flow graph visualization — nodes, edges, what they represent */}
-
-{/* TODO: Describe the main flow graph visualization — nodes, edges, what they represent */}
-
 默认的单主机视图。一张流图（基于 React Flow 构建）为所选主机和时间范围布局出 **父进程 → 子进程的关系**。
 
 ### 节点
@@ -62,14 +56,6 @@ description: "可视化数据在主机、进程与网络连接之间的流动方
 
 ### 流详情面板
 
-{/* TODO: Describe the data flow view — file → process → network chains */}
-
-{/* TODO: Describe the data flow view — file → process → network chains */}
-
-{/* TODO: Describe the process topology view — process trees and their relationships */}
-
-{/* TODO: Describe the process topology view — process trees and their relationships */}
-
 点击某个进程节点（根节点或集群节点除外），会从右侧滑入一个详情面板：
 
 | 部分 | 内容 |
@@ -87,14 +73,6 @@ description: "可视化数据在主机、进程与网络连接之间的流动方
 
 ## 会话视图
 
-{/* TODO: Describe the network view — network connections in the lineage context */}
-
-{/* TODO: Describe the network view — network connections in the lineage context */}
-
-{/* TODO: Describe the enrichment view — how ML enrichment is visualized */}
-
-{/* TODO: Describe the enrichment view — how ML enrichment is visualized */}
-
 将单主机切换开关切到 **会话**，即可检查执行会话——即进程活动反复出现的形态，并可加载任意单次运行。
 
 ### 选择会话
@@ -110,18 +88,6 @@ description: "可视化数据在主机、进程与网络连接之间的流动方
 低信号的分组会作为 **背景模式**（单次 exec、单次运行）被收起。使用 **显示背景模式** 将其展开，使用 **隐藏背景** 将其重新折叠。
 
 ### 会话详情
-
-{/* TODO: Describe how sessions are surfaced in the lineage view */}
-
-{/* TODO: Describe how sessions are surfaced in the lineage view */}
-
-{/* TODO: Describe the fleet-wide lineage overview */}
-
-{/* TODO: Describe the fleet-wide lineage overview */}
-
-{/* TODO: Describe the detail panel that appears when clicking a flow edge or node */}
-
-{/* TODO: Describe the detail panel that appears when clicking a flow edge or node */}
 
 一旦选中某个会话，视图便会分为两栏：
 

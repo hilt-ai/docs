@@ -1,253 +1,85 @@
 ---
 title: "Agent filtering"
 sidebarTitle: "Agent filtering"
-description: "How the collector reduces raw syscall volume to a security-relevant event stream using kernel-space and userspace filters."
+description: "How the collector reduces raw syscall volume to a security-relevant event stream."
 ---
 
-The agent captures kernel-level telemetry (file access, process execution, network flows) via eBPF. On a busy host, raw syscall volume can exceed **100k events/second** the vast majority of which is OS housekeeping noise with low governance value. The filtering system reduces this to a manageable stream of security-relevant events through a two-tier architecture: **kernel-space** filters that drop events before they ever leave the eBPF ring buffer, and **userspace** filters that apply richer logic once events reach the agent process.
+The collector captures kernel-level telemetry (file access, process execution, network flows) via eBPF. On a busy host, raw syscall volume can exceed **100k events/second** — the vast majority of which is OS housekeeping noise with low governance value. The filtering system reduces this to a manageable stream of security-relevant events through a two-tier architecture.
 
 ## Architecture overview
 
-Events that survive both tiers are serialized to JSON and either written to disk or shipped to the collector.
-
-## Tier 1: kernel-space filters
-
-Kernel-space filters execute inside eBPF programs attached to syscall tracepoints. They run on **every** syscall invocation and must be fast, the payoff is that dropped events never consume ring buffer capacity or wake the userspace agent.
-
-### Self-filter (`is_self`)
-
-Every BPF program's first check. Compares the calling process's TGID against the agent's own PID (stored in `self_tgid_map` at startup). Without this, the agent's own file I/O and network traffic would create a feedback loop.
-
-### Comm filter (`is_comm_filtered`)
-
-Drops events from processes whose `comm` (task name, 16 bytes) matches a pre-populated BPF hash map. 
-
-**Default filtered comms:**
-
-| Process | Reason |
-| :-- | :-- |
-| `irqbalance` | IRQ distribution daemon — constant `/proc` reads |
-| `gssproxy` | Kerberos / GSSAPI proxy — heavy socket \+ file I/O |
-| `sleep` | Shell `sleep` builtin — zero security relevance |
-
-This filter is applied to `openat`, `openat2`, `unlinkat`, `renameat2`, `fchmodat`, and `sched_process_fork` tracepoints. It is **not** applied to `sched_process_exec` (we always want to see what was executed) or `inet_sock_set_state` (runs in softirq context where `current->comm` is unreliable).
-
-### Path prefix filter (`is_path_filtered`)
-
-A fast, fixed-logic prefix matcher that drops read-only file opens on well-known noisy paths before they reach the ring buffer. It eliminates the majority of benign locale, library, and pseudo-filesystem reads.
-
-**Filtered prefixes:**
-
-| Prefix | What it catches |
-| :-- | :-- |
-| `/proc/` | procfs reads (per-PID stat, status, mountinfo) |
-| `/dev/` | Device file access (null, tty, urandom) |
-| `/sys/` | sysfs / cgroup controller reads |
-| `/usr/lib/` | Shared library loads |
-| `/usr/share/` | Locale data, shared assets |
-| `/etc/l` | `ld.so.cache`, `localtime` |
-
-**Write bypass:** For `openat`, if the flags include any write flag (`O_WRONLY | O_RDWR | O_CREAT | O_TRUNC | O_APPEND`), the path filter is skipped entirely. Writes to `/proc`, `/dev`, or `/sys` are always security-relevant.
-
-## Tier 2: userspace filters
-
-Userspace filters run when the agent polls events from the ring buffer. They have access to the full event struct and can perform operations (string matching, trie lookups, CIDR arithmetic) that are impossible or impractical in BPF.
-
-### Self-filter (userspace)
-
-Catches any events that leaked past the kernel self-filter (e.g., during the brief window between `main_bpf__attach()` and `self_tgid_map` population).
-
-### Process comm filter (userspace)
-
-Mirrors the kernel comm filter as a defense-in-depth backstop. Identical process list: `irqbalance`, `gssproxy`, `sleep`.
-
-### Kubernetes infrastructure filter
-
-On Kubernetes nodes, system components generate enormous file-open volume against non-sensitive paths. This filter drops read-only file opens from K8s infrastructure processes **unless** the path matches a sensitive-path allowlist.
-
-**Filtered K8s comms:**
-
-| Process | Role |
-| :-- | :-- |
-| `kubelet` | Node agent |
-| `containerd-shim` | Container runtime shim |
-| `eks-node-monito` | EKS node monitoring |
-| `eks-healthchec` | EKS health checker |
-| `eks-pod-identit` | EKS pod identity agent |
-| `eks-ebs-csi-dri` | EKS EBS CSI driver |
-| `coredns` | Cluster DNS |
-| `systemd` | Init system |
-| `systemctl` | systemd CLI |
-
-**Sensitive path allowlist**, file opens from the above processes are **kept** if the path contains:
-
-| Pattern | Why it matters |
-| :-- | :-- |
-| `token` | Service account tokens, API tokens |
-| `ca.crt` | Certificate authority certificates |
-| `secret` | Kubernetes secrets |
-| `Corefile` | CoreDNS configuration |
-| `resolv.conf` | DNS resolver config |
-| `kubeconfig` | Kubernetes credentials |
-
-If `comm` is a K8s infra process AND the file open has no write flags AND the path doesn't match the sensitive allowlist → filter. All writes from K8s infra processes are always passed through.
-
-### Auxv noise filter
-
-Drops `/proc/self/auxv` reads from `uptime` and `free` — these are benign ELF auxiliary vector reads that add no governance signal.
-
-### Path filter trie (`path_filter_match`)
-
-A userspace trie data structure for high-fidelity path matching with support for exact matches, prefix matches, suffix matches, and wildcards. It handles paths that passed the kernel filter but are still noise.
-
-#### System libraries and locale
-
-| Path | Mode | Suffix |
+| Tier | Where it runs | Purpose |
 | :-- | :-- | :-- |
-| `/usr/lib/locale` | prefix | — |
-| `/usr/share/locale` | prefix | — |
-| `/usr/share/locale-langpack` | prefix | — |
-| `/usr/lib64/gconv` | prefix | — |
-| `/usr/lib/gconv` | prefix | — |
-| `/lib64` | prefix | `.so` |
-| `/lib` | prefix | `.so` |
+| **Kernel-space** | Inside eBPF programs on syscall tracepoints | Drops obvious noise before it ever leaves the ring buffer — zero userspace cost |
+| **Userspace** | In the collector process after ring buffer read | Applies richer logic (string matching, CIDR math) that isn't feasible in BPF |
 
-#### System configuration
+Events that survive both tiers are serialized and either written to disk or shipped to the ingest endpoint.
 
-| Path | Mode |
+---
+
+## What gets filtered
+
+The filtering pipeline removes events that have no governance or security value:
+
+| Category | Examples | Why filtered |
+| :-- | :-- | :-- |
+| **Self-events** | The collector's own I/O | Prevents feedback loops |
+| **OS housekeeping** | Locale loads, shared library opens, procfs reads | High volume, zero security signal |
+| **Infrastructure noise** | Kubernetes node-agent file reads, systemd transient units | High volume from well-understood system components |
+| **Loopback traffic** | localhost and link-local network connections | Internal-only, not governance-relevant (configurable) |
+
+---
+
+## What is never filtered
+
+Certain event categories bypass all filtering regardless of source:
+
+- **All process executions** — the collector always records what was executed, even from filtered processes
+- **All write operations** — file writes to any path are always security-relevant
+- **Container lifecycle events** — required for maintaining container identity mapping
+- **Sensitive path access** — reads of credential files, tokens, secrets, and security-relevant configuration are preserved even from infrastructure processes
+
+---
+
+## Filtering behavior guarantees
+
+| Guarantee | Detail |
 | :-- | :-- |
-| `/etc/ld.so.cache` | exact |
-| `/etc/localtime` | exact |
-| `/etc/nsswitch.conf` | exact |
-| `/etc/hostname` | exact |
-| `/etc/os-release` | exact |
-| `/etc/pki` | prefix |
-| `/etc/crypto-policies` | prefix |
+| **Write-through** | Any file open with write flags always passes — writes are never filtered by path |
+| **Exec-through** | Process execution events are never filtered by process name |
+| **Defense in depth** | Kernel and userspace filters are layered; userspace re-checks as a backstop |
+| **No content inspection** | Filters operate on metadata (path prefix, process name, CIDR) — never on file or packet contents |
 
-#### Procfs (global)
-
-| Path | Mode |
-| :-- | :-- |
-| `/proc/stat` | exact |
-| `/proc/uptime` | exact |
-| `/proc/meminfo` | exact |
-| `/proc/filesystems` | exact |
-| `/proc/loadavg` | exact |
-| `/proc/tty/drivers` | exact |
-| `/proc/sys/kernel/osrelease` | exact |
-| `/proc/sys/kernel/pid_max` | exact |
-| `/proc/sys/kernel/threads-max` | exact |
-| `/proc/sys/crypto/fips_enabled` | exact |
-| `/proc/self/mountinfo` | exact |
-| `/proc/self/oom_score_adj` | exact |
-| `/proc/self/coredump_filter` | exact |
-
-#### Procfs (per-PID, wildcard)
-
-| Path | Mode |
-| :-- | :-- |
-| `/proc/*/stat` | exact |
-| `/proc/*/status` | exact |
-| `/proc/*/wchan` | exact |
-| `/proc/*/statm` | exact |
-| `/proc/*/loginuid` | exact |
-| `/proc/*/cmdline` | exact |
-| `/proc/*/cgroup` | exact |
-| `/proc/*/fd` | exact |
-| `/proc/*/limits` | exact |
-| `/proc/*/net/dev` | exact |
-
-#### Device files
-
-| Path | Mode |
-| :-- | :-- |
-| `/dev/null` | exact |
-| `/dev/tty` | exact |
-| `/dev/urandom` | exact |
-
-#### Kubernetes / systemd noise
-
-| Path | Mode |
-| :-- | :-- |
-| `/var/lib/kubelet/pods` | prefix |
-| `/run/systemd/transient` | prefix |
-| `/run/systemd/units` | prefix |
-| `/run/udev/links` | prefix |
-| `/var/log/messages` | exact |
-| `/var/log/cron.log` | exact |
-| `/var/run/utmp` | exact |
-| `/var/lib/sss` | prefix |
-| `/sys/fs/cgroup` | prefix |
-
-#### Other
-
-| Path | Mode |
-| :-- | :-- |
-| `/aarch64-bottlerocket-linux-gnu` | prefix |
-
-**Match modes:**
-
-- **Exact** (`is_exact = 1`): the full path must match exactly.
-- **Prefix** (`is_exact = 0`): any path that starts with the rule path matches.
-- **Suffix** (`check_suffix = 1`): prefix match plus the full original path must contain the specified suffix string. 
-- **Wildcard** (`*`): a `*` segment matches any single path segment. 
-
-**Trie structure:**
-
-```text
-root
-├── usr
-│   ├── lib
-│   │   ├── locale [prefix]
-│   │   └── gconv [prefix]
-│   └── share
-│       ├── locale [prefix]
-│       └── locale-langpack [prefix]
-├── proc
-│   ├── stat [exact]
-│   ├── uptime [exact]
-│   ├── * (wildcard)
-│   │   ├── stat [exact]
-│   │   ├── status [exact]
-│   │   └── ...
-│   └── ...
-└── ...
-```
-
-Trie lookup is O(d) where d is the depth of the path (number of `/`-separated segments), with O(c) child search at each node where c ≤ 16 (`MAX_CHILDREN`).
-
-## Filter bypass: cgroup lifecycle events
-
-`CGROUP_MKDIR` and `CGROUP_RMDIR` events **bypass all filtering**, both kernel and userspace. These events are critical for maintaining the container identity cache and the `workload_by_cgroup_id` BPF map. Missing a cgroup creation event would leave all subsequent events from that container untagged.
+---
 
 ## Metrics and observability
 
-The agent tracks per-category filter counters and reports them on shutdown and every ~10 seconds to a metrics file:
+The collector tracks filter hit rates and reports them periodically:
 
 | Metric | Description |
 | :-- | :-- |
 | `events_total` | Total events received from the ring buffer |
-| `filtered_self` | Dropped because the event came from the agent itself |
-| `filtered_comm` | Dropped by process name (kernel or userspace comm filter) |
-| `filtered_path` | Dropped by path filter (kernel prefix or userspace trie) |
-| `filtered_net` | Dropped by network CIDR filter |
+| `filtered_self` | Dropped — event came from the collector itself |
+| `filtered_comm` | Dropped — process name matched infrastructure filter |
+| `filtered_path` | Dropped — path matched noise category |
+| `filtered_net` | Dropped — destination matched excluded CIDR |
 | `passed` | Events that survived all filters and were output |
 | `ringbuf_drops` | Events the kernel couldn't submit (ring buffer full) |
 
-On shutdown, a summary is printed to stderr:
+On shutdown, a summary is printed:
 
 ```text
 --- Event Stats ---
 Total: 482031, Filtered: 459218 (95.3%), Passed: 22813
-  By self (agent): 1204, By process (userspace): 38201, By path: 419102, By net dest: 711
-  Note: process-filtered events in kernel not counted above
 ```
 
-## Configuration reference
+---
+
+## Configuration
 
 | Variable | Default | Description |
 | :-- | :-- | :-- |
-| `DAG_EXCLUDE_NET_CIDRS` | _(none)_ | Comma-separated CIDRs to exclude from `NET_FLOW` events |
+| `DAG_EXCLUDE_NET_CIDRS` | _(none)_ | Comma-separated CIDRs to exclude from network flow events |
 | `DAG_DISABLE_DEFAULT_LOCALHOST_FILTER` | `0` | Set to `1` to keep loopback and link-local traffic |
 
-The comm filter and path filter rules are compiled into the agent binary and are not user-configurable at runtime.
+The built-in noise filters are compiled into the collector and are not user-configurable. They target well-known system paths and infrastructure processes that generate high volume with no security signal.

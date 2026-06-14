@@ -1,0 +1,90 @@
+---
+title: "Getting Started"
+sidebarTitle: "Getting Started"
+description: "From contract to first finding — deployment phases, responsibilities, and what to expect in week one."
+---
+
+This page walks you through what happens between signing your contract and seeing your first security findings. It covers who does what, the deployment timeline, and what to expect while the platform learns your environment.
+
+---
+
+## Deployment phases
+
+<Steps>
+  <Step title="Infrastructure provisioning (Day 1–2)">
+    Hilt provisions a single-tenant deployment in your cloud account (AWS, GCP, Azure, or Ali Cloud). This includes the analytics database, dashboard, and ingest endpoint.
+
+    **Who:** Hilt engineering, with your cloud admin granting access.
+
+    **You provide:** A VPC or network segment, IAM/service-account permissions per the deployment guide, and DNS delegation if using a custom subdomain.
+  </Step>
+  <Step title="Collector deployment (Day 2–5)">
+    Deploy the Hilt collector to your hosts. The collector is a single static binary (Linux) or managed agent (macOS) — no dependencies, no kernel modules.
+
+    **Who:** Your infrastructure team, using provided guides:
+    - [Deploy on Kubernetes](/linux-collector/deploy-kubernetes)
+    - [Deploy on VMs](/linux-collector/deploy-vms)
+
+    **Typical scope:** Start with a representative subset (10–50 hosts) covering your main workload types. Expand once baseline is established.
+  </Step>
+  <Step title="Cold start & baseline (Week 1–2)">
+    The detection models begin learning your environment's normal behavior. During this phase:
+
+    - Telemetry flows into the dashboard immediately — you can browse activity from day one
+    - Anomaly scoring starts but operates in **cold-start mode** with elevated thresholds
+    - The platform builds behavioral baselines per host and per user
+
+    **What to expect:** Few or no findings in week one. This is intentional — the models need to observe normal patterns before they can identify deviations.
+  </Step>
+  <Step title="Active scoring (Week 2+)">
+    Once baselines stabilize, scoring thresholds lower and findings begin appearing. The system continues to refine as you provide feedback (confirming or dismissing findings).
+
+    **What to expect:** Initial findings will include both genuine anomalies and patterns that are normal for your environment. Reviewing these (via the [Anomalies](/dashboard/anomalies) page) trains the models to your specific context.
+  </Step>
+</Steps>
+
+---
+
+## Who does what
+
+| Responsibility | Hilt | Customer |
+| :-- | :-- | :-- |
+| Provision cloud infrastructure | ✓ | Grant access |
+| Deploy collectors | Support & guides | ✓ |
+| Configure network/firewall rules | Provide requirements | ✓ |
+| Monitor platform health | ✓ | |
+| Review findings and provide feedback | | ✓ |
+| Platform upgrades | ✓ | Approve maintenance windows |
+| Collector upgrades | Provide artifacts | ✓ (or use auto-update) |
+
+---
+
+## First-week checklist
+
+- [ ] Dashboard accessible at your deployment URL
+- [ ] At least one collector reporting (check [Collectors](/dashboard/collectors) page)
+- [ ] Hosts appearing as "Alive" in the fleet view
+- [ ] Events visible in [Investigate](/dashboard/investigate)
+- [ ] Your team has dashboard accounts with appropriate roles
+
+---
+
+## Realistic timeline
+
+| Milestone | Typical timing |
+| :-- | :-- |
+| First telemetry visible | Hours after collector deploy |
+| Full fleet deployed | 1–5 days (depends on fleet size and deployment method) |
+| Baseline established | 1–2 weeks |
+| First meaningful findings | 2–3 weeks |
+| Model fully calibrated | 4–6 weeks |
+
+The warm-up period varies by environment complexity. Environments with highly regular workloads baseline faster; diverse or bursty environments take longer.
+
+---
+
+## Next steps
+
+- [Linux Collector guide](/linux-collector/layout) — full deployment and configuration reference
+- [Dashboard overview](/dashboard/overview) — navigating the main interface
+- [Trust & Security](/trust-security) — security posture and compliance information

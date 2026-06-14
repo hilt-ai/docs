@@ -1,334 +1,80 @@
 ---
 title: "数据目录"
 sidebarTitle: "数据目录"
-description: "平台存储的所有表和列，以及每一列所包含内容的说明。"
+description: "平台存储的数据类别及各类别所含内容。"
 ---
 
-本页列出分析数据库（ClickHouse）和仪表盘数据库（Postgres）中存储的所有表和列，并说明每一列包含的内容。
+本页描述 Hilt 平台关于您环境所存储的数据类别。内容按各数据类别的含义组织，而非按内部存储细节。
 
-## `dag_events` — 主事件流
+---
 
-受监控主机上观察到的每个系统事件（程序启动、文件打开/重命名/删除、网络连接等）各占一行。这是最大、最详细的表。其他表大多复制此表的列；同名列在所有表中的含义相同。
+## 事件遥测
 
-### 事件基础信息
+平台从您的主机收集的主要数据。每条记录代表一个已观测到的系统事件。
 
-`event_type`、`type`、`kernel_ts_ns`、`wall_time_ns`、`event_time`、`ingest_time`、`parse_error`、`flags`、`mode`、`exec_seq` — 事件类别代码、时间戳和处理标志。
-
-### 进程信息
-
-| 列 | 包含内容 |
+| 类别 | 包含内容 |
 | :-- | :-- |
-| `pid`、`tgid`、`ppid`、`sid`、`ns_pid`、`ns_tgid`、`ns_sid` | 进程 ID 编号 |
-| `uid`、`euid` | 进程运行账户的数字用户 ID |
-| `comm`、`parent_comm` | 程序短名称（如 `bash`、`python3`） |
-| `proc_instance_id`、`prog_id`、`session_id`、`proc_start_time_ns` | 不透明的进程/会话标识符 |
+| **进程执行** | 命令名称、父进程、PID、用户 ID、时间戳、命令行参数 |
+| **文件操作** | 被访问的文件路径、操作类型（打开、重命名、删除、权限变更）、用户和进程上下文 |
+| **网络流** | 源/目标 IP 和端口、协议、发送/接收字节数、连接范围（内部/外部） |
+| **主机标识** | Host ID、主机名、云区域、实例 ID、集群归属 |
+| **用户标识** | 操作系统用户名、解析后的所有者身份、SSH 身份、身份来源及置信度 |
+| **容器/Kubernetes 上下文** | 容器 ID、Pod 名称/命名空间、工作负载控制器、cgroup 信息 |
+| **工作负载与应用标识** | 逻辑工作负载分组、应用名称、应用类型 |
 
-### 进程的行为（事件负载）
+---
 
-| 列 | 包含内容 |
+## 异常检测
+
+检测与评分管道产生的数据。
+
+| 类别 | 包含内容 |
 | :-- | :-- |
-| `filename` | 被执行或访问的完整文件路径 |
-| `argv` | 包含所有参数的完整命令行 |
-| `old_name`、`new_name` | 重命名操作的新旧文件路径 |
+| **异常评分** | 各检测通道每个 epoch 的数值评分、异常标记、评分阶段 |
+| **告警叙述** | AI 生成的发现解释：发生了什么、为何异常、涉及哪些身份 |
+| **行为聚类** | 全舰队行为分组及标签、主机归属、迁移历史 |
+| **检测规则匹配** | 规则名称、严重性、匹配条件、受影响主机及时间窗口 |
 
-### 网络活动
+---
 
-| 列 | 包含内容 |
+## 人工审核
+
+您团队的分诊活动所产生的数据。
+
+| 类别 | 包含内容 |
 | :-- | :-- |
-| `src_addr`、`dst_addr` | 源 / 目标 IP 地址 |
-| `src_port`、`dst_port`、`protocol`、`net_subtype` | 端口号和协议 |
-| `bytes_sent`、`bytes_recv` | 流量大小 |
-| `src_scope`、`dst_scope`、`flow_scope` | "内部" 与 "外部" 分类 |
-| `lineage_type` | 该连接值得关注的原因（新进程 / 新目标 / 流量激增） |
+| **审核判定** | 发现 ID、判定结果（确认/驳回）、审核人员、置信度、备注 |
+| **反馈事件** | 判定结果反馈至检测模型以抑制已知正常模式 |
 
-### 所在机器
+---
 
-| 列 | 包含内容 |
+## 仪表盘与访问
+
+Web 仪表盘所使用的数据。
+
+| 类别 | 包含内容 |
 | :-- | :-- |
-| `host_id`、`node` | 主机标识符和节点/服务器名称 |
-| `host_type`、`region` | 主机类别和云区域 |
-| `instance_id` | 云虚拟机实例 ID |
-| `iam_role` | 机器所绑定的云 IAM 角色 |
-| `cluster_id`、`peer_cluster_id`、`peer_site` | 集群 / 远程站点标识符 |
-| `boot_id` | 机器单次启动的随机 ID |
+| **用户账户** | 仪表盘登录凭据（已哈希）、角色、团队归属 |
+| **团队** | 团队层级、各团队的主机分配 |
+| **会话** | 活跃登录会话 |
+| **审计日志** | 仪表盘用户执行的管理操作 |
+| **主机记录** | 显示名称、隔离状态、标签、网络前缀清单 |
+| **身份目录** | 缓存的 Okta/IdP 目录，用于身份解析 |
 
-### 涉及的人员
+---
 
-| 列 | 包含内容 |
-| :-- | :-- |
-| `username` | 操作系统用户名 |
-| `owner`、`teleport_owner` | 解析出的会话所属人员 |
-| `ssh_identity` | SSH 登录身份（通常是邮箱或用户名） |
-| `ssh_source_ip` | 该人员连接时使用的 IP |
-| `teleport_node_name` | 访问系统中的节点名称 |
-| `identity` | 对行为者的最佳统一身份推断 |
-| `identity_source`、`identity_confidence` | 身份的确定方式 |
+## 每小时汇总
 
-### 容器 / Kubernetes 上下文
+用于仪表盘性能的预聚合计数器。包含每主机、每小时的事件计数——不含原始事件详情。
 
-| 列 | 包含内容 |
-| :-- | :-- |
-| `container_id`、`pod_uid`、`cgroup_id`、`cgroup_version` | 不透明的容器/Pod ID |
-| `container_name` | 人类可读的容器名称（如 `istio-proxy`） |
-| `cgroup_path_host`、`cgroup_memberships_raw` | 原始 cgroup 路径 — 可能嵌入 Pod/服务名称 |
-| `cgroup_family`、`cgroup_service`、`cgroup_parent_service` | 从 cgroup 路径推导出的服务名称 |
+---
 
-### 工作负载身份（"这个运行时范围属于谁？"）
+## 数据保留
 
-| 列 | 包含内容 |
-| :-- | :-- |
-| `workload_instance_id`、`workload_logical_id`、`workload_owner_uid` | 不透明的工作负载标识符 |
-| `workload_name`、`workload_namespace` | Kubernetes Pod 名称和命名空间 |
-| `workload_owner_name`、`workload_owner_kind` | 所属控制器（如 Deployment 名称） |
-| `workload_class`、`workload_kind`、`workload_manager` | 类别（容器 / systemd / k8s 等） |
-| `workload_boundary_source/confidence/reason`、`workload_logical_confidence/reason`、`workload_identity_origin`、`workload_boundary_reason` | 身份分配的方式/原因 |
+保留策略可按部署进行配置。请联系您的客户团队了解当前设置和可用选项。
 
-### 作业与应用身份（"实际运行的是什么？"）
+---
 
-| 列 | 包含内容 |
-| :-- | :-- |
-| `job_logical_id`、`application_logical_id`、`application_instance_id`、`application_root_proc_instance_id`、`application_root_prog_id` | 不透明标识符 |
-| `job_display_name`、`application_display_name` | 人类可读的作业/应用名称（通常源自脚本名） |
-| `job_kind`、`application_kind` | 类别（原生二进制、python 脚本等） |
-| `application_entry_filename` | 入口脚本/二进制文件的路径 |
-| `application_entry_argv` | 入口调用的命令行 |
-| `application_owner_workload_logical_id` | 指回工作负载的关联 |
-| `binary_build_id` | 所执行二进制文件的内容哈希 |
+## Hilt 无法看到的内容
 
-### `dag_events_old`
-
-`dag_events` 的旧版副本，列集较少。所有列的含义与上文相同。
-
-## 其他原始活动表
-
-### `process_edges` 和 `dag_fork_edges` — 进程父→子关系
-
-| 列 | 包含内容 |
-| :-- | :-- |
-| `host_id` | 主机标识符 |
-| `boot_id`、`parent_tgid`、`child_tgid`、`cgroup_id`、`session_id`、`prog_id`、`parent_proc_instance_id`、`child_proc_instance_id` | 不透明的进程/容器标识符 |
-| `uid` | 数字用户 ID |
-| `parent_comm` | 父进程的程序名称 |
-| `kernel_ts_ns`、`wall_time_ns`、`ingest_time`、`event_time` | 时间戳 |
-
-### `dag_network_flow_halves` — 内部网络连接
-
-内部主机间连接的每一侧各占一行。
-
-| 列 | 包含内容 |
-| :-- | :-- |
-| `host_id`、`node` | 主机标识符和服务器名称 |
-| `src_addr`、`dst_addr` | IP 地址 |
-| `identity`、`owner` | 解析出的连接行为者 / 所有者 |
-| `comm` | 程序名称 |
-| `application_display_name` | 人类可读的应用名称 |
-| `flow_id`、`proc_instance_id`、`application_logical_id`、`workload_logical_id` | 不透明标识符 |
-| `src_port`、`dst_port`、`protocol`、`bytes_sent`、`bytes_recv`、时间戳 | 数字 |
-
-### `dag_network_dns` — IP 到主机名查询缓存
-
-| 列 | 包含内容 |
-| :-- | :-- |
-| `ip` | IP 地址 |
-| `hostname` | 该 IP 解析出的主机名 |
-| `updated_at` | 时间戳 |
-
-### `dag_epoch_tokens` — 令牌化的活动摘要（ML 输入）
-
-| 列 | 包含内容 |
-| :-- | :-- |
-| `host_id` | 主机标识符 |
-| `uid` | 数字用户 ID |
-| `boot_id` | 不透明的启动标识符 |
-| `token_ids`、`token_sub_epochs`、`token_counts`、`token_importances`、`token_depths`、`token_roles`、`tokenizer_version`、`total_events`、`tokens_before_topk`、`is_active`、时间戳 | 数值型令牌数组和计数器 |
-| `token_evidence_json` | JSON 证据负载，可能嵌入文件路径和命令片段 |
-
-## 清单与状态表
-
-### `dag_process_tree` — 每个进程的最新已知状态
-
-与 `dag_events` 中对应列相同，包括 `filename`、`argv`、`comm`、`parent_comm` 以及机器 / 人员 / 工作负载 / 应用身份列。
-
-### `dag_workload_inventory` — 工作负载清单
-
-| 列 | 包含内容 |
-| :-- | :-- |
-| `workload_name`、`workload_namespace`、`workload_owner_name` | Kubernetes Pod / 命名空间 / 控制器名称 |
-| `host_id`、`node`、`cluster_id` | 机器和集群标识符 |
-| `workload_instance_id`、`workload_logical_id`、`workload_owner_uid` | 不透明标识符 |
-| 其余列 | 类别、置信度、时间戳 |
-
-### `dag_workload_transitions` — 工作负载身份变更日志
-
-| 列 | 包含内容 |
-| :-- | :-- |
-| 新旧工作负载 ID、`proc_instance_id`、`boot_id` | 不透明标识符 |
-| `host_id` | 主机标识符 |
-| 置信度列、`wall_time_ns` | 类别和时间戳 |
-
-### `dag_workload_identity_backfill` — 延迟身份解析
-
-| 列 | 包含内容 |
-| :-- | :-- |
-| `host_id` | 主机标识符 |
-| `cgroup_id`、已解析的 ID 列 | 不透明标识符 |
-| `miss_count`、`version`、时间戳列 | 计数器和时间戳 |
-
-### `dag_application_inventory` — 应用清单
-
-| 列 | 包含内容 |
-| :-- | :-- |
-| `display_name` | 人类可读的应用名称 |
-| `script_target` | 脚本路径 |
-| `interpreter_name` | 解释器程序名称（如 `python3`） |
-| `application_logical_id`、`workload_logical_id`、`binary_build_id` | 不透明标识符 |
-| `application_kind`、时间戳 | 类别和时间戳 |
-
-### `dag_host_tags` — 自由格式主机标签
-
-| 列 | 包含内容 |
-| :-- | :-- |
-| `host_id` | 主机标识符 |
-| `tags` | 键/值映射 — 内容取决于主机被打上的标签 |
-| `tag_source`、`updated_at` | 类别和时间戳 |
-
-### `dag_host_last_seen`（+ `dag_host_last_seen_mv`）— 每台主机的最近活动
-
-| 列 | 包含内容 |
-| :-- | :-- |
-| `host_id`、`node` | 主机标识符和服务器名称 |
-| `host_type`、`last_seen`、`updated_at` | 类别和时间戳 |
-
-### `dag_entity_snapshots` — 每台主机的周期性状态快照
-
-| 列 | 包含内容 |
-| :-- | :-- |
-| `host_id` | 主机标识符 |
-| `state_data` | 序列化数据块，可能包含进程名称和路径 |
-| `state_bytes`、`version`、`snapshot_time` | 大小、版本、时间戳 |
-
-## 检测与评分表
-
-### `dag_anomaly_scores` 和 `dag_anomaly_alerts` — 按周期的异常评分
-
-这两个表结构相同。绝大多数列都是纯数字：所有以 `raw_`、`med_`、`mad_`、`pct_` 开头或以 `_z` 结尾的列，以及 `max_abs_z`、`top_k_sum`、`volume_topk`、`behavior_topk`、`peer_top_k`、`cohort_top_k`、`file/net/exec_ch_max`、`features_triggered`、`is_anomaly`、`phase_*`、`mahal_distance`、`mahal_pvalue`、`mahal_confirmed`、`feedback_suppressed`、`feedback_similarity`、`group`。
-
-其余列：
-
-| 列 | 包含内容 |
-| :-- | :-- |
-| `host_id` | 主机标识符 |
-| `uid` | 被评分的数字用户 ID |
-| `boot_id`、`session_id`、`alert_id`、`feedback_match_id` | 不透明 ID |
-| `reason`、`drivers`、`evidence` | 解释告警的简短文本 — 可能提及进程或目标地址 |
-| `mahal_feature_contrib_json`、`z_fingerprint_json` | 特征名称 + 数值的 JSON |
-
-### 模型输出和内部数据
-
-`dag_ml_scores`、`dag_trace_scores`、`dag_ml_drift`、`dag_refit_log`、`dag_host_feature_profiles`、`dag_feature_cluster_artifacts`、`dag_baseline_snapshots` 几乎全部是数值评分、模型版本和统计数据。例外：
-
-| 表.列 | 包含内容 |
-| :-- | :-- |
-| （所有表）`host_id` | 主机标识符 |
-| （所有表）`uid` | 数字用户 ID |
-| `dag_trace_scores.top_tokens_json`、`attention_links_json` | 列出驱动评分的活动令牌的 JSON — 可能包含程序名称 |
-| `dag_baseline_snapshots.baseline_data` | 序列化的统计基线数据块 |
-| `dag_feature_cluster_artifacts.artifact_bytes`、`metadata_json` | 训练好的模型二进制文件 + 元数据 |
-
-## 检测结果、AI 叙述与人工反馈
-
-### `dag_behavior_clusters` — AI 标注的行为组
-
-| 列 | 包含内容 |
-| :-- | :-- |
-| `label`、`narrative` | AI 撰写的行为描述 — 可能提及作业/应用名称 |
-| `top_jobs` | 与该聚类最相关的作业名称 |
-| `top_features`、`stat_p25/50/75/95`、`size`、`persistence`、`risk_hint`、`exemplar_epochs`、版本、哈希 | 统计数据和 ID |
-
-### `dag_alert_narratives` — AI 撰写的告警解释
-
-| 列 | 包含内容 |
-| :-- | :-- |
-| `narrative_summary`、`narrative_headline`、`narrative_what_happened`、`narrative_why_unusual`、`narrative_key_artifacts`、`narrative_chips`、`narrative_event_map`、`cluster_narrative`、`cluster_label` | AI 撰写的告警描述文字 — 可能引用文件路径、命令行、主机名和用户名 |
-| `alert_id`、`cache_key`、`feature_cluster_id`、`llm_model_version`、`severity`、`confidence`、`is_host_typical` | ID 和评级 |
-
-### `dag_feedback_events` — 人工审核结论
-
-| 列 | 包含内容 |
-| :-- | :-- |
-| `reviewer` | 人工审核员的姓名/ID |
-| `notes` | 审核员撰写的自由文本 |
-| `verdict` | 真阳性 / 假阳性标签 |
-| `host_id` | 主机标识符 |
-| `uid` | 被评分行为者的数字用户 ID |
-| `group`、评分、时间戳 | 统计数据 |
-
-## 小时级仪表盘汇总
-
-`dag_events_hourly`、`dag_network_hourly`、`dag_file_hourly`、`dag_host_cluster_profile_mv`（及其 `_mv` 对应表）保存每台主机每小时的预聚合计数：
-
-| 列 | 包含内容 |
-| :-- | :-- |
-| `host_id` | 主机标识符 |
-| 小时桶、事件/连接/文件计数器 | 数字 |
-| `unique_identities`、`unique_paths`、`sensitive_hits` | 基于身份和文件路径构建的去重计数摘要；无法还原为原始值 |
-
-### `v_workload_divergence`
-
-基于 `dag_events` 计数器的诊断视图（仅数字）。无独立数据。
-
-### `goose_db_version`
-
-内部架构版本记录（仅数字）。不含遥测数据。
-
-## Postgres 数据库
-
-在 ClickHouse 之外，还有一个供仪表盘使用的小型 Postgres 数据库。
-
-### 仪表盘账户与访问
-
-| 表 | 列 | 包含内容 |
-| :-- | :-- | :-- |
-| `users` | `id`、`username`、`password_hash`、`role`、`team_id`、`disabled`、`created_at`、`updated_at` | 仪表盘登录账户 |
-| `roles` | `name`、`description` | 角色定义（admin / viewer） |
-| `teams` | `id`、`name` | 团队名称 |
-| `sessions` | `id`、`user_id`、`created_at`、`expires_at` | 活跃登录会话 |
-| `audit_log` | `id`、`user_id`、`username`、`action`、`detail`、`created_at` | 仪表盘用户操作日志 |
-| `team_nodes` | `team_id`、`host_id` | 各团队可见的主机 |
-
-### 主机记录
-
-| 表 | 列 | 包含内容 |
-| :-- | :-- | :-- |
-| `host_names` | `host_id`、`display_name`、`host_type`、`cluster_id`、`instance_id`、`updated_at` | 主机的显示名称 |
-| `quarantine_state` | `host_id`、`instance_id`、`original_sg_ids`、`quarantine_sg_id`、`quarantined_at`、`quarantined_by`、`status` | 被网络隔离的主机，以及执行隔离的用户 |
-| `host_tags` | `host_id`、`tag_source`、`tags`（键/值映射）、`updated_at` | 主机标签 |
-| `net_prefix_inventory` | `cidr`、`site_id`、`env`、`priority`、`updated_at` | 运维人员录入的网络范围和站点名称 |
-| `network_dns` | `ip`、`hostname`、`updated_at` | IP 到主机名查询缓存 |
-
-### 人工审核（HITL）
-
-| 表 | 列 | 包含内容 |
-| :-- | :-- | :-- |
-| `hitl_reviews` | `finding_id`、`verdict`、`model_confidence`、`human_confidence`、`notes`、`reviewer`、`reviewed_at` | 审核结论，含审核员姓名和自由文本备注 |
-| `hitl_anomalies` | `finding_id`、`host_id`、`uid`、`owner`、`flagged_at`、`finding_type`、`behavior_label`、`severity`、`model_confidence`、`human_confidence`、`verdict`、`notes`、`reviewer`、`reviewed_at`、`anomaly_snapshot`（JSON） | 待审核的标记结果；`owner` 为解析出的行为者，`anomaly_snapshot` 为该结果的 JSON 副本 |
-| `feedback_events` | `id`、`host_id`、`uid`、`wall_time_ns`、`group`、`verdict`、`reviewer`、`notes`、`topk_sum`、`mahal_distance`、`event_time`、`reviewed_at` | 反馈给检测模型的审核结论 |
-
-### 身份目录（Okta）
-
-| 表 | 列 | 包含内容 |
-| :-- | :-- | :-- |
-| `okta_users` | `okta_id`、`email`、`login`、`first_name`、`last_name`、`department`、`title`、`manager`、`status`、`profile_json`、时间戳 | 企业 Okta 目录的缓存副本 |
-| `identity_mappings` | `raw_identity`、`identity_source`、`host_pattern`、`okta_user_id`、`match_type`、`confirmed`、`identity_type`、`created_by`、时间戳 | 将管道身份（用户名、SSH 身份）关联到 Okta 用户 |
-
-### 模型记录（仅数字和状态）
-
-| 表 | 包含内容 |
-| :-- | :-- |
-| `ml_drift` | 每次运行的按特征漂移统计 |
-| `refit_log` | 每次模型重训尝试一行（状态、计数、版本、错误信息） |
-| `feature_cluster_artifacts` | 加密的训练模型二进制文件 + 校验和 |
-| `model_artifacts` | 已签名/加密模型文件的登记表（版本、哈希、状态） |
-| `model_training_runs` | 每次训练运行一行（计数、耗时、指标 JSON、`created_by`） |
-| `train_trigger_log` | 自动训练触发决策的审计记录 |
-| `component_status_daily` | 各组件的每日系统状态汇总 |
+采集器不捕获文件内容、数据包载荷、环境变量、内存内容或击键记录。平台存储的是关于系统活动的元数据——绝非数据本身。

@@ -6,6 +6,10 @@ description: "Hilt DMG 采集器是什么、它观测哪些内容，以及如何
 
 本指南介绍 Hilt 数据流转治理（Data Movement Governance）采集器：它是什么、观测哪些内容、如何部署到 Kubernetes 节点和普通 Linux VM 上，以及如何与单独交付给你的 Hilt 数据面（data-plane）集成。
 
+<Note>
+在文件路径、服务名和环境变量中，你可能会看到前缀 `dag`（例如 `dag-agent`、`DAG_SHIP_URL`）。这是 Hilt 遥测引擎的内部代号，在本文档中与"Hilt 采集器"功能等价。
+</Note>
+
 每个发布的 tarball 中还随附了一份更简短的快速上手指南，位于 `docs/client-deployment-guide.md`（并按版本以 `README.md` 形式上传）；本指南则是它的长篇配套文档。
 
 ## 什么是采集器

@@ -4,17 +4,13 @@ sidebarTitle: "Anomalies"
 description: "Understanding and triaging anomaly findings detected by Hilt's ML models."
 ---
 
-{/* TODO: Screenshot of the anomalies page */}
+---
 
 The triage queue for behavioral findings. Each finding represents a deviation detected by the anomaly scoring system (or raised by a detection rule); this page is where you review them and mark each one as a real anomaly or a false positive.
 
 ---
 
 ## Filters
-
-{/* TODO: Describe what information a finding card shows (host, time range, score, narrative) */}
-
-{/* TODO: Describe what information a finding card shows (host, time range, score, narrative) */}
 
 Filtering is structured through the **Filters** popover:
 
@@ -59,22 +55,6 @@ The selected card is highlighted with a green accent. Severity is available as a
 
 ## Finding detail
 
-{/* TODO: Describe the detail drawer and its tabs */}
-
-{/* TODO: Describe the detail drawer and its tabs */}
-
-{/* TODO: Describe the overview tab — summary, identity badges, scoring breakdown */}
-
-{/* TODO: Describe the overview tab — summary, identity badges, scoring breakdown */}
-
-{/* TODO: Describe the evidence tab — what raw evidence is shown and how to interpret it */}
-
-{/* TODO: Describe the evidence tab — what raw evidence is shown and how to interpret it */}
-
-{/* TODO: Describe the lineage tab — process tree and data flow context for the finding */}
-
-{/* TODO: Describe the lineage tab — process tree and data flow context for the finding */}
-
 Selecting a finding opens its report in the right panel. (If nothing is selected, the panel prompts you to _"Select a finding from the queue to view details."_) The report has two parts.
 
 ### Narrative
@@ -98,18 +78,6 @@ In the narrative band you act on the finding:
 - A notes field (_"Add review notes..."_) lets you record context.
 
 ### Event timeline
-
-{/* TODO: Describe the timeline tab — temporal view of the anomalous activity */}
-
-{/* TODO: Describe the timeline tab — temporal view of the anomalous activity */}
-
-{/* TODO: Describe the report tab — exporting or sharing a finding */}
-
-{/* TODO: Describe the report tab — exporting or sharing a finding */}
-
-{/* TODO: Describe how to filter anomalies by host, severity, time range, label */}
-
-{/* TODO: Describe how to filter anomalies by host, severity, time range, label */}
 
 Below the narrative, a **swimlane timeline** plots the evidence across a five-minute window in three lanes, **Process**, **Network**, and **File**. Nodes are colored by how strongly they contributed (the legend covers _key contributor_, _involved_, _background_, and _strongest link_), and clicking one pins a tooltip with the PID, parent, time, a relevance score and rank, and its linked events. Connecting arcs are labeled _strong_, _moderate_, or _weak link_. 
 

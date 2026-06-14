@@ -6,6 +6,10 @@ description: "What the Hilt DMG Collector is, what it observes, and how to navig
 
 This guide describes the Hilt Data Movement Governance Collector: what it is, what it observes, how it's deployed on Kubernetes nodes and on plain Linux VMs, and how it integrates with the Hilt data-plane you received separately.
 
+<Note>
+In file paths, service names, and environment variables you may see the prefix `dag` (e.g. `dag-agent`, `DAG_SHIP_URL`). This is the internal codename of Hilt's telemetry engine and is functionally equivalent to "Hilt Collector" throughout this documentation.
+</Note>
+
 A shorter quick-start also ships with every release tarball at `docs/client-deployment-guide.md` (and is uploaded as `README.md` per version); this guide is the long-form companion.
 
 ## What is a collector

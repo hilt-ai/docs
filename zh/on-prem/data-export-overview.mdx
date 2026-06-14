@@ -1,57 +1,78 @@
 ---
-title: "匿名化数据导出"
-sidebarTitle: "概览"
-description: "如何在保留 ML 模型所需统计结构的前提下，对本地部署的遥测数据进行匿名化，供 Hilt 模型训练使用。"
+title: "匿名数据导出"
+sidebarTitle: "概述"
+description: "本地部署的遥测数据如何在保护隐私的前提下进行匿名化，以用于 Hilt 模型改进。"
 ---
 
-## 为什么我们需要客户数据
+## 目的
 
-Hilt 提供四个 ML 模型族，它们学习正常的主机行为并标记异常：
+Hilt 的检测模型在使用多样化的真实行为模式进行训练时会得到改进。对于选择加入的客户，结构化导出管道会生成匿名化的统计摘要，帮助在不同基础设施类型间校准检测阈值。
 
-| 模型 | 学习内容 | 客户数据的价值 |
+---
+
+## 导出内容
+
+| 数据类别 | 描述 | 安全原因 |
 | :-- | :-- | :-- |
-| **TS-VAE** | 主机活动时段（epoch）中的时序模式 | 合成数据无法复现的真实工作负载多样性（CI、Web、批处理、GPU） |
-| **Isolation Forest** | 基于 VAE 增强特征的离群边界 | 在异构主机群之间校准的决策阈值 |
-| **TRACE** | 跨安全相关操作的 token 序列模式 | 与真实运营噪声交织在一起的真实攻击轨迹（ground truth） |
-| **HDBSCAN clusters** | 跨主机的行为原型 | 可迁移到新部署的稳定聚类几何结构 |
+| **聚合数值特征** | 每 5 分钟 epoch 的计数（如执行次数、传输字节数、唯一目的地数） | 无原始值——仅聚合统计 |
+| **派生统计特征** | 聚合计数的比率、熵和数学变换 | 对聚合值的纯数学运算 |
+| **抽象活动令牌** | 封闭词汇表的活动类型序列（不含文件名、IP 或命令） | 所有身份信息在令牌化时已被移除 |
+| **异常标签** | 二元异常标记和评分阶段标签 | 无客户特定上下文 |
+| **时间键** | 5 分钟时段时间戳（抖动 ±0–48 小时） | 防止日历关联 |
 
-## 可安全导出（模型所消费的数据）
+---
 
-| 数据 | 示例 | 为什么安全 |
-| :-- | :-- | :-- |
-| **24 个原始数值特征** | `exec_count`、`bytes_sent`、`unique_dest_ips`、`sensitive_path_hits` | 每 5 分钟时段（epoch）的聚合计数 —— 不含原始值 |
-| **32 个派生特征** | `exec_intensity`、`dest_spread`、`epoch_entropy`、`wavelet_exec_s6`、`fork_burst_max` | 比率、熵值、小波系数、会话统计量 —— 均为数学变换 |
-| **Token ID 序列** | `[FILE:read_sensitive, NET:connect_external, EXEC:shell]` | 封闭词表（约 80 个 token）；文件名 / IP 已被抽象剥离 |
-| **Token 附属特征** | `token_sub_epochs`、`token_depths`、`token_roles`、`token_counts`、`token_importances` | 关于 token 序列的结构性元数据 |
-| **标签** | `ml_label`、`is_anomaly`、`ml_source`、`phase` | 攻击阶段标注（来自 HITL 或合成注入） |
-| **异常评分** | `composite_score`、`z_exec`、`mahal_distance`、`topk_sum` | 评分流水线的数值输出 |
-| **时间键** | `epoch_ts`（5 分钟分桶时间戳） | 保留时间顺序 |
-
-## 导出前将被匿名化
-
-| 数据 | 风险 | 匿名化方式 |
-| :-- | :-- | :-- |
-| `host_id` | 可关联到特定机器 | 确定性重映射：每次导出生成 `host-<sequential-id>` |
-| `uid` / `euid` | Unix 用户 ID，可被关联 | 重映射为顺序整数 |
-| `owner` / `identity` | 可读的身份字符串 | 完全丢弃 |
-
-## 永远不会导出
+## 绝不导出的内容
 
 | 数据 | 原因 |
 | :-- | :-- |
-| `token_evidence_json` | 包含原始的 `filename`、`argv`、`dst_addr`、`comm`、`tree_path` |
-| `evidence`、`reason`、`drivers` | 会回显原始事件上下文的自由文本说明 |
-| `matched_conditions` | 会回显字段值的检测规则匹配描述（例如 "filename contains .pem"） |
-| `rule_name`、`rule_label` | 客户自定义的检测规则名称 —— 可能泄露安全态势 |
-| `src_addr`、`dst_addr`、端口 | 客户网络拓扑 |
-| `filename`、`argv`、`old_name`、`new_name` | 文件路径、命令行 —— 直接的 PII / 基础设施泄露 |
-| `ssh_identity`、`ssh_source_ip` | 凭证与网络身份 |
-| `username`、`teleport_owner`、`teleport_node_name` | 人员 / 机器身份 |
-| `instance_id`、`iam_role`、`region` | AWS 账户指纹信息 |
-| `container_id`、`pod_uid`、`pod_name`、`pod_namespace` | Kubernetes 拓扑 |
-| `comm`、`parent_comm`、`binary_build_id` | 可能泄露专有软件 |
-| `dag_network_dns.hostname` | 内部 DNS 名称 |
-| `dag_alert_narratives.*` | 可能回显敏感事件上下文的 LLM 文本 |
-| `dag_entity_snapshots.*` | 序列化的评分器状态 —— 包含与特定主机绑定的基线向量 |
-| 检测规则定义 | `detection_rules` Postgres 表 —— 客户的安全逻辑 |
-| Postgres 认证相关表 | `users`、`sessions`、`okta_users`、`audit_log` |
+| 文件路径、命令行、参数 | 直接泄露基础设施/个人信息 |
+| IP 地址、主机名、DNS 名称 | 网络拓扑暴露 |
+| 用户名、SSH 身份、Okta 数据 | 身份泄露 |
+| 云资源 ID（实例、IAM 角色、区域） | 账户指纹化 |
+| 容器/Pod 名称和命名空间 | Kubernetes 拓扑 |
+| 检测规则名称和匹配逻辑 | 客户安全态势 |
+| 自由文本告警解释 | 可能回显敏感事件上下文 |
+| 仪表盘账户和会话 | 访问凭据暴露 |
+
+---
+
+## 匿名化
+
+导出前，所有身份信息都会被剥离或重新映射：
+
+- **Host ID** → 确定性顺序重映射（`host-0001`、`host-0002`、…）
+- **User ID** → 每主机的顺序整数
+- **所有者/身份字符串** → 完全丢弃
+- **时间戳** → 随机偏移 0–48 小时以防止日历关联
+- **最低主机阈值** → 少于 5 台主机的导出将被拒绝
+
+---
+
+## 客户控制
+
+### 传输前审核
+
+当需要审批时（默认设置），导出会生成一个清单和小型样本文件。完整归档会暂存，但在您明确批准之前**不会传输**。您可以：
+
+- 检查清单以验证具体包含哪些列
+- 加载样本文件以确认匿名化效果
+- 从存储桶中删除暂存文件以拒绝导出
+
+### 日期范围控制
+
+您可控制导出的历史数据量，并可限定特定时间窗口。
+
+### 删除
+
+您可随时从存储桶中删除已导出的数据。
+
+### 审计追踪
+
+每次导出都会创建一条日志事件，包含导出 ID、行数、日期范围和审批状态。Host ID 映射文件仅保留在您的存储桶中。
+
+---
+
+## Hilt 收到的内容
+
+仅行为特征向量和抽象活动序列。不含文件名、IP 地址、主机名、用户名、云资源 ID、检测规则名称或匹配描述。

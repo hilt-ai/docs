@@ -1,351 +1,80 @@
 ---
 title: "Data catalog"
 sidebarTitle: "Data catalog"
-description: "Every table and column stored by the platform, with a description of what each column contains."
+description: "Categories of data stored by the platform and what each category contains."
 ---
 
-This page lists every table and column stored in the analytics database (ClickHouse) and
-the dashboard database (Postgres), with a description of what each column contains.
+This page describes the categories of data the Hilt platform stores about your environment. It is organized by what each data category represents, not by internal storage details.
 
-## `dag_events` — the main event stream
+---
 
-One row per system event observed on a monitored host (program started, file opened /
-renamed / deleted, network connection, etc.). This is the largest and most detailed
-table. Other tables mostly copy columns from this one; a column has the same meaning
-everywhere it appears.
+## Event telemetry
 
-### Event basics
+The primary data the platform collects from your hosts. Each record represents one observed system event.
 
-`event_type`, `type`, `kernel_ts_ns`, `wall_time_ns`, `event_time`, `ingest_time`,
-`parse_error`, `flags`, `mode`, `exec_seq` — event category codes, timestamps, and
-processing flags.
-
-### Process information
-
-| Column | What it contains |
+| Category | What it contains |
 | :-- | :-- |
-| `pid`, `tgid`, `ppid`, `sid`, `ns_pid`, `ns_tgid`, `ns_sid` | Process ID numbers |
-| `uid`, `euid` | Numeric user IDs of the account the process ran as |
-| `comm`, `parent_comm` | Short program name (e.g. `bash`, `python3`) |
-| `proc_instance_id`, `prog_id`, `session_id`, `proc_start_time_ns` | Opaque process/session identifiers |
+| **Process execution** | Command name, parent process, PID, user ID, timestamps, command-line arguments |
+| **File operations** | File path accessed, operation type (open, rename, delete, permission change), user and process context |
+| **Network flows** | Source/destination IP and port, protocol, bytes sent/received, connection scope (internal/external) |
+| **Host identity** | Host ID, hostname, cloud region, instance ID, cluster membership |
+| **User identity** | OS username, resolved owner identity, SSH identity, identity source and confidence |
+| **Container/Kubernetes context** | Container ID, pod name/namespace, workload controller, cgroup information |
+| **Workload & application identity** | Logical workload grouping, application name, application kind |
 
-### What the process did (event payload)
+---
 
-| Column | What it contains |
+## Anomaly detection
+
+Data produced by the detection and scoring pipeline.
+
+| Category | What it contains |
 | :-- | :-- |
-| `filename` | Full file path that was executed or accessed |
-| `argv` | Full command line with all arguments |
-| `old_name`, `new_name` | Old/new file paths for renames |
+| **Anomaly scores** | Per-epoch numerical scores across detection channels, anomaly flags, scoring phase |
+| **Alert narratives** | AI-generated explanations of findings: what happened, why it's unusual, affected identities |
+| **Behavior clusters** | Fleet-wide behavioral groupings with labels, host membership, and movement history |
+| **Detection rule matches** | Rule name, severity, matched conditions, affected host and time window |
 
-### Network activity
+---
 
-| Column | What it contains |
+## Human review
+
+Data produced by your team's triage activity.
+
+| Category | What it contains |
 | :-- | :-- |
-| `src_addr`, `dst_addr` | Source / destination IP addresses |
-| `src_port`, `dst_port`, `protocol`, `net_subtype` | Port numbers and protocol |
-| `bytes_sent`, `bytes_recv` | Traffic volume |
-| `src_scope`, `dst_scope`, `flow_scope` | "internal" vs "external" classification |
-| `lineage_type` | Why the flow was interesting (new process / new destination / volume spike) |
+| **Review verdicts** | Finding ID, verdict (confirmed/dismissed), reviewer, confidence, notes |
+| **Feedback events** | Verdicts fed back to detection models to suppress known-good patterns |
 
-### Which machine
+---
 
-| Column | What it contains |
+## Dashboard & access
+
+Data used by the web dashboard.
+
+| Category | What it contains |
 | :-- | :-- |
-| `host_id`, `node` | Host identifier and node/server name |
-| `host_type`, `region` | Host category and cloud region |
-| `instance_id` | Cloud VM instance ID |
-| `iam_role` | Cloud IAM role attached to the machine |
-| `cluster_id`, `peer_cluster_id`, `peer_site` | Cluster / remote-site identifiers |
-| `boot_id` | Random ID for one boot of the machine |
+| **User accounts** | Dashboard login credentials (hashed), roles, team membership |
+| **Teams** | Team hierarchy, host assignments per team |
+| **Sessions** | Active login sessions |
+| **Audit log** | Administrative actions taken by dashboard users |
+| **Host records** | Display names, quarantine state, tags, network prefix inventory |
+| **Identity directory** | Cached Okta/IdP directory for identity resolution |
 
-### Which person
+---
 
-| Column | What it contains |
-| :-- | :-- |
-| `username` | OS username |
-| `owner`, `teleport_owner` | Resolved human owner of the session |
-| `ssh_identity` | SSH login identity (often an email or username) |
-| `ssh_source_ip` | IP the person connected from |
-| `teleport_node_name` | Name of the node in the access system |
-| `identity` | Best-guess unified identity for the actor |
-| `identity_source`, `identity_confidence` | How the identity was determined |
+## Hourly rollups
 
-### Container / Kubernetes context
+Pre-aggregated counters used for dashboard performance. These contain per-host, per-hour event counts — no raw event details.
 
-| Column | What it contains |
-| :-- | :-- |
-| `container_id`, `pod_uid`, `cgroup_id`, `cgroup_version` | Opaque container/pod IDs |
-| `container_name` | Human-readable container name (e.g. `istio-proxy`) |
-| `cgroup_path_host`, `cgroup_memberships_raw` | Raw cgroup paths — can embed pod/service names |
-| `cgroup_family`, `cgroup_service`, `cgroup_parent_service` | Service names derived from cgroup path |
+---
 
-### Workload identity ("who owns this runtime scope?")
+## Data retention
 
-| Column | What it contains |
-| :-- | :-- |
-| `workload_instance_id`, `workload_logical_id`, `workload_owner_uid` | Opaque workload identifiers |
-| `workload_name`, `workload_namespace` | Kubernetes pod name and namespace |
-| `workload_owner_name`, `workload_owner_kind` | Owning controller (e.g. Deployment name) |
-| `workload_class`, `workload_kind`, `workload_manager` | Category (container / systemd / k8s …) |
-| `workload_boundary_source/confidence/reason`, `workload_logical_confidence/reason`, `workload_identity_origin`, `workload_boundary_reason` | How/why identity was assigned |
+Retention policies are configurable per deployment. Contact your account team for your current settings and available options.
 
-### Job & application identity ("what actually ran?")
+---
 
-| Column | What it contains |
-| :-- | :-- |
-| `job_logical_id`, `application_logical_id`, `application_instance_id`, `application_root_proc_instance_id`, `application_root_prog_id` | Opaque identifiers |
-| `job_display_name`, `application_display_name` | Human-readable job/app names (often derived from script names) |
-| `job_kind`, `application_kind` | Category (native binary, python script, …) |
-| `application_entry_filename` | Path of the entry script/binary |
-| `application_entry_argv` | Command line of the entry invocation |
-| `application_owner_workload_logical_id` | Link back to workload |
-| `binary_build_id` | Content hash of the executed binary |
+## What Hilt cannot see
 
-### `dag_events_old`
-
-A legacy copy of `dag_events` with a smaller column set. All columns have the same
-meanings as above.
-
-## Other raw-activity tables
-
-### `process_edges` and `dag_fork_edges` — process parent→child links
-
-| Column | What it contains |
-| :-- | :-- |
-| `host_id` | Host identifier |
-| `boot_id`, `parent_tgid`, `child_tgid`, `cgroup_id`, `session_id`, `prog_id`, `parent_proc_instance_id`, `child_proc_instance_id` | Opaque process/container identifiers |
-| `uid` | Numeric user ID |
-| `parent_comm` | Program name of the parent process |
-| `kernel_ts_ns`, `wall_time_ns`, `ingest_time`, `event_time` | Timestamps |
-
-### `dag_network_flow_halves` — internal network connections
-
-One row per side of an internal host-to-host connection.
-
-| Column | What it contains |
-| :-- | :-- |
-| `host_id`, `node` | Host identifier and server name |
-| `src_addr`, `dst_addr` | IP addresses |
-| `identity`, `owner` | Resolved actor / owner of the connection |
-| `comm` | Program name |
-| `application_display_name` | Human-readable application name |
-| `flow_id`, `proc_instance_id`, `application_logical_id`, `workload_logical_id` | Opaque identifiers |
-| `src_port`, `dst_port`, `protocol`, `bytes_sent`, `bytes_recv`, timestamps | Numbers |
-
-### `dag_network_dns` — IP-to-hostname lookup cache
-
-| Column | What it contains |
-| :-- | :-- |
-| `ip` | IP address |
-| `hostname` | Resolved hostname for that IP |
-| `updated_at` | Timestamp |
-
-### `dag_epoch_tokens` — tokenized activity summaries (ML input)
-
-| Column | What it contains |
-| :-- | :-- |
-| `host_id` | Host identifier |
-| `uid` | Numeric user ID |
-| `boot_id` | Opaque boot identifier |
-| `token_ids`, `token_sub_epochs`, `token_counts`, `token_importances`, `token_depths`, `token_roles`, `tokenizer_version`, `total_events`, `tokens_before_topk`, `is_active`, timestamps | Numeric token arrays and counters |
-| `token_evidence_json` | JSON evidence payload that can embed file paths and command fragments |
-
-## Inventory & state tables
-
-### `dag_process_tree` — latest known state per process
-
-Same columns as the corresponding `dag_events` columns, including `filename`, `argv`,
-`comm`, `parent_comm` and the machine / person / workload / application identity columns.
-
-### `dag_workload_inventory` — registry of workloads
-
-| Column | What it contains |
-| :-- | :-- |
-| `workload_name`, `workload_namespace`, `workload_owner_name` | Kubernetes pod / namespace / controller names |
-| `host_id`, `node`, `cluster_id` | Machine and cluster identifiers |
-| `workload_instance_id`, `workload_logical_id`, `workload_owner_uid` | Opaque identifiers |
-| remaining columns | Categories, confidences, timestamps |
-
-### `dag_workload_transitions` — log of workload identity changes
-
-| Column | What it contains |
-| :-- | :-- |
-| old/new workload IDs, `proc_instance_id`, `boot_id` | Opaque identifiers |
-| `host_id` | Host identifier |
-| confidence columns, `wall_time_ns` | Categories and timestamps |
-
-### `dag_workload_identity_backfill` — late identity resolutions
-
-| Column | What it contains |
-| :-- | :-- |
-| `host_id` | Host identifier |
-| `cgroup_id`, resolved ID columns | Opaque identifiers |
-| `miss_count`, `version`, timestamp columns | Counters and timestamps |
-
-### `dag_application_inventory` — registry of applications
-
-| Column | What it contains |
-| :-- | :-- |
-| `display_name` | Human-readable application name |
-| `script_target` | Script path |
-| `interpreter_name` | Interpreter program name (e.g. `python3`) |
-| `application_logical_id`, `workload_logical_id`, `binary_build_id` | Opaque identifiers |
-| `application_kind`, timestamps | Category and timestamps |
-
-### `dag_host_tags` — free-form host tags
-
-| Column | What it contains |
-| :-- | :-- |
-| `host_id` | Host identifier |
-| `tags` | Key/value map — content depends on what hosts are tagged with |
-| `tag_source`, `updated_at` | Category and timestamp |
-
-### `dag_host_last_seen` (+ `dag_host_last_seen_mv`) — last activity per host
-
-| Column | What it contains |
-| :-- | :-- |
-| `host_id`, `node` | Host identifier and server name |
-| `host_type`, `last_seen`, `updated_at` | Category and timestamps |
-
-### `dag_entity_snapshots` — periodic state snapshot per host
-
-| Column | What it contains |
-| :-- | :-- |
-| `host_id` | Host identifier |
-| `state_data` | Serialized blob that can contain process names and paths |
-| `state_bytes`, `version`, `snapshot_time` | Size, version, timestamp |
-
-## Detection & scoring tables
-
-### `dag_anomaly_scores` and `dag_anomaly_alerts` — per-epoch anomaly scoring
-
-These two tables share a layout. The vast majority of columns are pure numbers:
-all columns starting with `raw_`, `med_`, `mad_`, `pct_`, or ending in `_z`,
-plus `max_abs_z`, `top_k_sum`, `volume_topk`, `behavior_topk`, `peer_top_k`,
-`cohort_top_k`, `file/net/exec_ch_max`, `features_triggered`, `is_anomaly`,
-`phase_*`, `mahal_distance`, `mahal_pvalue`, `mahal_confirmed`,
-`feedback_suppressed`, `feedback_similarity`, `group`.
-
-The remaining columns:
-
-| Column | What it contains |
-| :-- | :-- |
-| `host_id` | Host identifier |
-| `uid` | Numeric user ID being scored |
-| `boot_id`, `session_id`, `alert_id`, `feedback_match_id` | Opaque IDs |
-| `reason`, `drivers`, `evidence` | Short text explaining the alert — can name processes or destinations |
-| `mahal_feature_contrib_json`, `z_fingerprint_json` | JSON of feature names + numbers |
-
-### Model outputs and internals
-
-`dag_ml_scores`, `dag_trace_scores`, `dag_ml_drift`, `dag_refit_log`,
-`dag_host_feature_profiles`, `dag_feature_cluster_artifacts`, `dag_baseline_snapshots`
-are almost entirely numeric scores, model versions, and statistics. The exceptions:
-
-| Table.Column | What it contains |
-| :-- | :-- |
-| (all) `host_id` | Host identifier |
-| (all) `uid` | Numeric user ID |
-| `dag_trace_scores.top_tokens_json`, `attention_links_json` | JSON naming the activity tokens that drove a score — can include program names |
-| `dag_baseline_snapshots.baseline_data` | Serialized statistical baseline blob |
-| `dag_feature_cluster_artifacts.artifact_bytes`, `metadata_json` | Trained model binary + metadata |
-
-## Findings, AI narratives & human feedback
-
-### `dag_behavior_clusters` — AI-labeled behavior groups
-
-| Column | What it contains |
-| :-- | :-- |
-| `label`, `narrative` | AI-written descriptions of behavior — may mention job/app names |
-| `top_jobs` | Names of the jobs most associated with the cluster |
-| `top_features`, `stat_p25/50/75/95`, `size`, `persistence`, `risk_hint`, `exemplar_epochs`, versions, hashes | Statistics and IDs |
-
-### `dag_alert_narratives` — AI-written alert explanations
-
-| Column | What it contains |
-| :-- | :-- |
-| `narrative_summary`, `narrative_headline`, `narrative_what_happened`, `narrative_why_unusual`, `narrative_key_artifacts`, `narrative_chips`, `narrative_event_map`, `cluster_narrative`, `cluster_label` | AI-written prose about the alert — can quote file paths, command lines, hostnames, and usernames |
-| `alert_id`, `cache_key`, `feature_cluster_id`, `llm_model_version`, `severity`, `confidence`, `is_host_typical` | IDs and ratings |
-
-### `dag_feedback_events` — human reviewer verdicts
-
-| Column | What it contains |
-| :-- | :-- |
-| `reviewer` | Name/ID of the human reviewer |
-| `notes` | Free-text written by the reviewer |
-| `verdict` | true-positive / false-positive label |
-| `host_id` | Host identifier |
-| `uid` | Numeric user ID of the scored actor |
-| `group`, scores, timestamps | Statistics |
-
-## Hourly dashboard rollups
-
-`dag_events_hourly`, `dag_network_hourly`, `dag_file_hourly`,
-`dag_host_cluster_profile_mv` (and their `_mv` twins) hold pre-aggregated counters per
-host per hour:
-
-| Column | What it contains |
-| :-- | :-- |
-| `host_id` | Host identifier |
-| hour buckets, event/flow/file counters | Numbers |
-| `unique_identities`, `unique_paths`, `sensitive_hits` | Unique-count sketches built from identities and file paths; not readable back as plain values |
-
-### `v_workload_divergence`
-
-A diagnostic view of counters over `dag_events` (numbers only). No independent data.
-
-### `goose_db_version`
-
-Internal schema-version bookkeeping (numbers only). No telemetry data.
-
-## Postgres database
-
-Alongside ClickHouse there is a small Postgres database used by the dashboard.
-
-### Dashboard accounts & access
-
-| Table | Columns | What it contains |
-| :-- | :-- | :-- |
-| `users` | `id`, `username`, `password_hash`, `role`, `team_id`, `disabled`, `created_at`, `updated_at` | Dashboard login accounts |
-| `roles` | `name`, `description` | Role definitions (admin / viewer) |
-| `teams` | `id`, `name` | Team names |
-| `sessions` | `id`, `user_id`, `created_at`, `expires_at` | Active login sessions |
-| `audit_log` | `id`, `user_id`, `username`, `action`, `detail`, `created_at` | Log of actions taken by dashboard users |
-| `team_nodes` | `team_id`, `host_id` | Which hosts each team can see |
-
-### Host records
-
-| Table | Columns | What it contains |
-| :-- | :-- | :-- |
-| `host_names` | `host_id`, `display_name`, `host_type`, `cluster_id`, `instance_id`, `updated_at` | Display names for hosts |
-| `quarantine_state` | `host_id`, `instance_id`, `original_sg_ids`, `quarantine_sg_id`, `quarantined_at`, `quarantined_by`, `status` | Hosts placed in network quarantine, and which user did it |
-| `host_tags` | `host_id`, `tag_source`, `tags` (key/value map), `updated_at` | Host tags |
-| `net_prefix_inventory` | `cidr`, `site_id`, `env`, `priority`, `updated_at` | Operator-entered network ranges and site names |
-| `network_dns` | `ip`, `hostname`, `updated_at` | IP-to-hostname lookup cache |
-
-### Human review (HITL)
-
-| Table | Columns | What it contains |
-| :-- | :-- | :-- |
-| `hitl_reviews` | `finding_id`, `verdict`, `model_confidence`, `human_confidence`, `notes`, `reviewer`, `reviewed_at` | Reviewer verdicts, with reviewer name and free-text notes |
-| `hitl_anomalies` | `finding_id`, `host_id`, `uid`, `owner`, `flagged_at`, `finding_type`, `behavior_label`, `severity`, `model_confidence`, `human_confidence`, `verdict`, `notes`, `reviewer`, `reviewed_at`, `anomaly_snapshot` (JSON) | Flagged findings under review; `owner` is the resolved actor, `anomaly_snapshot` is a JSON copy of the finding |
-| `feedback_events` | `id`, `host_id`, `uid`, `wall_time_ns`, `group`, `verdict`, `reviewer`, `notes`, `topk_sum`, `mahal_distance`, `event_time`, `reviewed_at` | Reviewer verdicts fed back to the detection models |
-
-### Identity directory (Okta)
-
-| Table | Columns | What it contains |
-| :-- | :-- | :-- |
-| `okta_users` | `okta_id`, `email`, `login`, `first_name`, `last_name`, `department`, `title`, `manager`, `status`, `profile_json`, timestamps | Cached copy of the corporate Okta directory |
-| `identity_mappings` | `raw_identity`, `identity_source`, `host_pattern`, `okta_user_id`, `match_type`, `confirmed`, `identity_type`, `created_by`, timestamps | Links pipeline identities (usernames, SSH identities) to Okta users |
-
-### Model bookkeeping (numbers and statuses only)
-
-| Table | What it contains |
-| :-- | :-- |
-| `ml_drift` | Per-feature drift statistics per run |
-| `refit_log` | One row per model refit attempt (status, counts, versions, error message) |
-| `feature_cluster_artifacts` | Encrypted trained-model binaries + checksums |
-| `model_artifacts` | Registry of signed/encrypted model files (versions, hashes, status) |
-| `model_training_runs` | One row per training run (counts, timing, metrics JSON, `created_by`) |
-| `train_trigger_log` | Audit of automatic train-trigger decisions |
-| `component_status_daily` | Daily system-status rollup per component |
+The collector does not capture file contents, packet payloads, environment variables, memory contents, or keystrokes. The platform stores metadata about system activity — never the data itself.

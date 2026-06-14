@@ -1,8 +1,8 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "sequoia",
-  "name": "Knowledge base",
-  "description": "Onboarding, employee handbook, HR guides, IT help, company policies, and department runbooks.",
+  "name": "Hilt Documentation",
+  "description": "Deploy, configure, and operate Hilt — data detection and response for your infrastructure.",
   "colors": {
     "primary": "#166E3F",
     "light": "#26BD6C",
@@ -33,6 +33,13 @@
             "product": "Hilt",
             "tabs": [
               {
+                "tab": "Getting Started",
+                "pages": [
+                  "getting-started",
+                  "deployment-architecture"
+                ]
+              },
+              {
                 "tab": "Dashboard",
                 "pages": [
                   "dashboard/layout",
@@ -55,9 +62,16 @@
                       "dashboard/anomalies",
                       "dashboard/detection-rules",
                       "dashboard/fleet-behavior",
-                      "dashboard/investigate"
+                      "dashboard/investigate",
+                      "dashboard/quarantine"
                     ]
                   }
+                ]
+              },
+              {
+                "tab": "Trust & Security",
+                "pages": [
+                  "trust-security"
                 ]
               },
               {
@@ -84,6 +98,12 @@
                   "linux-collector/sizing-capacity",
                   "linux-collector/data-flow",
                   "linux-collector/troubleshooting"
+                ]
+              },
+              {
+                "tab": "macOS Collector",
+                "pages": [
+                  "macos-collector"
                 ]
               },
               {
@@ -121,6 +141,13 @@
             "product": "Hilt",
             "tabs": [
               {
+                "tab": "快速入门",
+                "pages": [
+                  "zh/getting-started",
+                  "zh/deployment-architecture"
+                ]
+              },
+              {
                 "tab": "仪表盘",
                 "pages": [
                   "zh/dashboard/layout",
@@ -142,9 +169,16 @@
                       "zh/dashboard/anomalies",
                       "zh/dashboard/detection-rules",
                       "zh/dashboard/fleet-behavior",
-                      "zh/dashboard/investigate"
+                      "zh/dashboard/investigate",
+                      "zh/dashboard/quarantine"
                     ]
                   }
+                ]
+              },
+              {
+                "tab": "信任与安全",
+                "pages": [
+                  "zh/trust-security"
                 ]
               },
               {
@@ -171,6 +205,12 @@
                   "zh/linux-collector/sizing-capacity",
                   "zh/linux-collector/data-flow",
                   "zh/linux-collector/troubleshooting"
+                ]
+              },
+              {
+                "tab": "macOS 采集器",
+                "pages": [
+                  "zh/macos-collector"
                 ]
               },
               {
@@ -210,8 +250,8 @@
   "navbar": {
     "primary": {
       "type": "button",
-      "label": "Employee portal",
-      "href": "https://dashboard.mintlify.com"
+      "label": "Dashboard",
+      "href": "https://app.hilt.ai"
     }
   },
   "footer": {},

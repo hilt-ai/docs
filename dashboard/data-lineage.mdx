@@ -4,7 +4,7 @@ sidebarTitle: "Data Lineage"
 description: "Visualizing how data moves across hosts, processes, and network connections."
 ---
 
-{/* TODO: Screenshot of the data lineage page */}
+---
 
 Traces process relationships and execution sessions for a host: which processes spawn which, what they run, and where anomalies surface in the chain.
 
@@ -39,10 +39,6 @@ If there's no activity, the table prompts you to expand the time window.
 
 ## Data Flow view
 
-{/* TODO: Describe the main flow graph visualization — nodes, edges, what they represent */}
-
-{/* TODO: Describe the main flow graph visualization — nodes, edges, what they represent */}
-
 The default per-host view. A flow graph (built on React Flow) lays out **parent → child process relationships** for the selected host and time range.
 
 ### Nodes
@@ -62,14 +58,6 @@ Processes that are evidence for an anomaly are outlined with a red ring.
 
 ### Flow detail panel
 
-{/* TODO: Describe the data flow view — file → process → network chains */}
-
-{/* TODO: Describe the data flow view — file → process → network chains */}
-
-{/* TODO: Describe the process topology view — process trees and their relationships */}
-
-{/* TODO: Describe the process topology view — process trees and their relationships */}
-
 Click a process node (other than the root or a cluster) to slide in a detail panel from the right:
 
 | Section | Contents |
@@ -87,14 +75,6 @@ The detail panel describes the selected **process node**, not graph edges.
 
 ## Sessions view
 
-{/* TODO: Describe the network view — network connections in the lineage context */}
-
-{/* TODO: Describe the network view — network connections in the lineage context */}
-
-{/* TODO: Describe the enrichment view — how ML enrichment is visualized */}
-
-{/* TODO: Describe the enrichment view — how ML enrichment is visualized */}
-
 Switch the per-host toggle to **Sessions** to inspect execution sessions, recurring shapes of process activity, with the ability to load any individual run.
 
 ### Choosing a session
@@ -110,18 +90,6 @@ Each grouping (cluster) row shows the command chain (`parent_comm → comm`), a 
 Low-signal groupings are tucked away as **background patterns** (single exec, single run). Use **Show background pattern(s)** to reveal them and **Hide background** to collapse them again.
 
 ### Session detail
-
-{/* TODO: Describe how sessions are surfaced in the lineage view */}
-
-{/* TODO: Describe how sessions are surfaced in the lineage view */}
-
-{/* TODO: Describe the fleet-wide lineage overview */}
-
-{/* TODO: Describe the fleet-wide lineage overview */}
-
-{/* TODO: Describe the detail panel that appears when clicking a flow edge or node */}
-
-{/* TODO: Describe the detail panel that appears when clicking a flow edge or node */}
 
 Once a session is selected, the view splits:
 

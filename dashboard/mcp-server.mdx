@@ -1,127 +1,28 @@
 ---
 title: "MCP server"
 sidebarTitle: "MCP Server"
-description: "Connect AI assistants to Hilt telemetry with the dag-query MCP server."
+description: "Connect AI assistants to Hilt telemetry with the MCP server."
 ---
 
-The query service (`dag-query`) ships with a built-in [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server. It exposes the same 15 telemetry tools that power the [Query](/dashboard/query) page, so any MCP-compatible client — Cursor, Claude Desktop, or your own agent — can search events, investigate anomalies, and draft detection rules directly against your Hilt data.
+The Hilt query service ships with a built-in [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server. It exposes the same 15 telemetry tools that power the [Query](/dashboard/query) page, so any MCP-compatible client — Cursor, Claude Desktop, or your own agent — can search events, investigate anomalies, and draft detection rules directly against your Hilt data.
 
 <Note>
-The MCP server is intended for **local and development use**. It speaks over stdin/stdout and runs without session authentication — host scoping and permission checks only apply to the dashboard's authenticated `/api/query` path. Do not expose an MCP-mode process to untrusted users.
+The MCP server is currently in **early access**. It is intended for use within your secured environment by authorized operators. Contact your account team for access and configuration guidance.
 </Note>
 
 ---
 
-## How it works
+## Capabilities
 
-The server implements a minimal subset of MCP — JSON-RPC 2.0 over **stdio**, one JSON object per line. It advertises protocol version `2024-11-05` and supports **tools only** (no resources, prompts, or sampling).
-
-<Steps>
-  <Step title="Client launches the binary">
-    The MCP client spawns `dag-query` with `MODE=mcp` and connects to its stdin/stdout.
-  </Step>
-  <Step title="Handshake">
-    The client sends `initialize`; the server responds with its capabilities and server info (`dag-query` v1.0.0).
-  </Step>
-  <Step title="Tool discovery">
-    `tools/list` returns all registered tool definitions with JSON Schema input descriptions.
-  </Step>
-  <Step title="Tool calls">
-    `tools/call` dispatches to the shared tool registry, which queries ClickHouse (or the embedded demo dataset) and returns formatted results.
-  </Step>
-</Steps>
-
-### Supported methods
-
-| Method | Behavior |
-| --- | --- |
-| `initialize` | Returns server info, capabilities, and protocol version |
-| `notifications/initialized` | Accepted and ignored (no response, per spec) |
-| `tools/list` | Returns all tool definitions |
-| `tools/call` | Invokes a tool by name with JSON arguments |
-| Anything else | JSON-RPC error `-32601` (method not found) |
-
-Tool results are returned as a single `text` content block containing markdown tables plus a `_meta` JSON footer that reports row counts and truncation, capped at 50&nbsp;KB. Failures set `isError: true` in the result rather than a protocol-level error.
-
----
-
-## Running the server
-
-Build and run the binary with `MODE=mcp`:
-
-```bash
-cd dag-query
-go build -o dag-query ./cmd/dag-query
-MODE=mcp AUTH_DISABLED=true \
-  LLM_PROVIDER=openai_compatible DEFAULT_LLM_BASE_URL=http://localhost \
-  ./dag-query
-```
-
-The two `LLM_*` variables are stubs: the binary validates LLM configuration at startup in every mode, but the MCP path never calls the LLM, so any syntactically valid value satisfies the check. If a `.env` file with real LLM settings is present in the working directory, you can omit them.
-
-### Modes
-
-The `MODE` environment variable selects the transport:
-
-| Mode | Behavior |
-| --- | --- |
-| `http` (default) | HTTP API only (`POST /api/query`) |
-| `mcp` | MCP over stdio only |
-| `both` | HTTP server, plus MCP on stdio in the background |
-
-### Environment variables
-
-| Variable | Purpose |
-| --- | --- |
-| `MODE` | `http`, `mcp`, or `both` |
-| `AUTH_DISABLED` | `true` skips ClickHouse entirely and serves the embedded synthetic dataset — ideal for trying out the MCP server locally |
-| `endpoint` / `CLICKHOUSE_HOST` / `CLICKHOUSE_PORT` | ClickHouse address (defaults to `localhost:9000`) |
-| `CLICKHOUSE_DB`, `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD` | ClickHouse credentials |
-| `CLICKHOUSE_SECURE` | `true` enables TLS (default port becomes `9440`) |
-| `DEMO_MODE` | `true` merges the embedded demo rows with live ClickHouse results |
-| `LLM_PROVIDER`, `DEFAULT_LLM_MODEL`, … | Required at startup even in MCP mode (used only by the HTTP agent path) |
-
-<Warning>
-The binary validates the LLM provider configuration at startup in every mode and exits if it doesn't resolve (e.g. `llm provider: DEFAULT_LLM_BASE_URL is required for openai_compatible provider`). In pure MCP mode the LLM is never invoked, so a stub configuration is sufficient — see the run example above.
-</Warning>
-
-If ClickHouse is unreachable, the server logs a warning and falls back to the embedded synthetic dataset instead of failing.
-
-### Client configuration
-
-A typical MCP client entry (Cursor, Claude Desktop, and similar):
-
-```json
-{
-  "mcpServers": {
-    "dag-query": {
-      "command": "/path/to/dag-query",
-      "env": {
-        "MODE": "mcp",
-        "AUTH_DISABLED": "true",
-        "LLM_PROVIDER": "openai_compatible",
-        "DEFAULT_LLM_BASE_URL": "http://localhost"
-      }
-    }
-  }
-}
-```
-
-Point the `CLICKHOUSE_*` variables at your cluster instead of `AUTH_DISABLED` to query live telemetry.
-
----
-
-## Available tools
-
-All 15 tools share one registry with the dashboard Query agent, so MCP clients and the chat interface always see the same capabilities.
+The MCP server provides read-only access to your telemetry through 15 structured tools:
 
 ### Discovery and events
 
 | Tool | What it does |
 | --- | --- |
-| `list_hosts` | List monitored hosts and when they were last seen — call this first to discover `host_id`s |
+| `list_hosts` | List monitored hosts and when they were last seen |
 | `search_events` | Search raw kernel telemetry with filters (event type, command, identity, destination, file prefix) |
-| `get_event_detail` | Full payload of a single event by its 5-part composite key |
+| `get_event_detail` | Full payload of a single event by its composite key |
 | `summarize_activity` | High-level counts: event types, total events, unique users/processes/hosts |
 
 ### Processes and users
@@ -129,7 +30,7 @@ All 15 tools share one registry with the dashboard Query agent, so MCP clients a
 | Tool | What it does |
 | --- | --- |
 | `get_process_tree` | Parent-child process hierarchy for a host and time window |
-| `get_process_events` | Everything one process did (by `tgid`): files, network, children |
+| `get_process_events` | Everything one process did: files, network, children |
 | `list_users` | Active users with event counts and host access patterns |
 | `user_activity` | Detailed activity for one identity: files, processes, connections |
 
@@ -137,8 +38,8 @@ All 15 tools share one registry with the dashboard Query agent, so MCP clients a
 
 | Tool | What it does |
 | --- | --- |
-| `get_anomaly_alerts` | Curated alerts that exceeded detection thresholds — the primary entry point for anomaly questions |
-| `get_anomaly_scores` | Per-epoch (5-minute) anomaly scores by detection group (`PROVEN`, `EXFIL_NET`, `EXFIL_SENSITIVE`, …) |
+| `get_anomaly_alerts` | Curated alerts that exceeded detection thresholds |
+| `get_anomaly_scores` | Per-epoch anomaly scores by detection group |
 | `get_alert_context` | Raw events in a time window around an alert |
 | `investigate_alert` | One-call investigation bundle: activity summary, process tree, network flows, and anomaly score |
 
@@ -157,18 +58,48 @@ All 15 tools share one registry with the dashboard Query agent, so MCP clients a
 
 ---
 
+## Client configuration
+
+A typical MCP client entry (Cursor, Claude Desktop, or similar):
+
+```json
+{
+  "mcpServers": {
+    "hilt": {
+      "command": "/path/to/hilt-query",
+      "env": {
+        "MODE": "mcp"
+      }
+    }
+  }
+}
+```
+
+Contact your account team for the correct binary path and environment configuration for your deployment.
+
+---
+
+## Example prompts
+
+Once connected, you can ask your AI assistant questions like:
+
+- "What hosts have been active in the last 24 hours?"
+- "Show me network flows from web-01 to external destinations"
+- "Investigate the latest anomaly alert — what happened?"
+- "List all file activity under /etc/ on prod-db-03 today"
+- "Draft a detection rule for processes connecting to new external IPs after midnight"
+
+---
+
 ## Verifying the server
 
-You can smoke-test the protocol from a shell — each request is one line of JSON on stdin:
+You can smoke-test the protocol with a JSON-RPC handshake:
 
 ```bash
-MODE=mcp AUTH_DISABLED=true \
-  LLM_PROVIDER=openai_compatible DEFAULT_LLM_BASE_URL=http://localhost \
-  ./dag-query <<'EOF'
+MODE=mcp ./hilt-query <<'EOF'
 {"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
 {"jsonrpc":"2.0","id":2,"method":"tools/list"}
-{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_hosts","arguments":{}}}
 EOF
 ```
 
-A healthy server responds with the handshake, the tool catalog, and a markdown table of hosts from the demo dataset.
+A healthy server responds with the handshake and the tool catalog.

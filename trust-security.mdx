@@ -1,0 +1,103 @@
+---
+title: "Trust & Security"
+sidebarTitle: "Trust & Security"
+description: "Hilt's security posture, data handling practices, and compliance roadmap for security reviewers."
+---
+
+This page summarizes Hilt's security posture for prospects, customers, and their security reviewers. If you have questions beyond what's covered here, contact your account team or email security@hilt.ai.
+
+---
+
+## Architecture principles
+
+| Principle | Implementation |
+| :-- | :-- |
+| **Single-tenant, your cloud** | Each customer receives a dedicated deployment inside their own AWS/GCP/Azure/Ali Cloud account. Hilt engineers access it only through your approval workflow. |
+| **Metadata-only telemetry** | The collector captures process execution metadata, network flow summaries, and file operation events. It does **not** read file contents, packet payloads, memory, or environment variables. |
+| **No lateral network access** | The collector makes a single outbound HTTPS connection to your ingest endpoint (`DAG_SHIP_URL`). It opens no listening ports and cannot be addressed from the network. |
+| **Minimal privilege** | On Kubernetes the collector runs as a privileged DaemonSet solely for eBPF access — it does not mount the host filesystem beyond `/sys/kernel/btf`. On VMs it requires `CAP_BPF` + `CAP_PERFMON` (or equivalent `LimitMEMLOCK`). |
+
+---
+
+## Data handling
+
+### What the collector sees
+
+- Process execution events (command, parent, PID, UID, timestamps)
+- File operation metadata (path, open flags, rename from/to — **not** file contents)
+- Network flow summaries (src/dst IP+port, bytes transferred, protocol — **not** packet payloads)
+
+### What the collector cannot see
+
+- File contents or application-layer data
+- Packet payloads or HTTP bodies
+- Environment variables, secrets, or in-memory data
+- Clipboard, screen, or keyboard input
+
+### Data residency
+
+All telemetry stays within your cloud account. The analytics database (ClickHouse) and dashboard database (PostgreSQL) run inside your deployment's VPC. Hilt does not replicate or mirror customer data externally.
+
+### Anonymized model training exports
+
+For customers who opt in, a structured export pipeline produces anonymized feature vectors for model improvement. Exports are:
+
+- Stripped of all identifiers, file paths, IPs, and command lines
+- Subject to customer review and explicit approval before transfer
+- Documented in detail at [Data Export Overview](/on-prem/data-export-overview)
+
+---
+
+## Authentication & access control
+
+| Capability | Status |
+| :-- | :-- |
+| Username/password authentication | Available |
+| SSO (SAML/OIDC) | Roadmap — contact your account team for timeline |
+| Role-based access control | Available (admin, viewer roles) |
+| Team-scoped host visibility | Available |
+| Audit log of administrative actions | Available |
+
+---
+
+## Compliance
+
+| Framework | Relevance |
+| :-- | :-- |
+| **SOC 2 Type II** | In progress — contact your account team for current status and expected completion |
+| **NYDFS Part 500** | Hilt's privileged-access monitoring and logging capabilities map to §500.7 (access privileges) and §500.14 (monitoring) |
+| **PCI DSS 4.0.1** | Network egress monitoring and exfiltration detection support Requirement 1 (network controls) and Requirement 10 (logging) |
+| **HIPAA Security Rule** | ePHI movement tracking via file and network telemetry supports §164.312 (technical safeguards) |
+| **FTC Safeguards Rule** | Data flow visibility supports the information security program requirements |
+
+---
+
+## Penetration testing
+
+Hilt conducts periodic penetration testing of the platform. Contact your account team for the latest summary or to coordinate testing of your deployment.
+
+---
+
+## Vulnerability disclosure
+
+If you discover a security vulnerability in Hilt software, please report it to security@hilt.ai. We aim to acknowledge reports within 2 business days and provide remediation timelines within 5 business days.
+
+---
+
+## Privileged agent FAQ
+
+**Q: Why does the collector need root / privileged mode?**
+
+eBPF program loading requires elevated privileges (`CAP_BPF` + `CAP_PERFMON`, or running as privileged on Kubernetes). This is the minimum required to attach tracepoints — the collector does not use these privileges for any other purpose.
+
+**Q: Can the collector modify or block activity on the host?**
+
+No. The collector is strictly observational. It attaches read-only tracepoints and never modifies syscall behavior, drops packets, or alters host state. Quarantine actions (where configured) are executed by the control plane via cloud APIs (e.g., AWS Security Groups), not by the collector.
+
+**Q: What resources does the collector consume?**
+
+Typical overhead is <2% CPU and <200 MB memory. Resource limits can be enforced via systemd cgroups or Kubernetes resource requests/limits. See [Sizing and capacity](/linux-collector/sizing-capacity) for benchmarks.
+
+**Q: What kernel versions are supported?**
+
+The collector requires Linux kernel 5.8+ with BTF (BPF Type Format) enabled. See [System requirements](/linux-collector/system-requirements) for the full compatibility matrix.

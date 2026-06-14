@@ -1,73 +1,38 @@
 ---
 title: "Export schema"
 sidebarTitle: "Export schema"
-description: "Parquet export schema for anonymized data exports."
+description: "Schema of the anonymized Parquet export file."
 ---
 
-The exported Parquet file contains exactly these columns and no others. Anything not listed here is excluded at the query level.
+The exported Parquet file contains exactly the columns listed below. Anything not listed here is excluded at the query level.
 
 ## Temporal and grouping
 
 | Column | Type | Notes |
 | :-- | :-- | :-- |
 | `epoch_ts` | `String` | 5-minute bucket timestamp; offset by a random per-export shift (±0–48h) to prevent calendar correlation |
-| `host_id_anon` | `String` | Deterministic remap: `host-0001`, `host-0002`, etc. Consistent within one export so temporal models work |
-| `uid_anon` | `UInt32` | Sequential remap: 0, 1, 2, ... per host |
+| `host_id_anon` | `String` | Deterministic remap: `host-0001`, `host-0002`, etc. Consistent within one export |
+| `uid_anon` | `UInt32` | Sequential remap: 0, 1, 2, … per host |
 | `phase` | `String` | Scoring phase label (e.g. `cold_start`, `baseline`, `scoring`) |
 | `is_active` | `UInt8` | Whether the epoch had meaningful activity |
-| `is_anomaly` | `UInt8` | Binary anomaly flag from the scorer |
+| `is_anomaly` | `UInt8` | Binary anomaly flag |
 | `topk_sum` | `Float64` | Sum of top-K anomaly channel scores |
 | `volume_topk` | `Float64` | Volume-weighted top-K score |
 
-## Raw features (24 columns)
-
-From the canonical feature table, `file_open_cusum_drift` is a removed slot kept for index stability, it is always zero and excluded from the export.
-
-```text
-exec_count, file_open_count, destructive_file_ops, net_flow_count,
-bytes_sent, bytes_recv,
-unique_pids, unique_binaries, unique_dest_ips,
-novel_binary_exec, novel_parent_child,
-unique_dest_ports, sensitive_path_hits,
-write_open_count, sensitive_write_opens,
-exfil_novelty_bytes, new_dest_port,
-read_then_send_count, sensitive_read_send_count, unique_read_send_processes,
-fork_count, new_peer_site_count, cross_cluster_bytes_sent
-```
-
-## Derived features (32 columns)
-
-From the canonical derived table. Pure algebra on raw features, no new state or raw values.
-
-```text
-exec_intensity, dest_spread, novelty_byte_share, log_ratio,
-proc_share, file_share, net_share,
-new_bins_2h, new_ext_dests_2h,
-parent_child_trans_surprisal, epoch_state_trans_surprisal,
-epoch_entropy, dest_entropy,
-wavelet_exec_s1, wavelet_exec_s3, wavelet_exec_s6,
-wavelet_bytes_s1, wavelet_bytes_s3, wavelet_bytes_s6,
-wavelet_net_s1, wavelet_net_s3, wavelet_net_s6,
-hour_sin, hour_cos,
-session_fan_out, session_comm_entropy,
-session_lifetime_sec, session_net_dest_card, session_bytes_out,
-fork_exec_ratio, fork_burst_max, fork_exec_latency_mean_ms
-```
-
-## Numeric and derived feature vectors
-
-Rather than individual columns, the Parquet file stores features as packed Arrow List columns:
+## Feature vectors
 
 | Column | Type | Notes |
 | :-- | :-- | :-- |
-| `numeric_features` | `List(Float64)` | 24-element vector of raw features (indices match `features.go`; index 9 is always zero) |
-| `derived_features` | `List(Float64)` | 32-element vector of derived features |
+| `numeric_features` | `List(Float64)` | 24-element vector of aggregate activity counts per epoch |
+| `derived_features` | `List(Float64)` | 32-element vector of statistical transforms (ratios, entropies, wavelets) |
 
-## Token sequences (for TRACE)
+Feature vectors are packed as Arrow List columns. Individual feature semantics are documented in internal engineering references.
+
+## Activity token sequences
 
 | Column | Type | Notes |
 | :-- | :-- | :-- |
-| `token_ids` | `List(UInt16)` | Closed vocabulary IDs only — no raw strings |
+| `token_ids` | `List(UInt16)` | Closed vocabulary IDs — no raw strings, filenames, or IPs |
 | `token_sub_epochs` | `List(UInt8)` | Sub-epoch index per token |
 | `token_counts` | `List(UInt16)` | Occurrence count per token |
 | `token_importances` | `List(Float32)` | Per-token anomaly importance weight |
@@ -85,16 +50,13 @@ Rather than individual columns, the Parquet file stores features as packed Arrow
 
 ## Explicitly excluded
 
-Every column not in the allowlist above is excluded from the query. The export job does not have access to `dag_events` or any Postgres table. It queries only:
+Every column not in the allowlist above is excluded. The export queries only aggregated scoring and token tables — it has no access to raw event data or application databases.
 
-- `dag_anomaly_scores WHERE group = 'EPOCH'`
-- `dag_epoch_tokens` (joined by `host_id` \+ `epoch_ts`)
+Excluded categories include:
 
-The following columns from these tables are explicitly dropped before export:
-
-- `token_evidence_json` — contains raw filenames, argv, addresses
-- `evidence`, `reason`, `drivers` — free-text scorer explanations
-- `owner`, `identity` — human identity strings
-- `host_id` — replaced with `host_id_anon`
-- `boot_id` — correlatable host lifecycle identifier
-- `alert_source`, `rule_id`, `rule_name`, `rule_label`, `rule_severity`, `matched_conditions` — detection rule provenance columns that can leak customer-defined rule logic and matched field values
+- Raw event evidence (filenames, argv, addresses)
+- Free-text scorer explanations
+- Human identity strings
+- Original host IDs (replaced with anonymized versions)
+- Boot IDs and lifecycle identifiers
+- Detection rule provenance (rule names, match conditions, severity labels)

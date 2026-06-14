@@ -1,6 +1,6 @@
 ---
 title: "Deploy on VMs"
-description: "Install the DMG Collector on bare EC2 or on-prem Linux via systemd, including interactive and automated installs."
+description: "Install the Hilt Collector on bare EC2 or on-prem Linux via systemd, including interactive and automated installs."
 ---
 
 ## Host resources
@@ -80,7 +80,7 @@ The systemd unit (`deploy/dag-agent.service`) is minimal:
 
 ```ini
 [Unit]
-Description=Cybe DAG Agent - eBPF Telemetry Sensor
+Description=Hilt Collector - eBPF Telemetry Sensor
 After=network.target
 
 [Service]

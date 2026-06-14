@@ -1,0 +1,170 @@
+---
+title: "部署架构"
+sidebarTitle: "部署架构"
+description: "Hilt 如何在您的云中部署 — AWS、GCP、Azure 和阿里云架构。"
+---
+
+Hilt 作为单租户平台部署在您自己的云账户中。不同云服务商的架构保持一致：由托管 Kubernetes 集群运行分析和仪表板服务，采集器则部署在您的工作负载主机上。
+
+---
+
+## 支持的云平台
+
+| 云平台 | 状态 | 使用的主要服务 |
+| :-- | :-- | :-- |
+| **AWS** | 正式可用 | EKS, MSK, PrivateLink, S3, RDS |
+| **GCP** | 正式可用 | GKE, Pub/Sub, Private Service Connect, Cloud Storage, Cloud SQL |
+| **Azure** | 正式可用 | AKS, Event Hubs, Private Link, Blob Storage, Azure Database for PostgreSQL |
+| **阿里云** | 正式可用 | ACK, Message Queue for Kafka, PrivateLink, OSS, ApsaraDB RDS |
+
+---
+
+## 通用架构
+
+无论使用哪家云服务商，每个 Hilt 部署都包含以下组件：
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Your Cloud Account                                      │
+│                                                          │
+│  ┌──────────┐    ┌──────────────────────────────────┐   │
+│  │ Collector │───▶│  Ingest Endpoint (Private Link)  │   │
+│  │ (hosts)  │    └──────────────┬───────────────────┘   │
+│  └──────────┘                   │                        │
+│                                 ▼                        │
+│                    ┌────────────────────────┐            │
+│                    │  Streaming Platform     │            │
+│                    │  (Kafka / Pub/Sub /     │            │
+│                    │   Event Hubs / MQ)      │            │
+│                    └───────────┬────────────┘            │
+│                                │                         │
+│                    ┌───────────▼────────────┐            │
+│                    │  Analytics Engine       │            │
+│                    │  (ClickHouse on K8s)    │            │
+│                    └───────────┬────────────┘            │
+│                                │                         │
+│                    ┌───────────▼────────────┐            │
+│                    │  Dashboard + API        │            │
+│                    │  (PostgreSQL + Web)     │            │
+│                    └────────────────────────┘            │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 组件
+
+| 组件 | 用途 |
+| :-- | :-- |
+| **采集器** | 部署在工作负载主机上的基于 eBPF 的代理（Linux）或 Endpoint Security 代理（macOS） |
+| **接入端点** | 私有加密端点，用于接收遥测数据 — 不暴露于公共互联网 |
+| **流处理平台** | 缓冲和分发事件以供处理 |
+| **分析引擎** | ClickHouse 集群，用于遥测数据存储、查询和异常评分 |
+| **仪表板** | Web 应用程序，以 PostgreSQL 作为后端存储，管理用户账户、团队和审核状态 |
+
+---
+
+## AWS
+
+### 服务
+
+| 服务 | 角色 |
+| :-- | :-- |
+| EKS | 托管 Kubernetes，运行平台服务 |
+| MSK (Kafka) | 事件流处理 |
+| PrivateLink | 私有接入端点 — 采集器无需经过公共互联网即可连接 |
+| S3 | 长期存储和数据导出 |
+| RDS (PostgreSQL) | 仪表板数据库 |
+| ACM + Route 53 | TLS 证书和私有 DNS |
+
+### 网络拓扑
+
+- 采集器通过您账户中的 **VPC Endpoint**（PrivateLink）连接
+- 所有流量保持在 AWS 私有网络内
+- 任何平台组件均无入站互联网访问
+- 仅在需要拉取镜像时使用出站互联网访问（可配置为使用私有镜像仓库）
+
+---
+
+## GCP
+
+### 服务
+
+| 服务 | 角色 |
+| :-- | :-- |
+| GKE | 托管 Kubernetes，运行平台服务 |
+| Pub/Sub | 事件流处理 |
+| Private Service Connect | 私有接入端点 |
+| Cloud Storage | 长期存储和数据导出 |
+| Cloud SQL (PostgreSQL) | 仪表板数据库 |
+| Certificate Manager | TLS 证书 |
+
+### 网络拓扑
+
+- 采集器通过 **Private Service Connect** 端点连接
+- 使用 VPC 原生网络，平台 Pod 无公共 IP
+- 使用 Workload Identity 进行 GCP 服务身份验证
+
+---
+
+## Azure
+
+### 服务
+
+| 服务 | 角色 |
+| :-- | :-- |
+| AKS | 托管 Kubernetes，运行平台服务 |
+| Event Hubs | 事件流处理（兼容 Kafka） |
+| Private Link | 私有接入端点 |
+| Blob Storage | 长期存储和数据导出 |
+| Azure Database for PostgreSQL | 仪表板数据库 |
+| App Gateway / Front Door | TLS 终结（仅限私有） |
+
+### 网络拓扑
+
+- 采集器通过 **Azure Private Link** 端点连接
+- 平台运行在无公共入口的私有 VNet 中
+- 使用 Managed Identity 进行 Azure 服务身份验证
+
+---
+
+## 阿里云
+
+### 服务
+
+| 服务 | 角色 |
+| :-- | :-- |
+| ACK | 托管 Kubernetes，运行平台服务 |
+| Message Queue for Apache Kafka | 事件流处理 |
+| PrivateLink | 私有接入端点 |
+| OSS | 长期存储和数据导出 |
+| ApsaraDB RDS (PostgreSQL) | 仪表板数据库 |
+
+### 网络拓扑
+
+- 采集器通过 VPC 内的 **PrivateLink** 端点连接
+- 平台部署在专用 VSwitch 中，使用安全组隔离
+- 使用 RAM 角色进行服务间身份验证
+
+---
+
+## 部署流程
+
+Hilt 使用 Terraform 来部署您的环境。典型的部署流程如下：
+
+1. 您提供一个目标云账户/项目/订阅，并配置约定的 IAM 权限
+2. Hilt 执行 Terraform 配置以创建所有基础设施
+3. 在您的工作负载 VPC 与平台 VPC 之间建立网络连接（PrivateLink/PSC/Private Link）
+4. 按照本文档中的指南将采集器部署到您的主机上
+
+完整流程请参阅[快速开始](/getting-started)。
+
+---
+
+## 安全边界
+
+| 边界 | 实现方式 |
+| :-- | :-- |
+| **网络隔离** | 所有组件位于私有子网；仅通过 Private Link 接入 |
+| **传输加密** | 所有连接使用 TLS 1.2+ |
+| **静态加密** | 所有存储使用云原生加密（KMS 托管密钥） |
+| **访问控制** | Hilt 工程师仅通过您的审批流程获得访问权限 |
+| **无数据外泄** | 遥测数据不会离开您的云账户（除非选择启用匿名化数据导出） |

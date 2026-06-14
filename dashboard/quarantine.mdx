@@ -1,0 +1,82 @@
+---
+title: "Quarantine"
+sidebarTitle: "Quarantine"
+description: "Isolating compromised hosts from the network while preserving forensic access."
+---
+
+Quarantine is Hilt's network isolation response. When a host shows signs of compromise or active data exfiltration, an authorized user can quarantine it — severing its network access to prevent lateral movement or continued data loss, while preserving the ability to investigate.
+
+---
+
+## How quarantine works
+
+When you quarantine a host:
+
+1. **Network isolation** — the host's security group (AWS) or equivalent network policy is replaced with a quarantine security group that blocks all inbound and outbound traffic except the Hilt collector's ingest path.
+2. **Collector continues** — the Hilt collector maintains its outbound connection, so telemetry continues flowing for forensic analysis.
+3. **State recorded** — the original security group IDs are saved so the action can be reversed.
+4. **Audit trail** — the quarantine action, the user who initiated it, and the timestamp are recorded in the audit log.
+
+<Warning>
+Quarantine severs the host's network connections. Running workloads on the host will lose connectivity. Only use quarantine when the security risk of continued operation outweighs the availability impact.
+</Warning>
+
+---
+
+## Quarantining a host
+
+You can quarantine a host from multiple places in the dashboard:
+
+- **Anomalies page** — when viewing a finding, the action menu includes **Quarantine host**
+- **Collectors page** — the host detail panel includes a **Quarantine** action
+- **Finding detail** — confirmed findings show a quarantine option in the response actions
+
+### Requirements
+
+- Your dashboard user must have the **quarantine hosts** permission
+- The host must be in a cloud environment where Hilt has the required IAM permissions to modify security groups
+- The deployment must have quarantine capability enabled (configured during provisioning)
+
+---
+
+## Viewing quarantined hosts
+
+Quarantined hosts are marked throughout the dashboard:
+
+- A **Quarantined** badge appears on the host in the Collectors fleet list
+- Finding cards show a **Host quarantined · View** link when the host has been isolated
+- The finding detail narrative includes a **Quarantined** indicator
+
+---
+
+## Releasing a host
+
+To restore a quarantined host to normal operation:
+
+1. Navigate to the quarantined host (via Collectors or the quarantine badge on a finding)
+2. Select **Release from quarantine**
+3. Confirm the action
+
+The host's original security group is restored, re-establishing its previous network access. The release is recorded in the audit log.
+
+---
+
+## Blast-radius assessment
+
+Before quarantining, the dashboard shows a blast-radius summary:
+
+- **Workloads affected** — services running on the host that will lose connectivity
+- **Dependent connections** — other hosts or services that connect to this host
+- **Active sessions** — users currently connected to the host
+
+This helps you make an informed decision about the availability impact of isolation.
+
+---
+
+## Limitations
+
+| Limitation | Detail |
+| :-- | :-- |
+| **Cloud-only** | Quarantine via security groups requires AWS (or equivalent cloud API access). On-prem VMs without cloud security groups are not currently supported. |
+| **Network-level only** | Quarantine isolates at the network layer. It does not terminate processes, lock accounts, or modify host state. |
+| **Requires IAM permissions** | The Hilt deployment must have permissions to modify security groups in your account. |

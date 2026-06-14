@@ -10,7 +10,7 @@ The raw event explorer. Investigate lets you scope to hosts and a time window, n
 
 ## Context banner
 
-When you arrive from another page, a context banner gives you a one-click way back, labeled for the source:
+When you arrive from another page, a context banner gives you a one-click way back, labeled for the source.
 
 ## Filters
 
@@ -26,10 +26,6 @@ Filters are grouped into tabs across the header, **Event**, **Process**, **Netwo
 | **Location** | Hosts (multi-select), boot ID, container ID, pod UID |
 
 Active filters show as removable chips, with **Clear all** to reset. Filtering is entirely structured. 
-
----
-
-The raw event explorer. Investigate lets you scope to hosts and a time window, narrow down with structured filters, and read individual events in chronological order — with anomaly windows highlighted inline. It's where most "Investigate events" links across the dashboard land.
 
 ---
 
@@ -52,13 +48,6 @@ Click a row to expand it. If the event overlaps a finding, an **Anomaly overlap*
 
 Events load 200 at a time. Use **Show more** to fetch older events.
 
-Above the event list, an **Activity** histogram plots event volume over time, one bar per time bucket, with the count on the Y axis.
-
-- **Drag to zoom** — select a region to narrow the window; the selection becomes a custom range.
-- **Back** and **Reset** step out of zoom levels.
-- **Anomaly overlay** — amber bands mark windows where findings occurred (±2.5 minutes).
-- Hovering a bucket shows its event count and time. An empty window reads **"No activity in range."**
-
 ---
 
 ## Event list
@@ -72,7 +61,3 @@ Below the scrubber is the event list. Despite being internally called a "process
 - **Refresh** — manually reloads (the list does not auto-poll; anomaly markers do refresh every 30 seconds).
 
 The header title is **Investigate**, and the subtitle reflects how you got here — for example _"All hosts · 12,340 events"_, _"web-01 · 512 events"_, or, when arriving from a finding, _"Investigating: \<alert group\> - \<host\>"_ naming the finding's group and host.
-
-- **Sort** — **Newest** or **Oldest** first.
-- A count of how many events are loaded.
-- **Refresh** — manually reloads (the list does not auto-poll; anomaly markers do refresh every 30 seconds).
