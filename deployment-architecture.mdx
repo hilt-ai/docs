@@ -1,7 +1,7 @@
 ---
 title: "Deployment Architecture"
 sidebarTitle: "Deployment Architecture"
-description: "How Hilt deploys in your cloud — AWS, GCP, Azure, and Ali Cloud architectures."
+description: "How Hilt deploys in your cloud: AWS, GCP, Azure, and Ali Cloud architectures."
 ---
 
 Hilt deploys as a single-tenant platform inside your own cloud account. The architecture is consistent across providers: a managed Kubernetes cluster runs the analytics and dashboard services, with collectors deployed to your workload hosts.
@@ -55,7 +55,7 @@ Regardless of cloud provider, every Hilt deployment includes:
 | Component | Purpose |
 | :-- | :-- |
 | **Collectors** | eBPF-based agents on your workload hosts (Linux) or Endpoint Security agents (macOS) |
-| **Ingest endpoint** | Private, encrypted endpoint that receives telemetry — no public internet exposure |
+| **Ingest endpoint** | Private, encrypted endpoint that receives telemetry, with no public internet exposure |
 | **Streaming platform** | Buffers and distributes events for processing |
 | **Analytics engine** | ClickHouse cluster for telemetry storage, querying, and anomaly scoring |
 | **Dashboard** | Web application with PostgreSQL backing store for user accounts, teams, and review state |
@@ -70,7 +70,7 @@ Regardless of cloud provider, every Hilt deployment includes:
 | :-- | :-- |
 | EKS | Managed Kubernetes for platform services |
 | MSK (Kafka) | Event streaming |
-| PrivateLink | Private ingest endpoint — collectors connect without traversing public internet |
+| PrivateLink | Private ingest endpoint: collectors connect without traversing public internet |
 | S3 | Long-term storage and data exports |
 | RDS (PostgreSQL) | Dashboard database |
 | ACM + Route 53 | TLS certificates and private DNS |

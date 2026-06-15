@@ -4,7 +4,7 @@ sidebarTitle: "MCP Server"
 description: "Connect AI assistants to Hilt telemetry with the MCP server."
 ---
 
-The Hilt query service ships with a built-in [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server. It exposes the same 15 telemetry tools that power the [Query](/dashboard/query) page, so any MCP-compatible client — Cursor, Claude Desktop, or your own agent — can search events, investigate anomalies, and draft detection rules directly against your Hilt data.
+The Hilt query service ships with a built-in [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server. It exposes the same 15 telemetry tools that power the [Query](/dashboard/query) page, so any MCP-compatible client (Cursor, Claude Desktop, or your own agent) can search events, investigate anomalies, and draft detection rules directly against your Hilt data.
 
 <Note>
 The MCP server is currently in **early access**. It is intended for use within your secured environment by authorized operators. Contact your account team for access and configuration guidance.
@@ -54,7 +54,7 @@ The MCP server provides read-only access to your telemetry through 15 structured
 
 | Tool | What it does |
 | --- | --- |
-| `build_detection_rule` | Validates a detection-rule draft and returns it — **does not save the rule**. Take the draft to the [Detection Rules](/dashboard/detection-rules) page to review and create it |
+| `build_detection_rule` | Validates a detection-rule draft and returns it. **Does not save the rule.** Take the draft to the [Detection Rules](/dashboard/detection-rules) page to review and create it |
 
 ---
 
@@ -85,7 +85,7 @@ Once connected, you can ask your AI assistant questions like:
 
 - "What hosts have been active in the last 24 hours?"
 - "Show me network flows from web-01 to external destinations"
-- "Investigate the latest anomaly alert — what happened?"
+- "Investigate the latest anomaly alert. What happened?"
 - "List all file activity under /etc/ on prod-db-03 today"
 - "Draft a detection rule for processes connecting to new external IPs after midnight"
 

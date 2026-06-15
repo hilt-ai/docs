@@ -31,11 +31,11 @@ Active filters show as removable chips, with **Clear all** to reset. Filtering i
 
 ## Timeline scrubber
 
-Above the event list, an **Activity** histogram plots event volume over time — one bar per time bucket, with the count on the Y axis.
+Above the event list, an **Activity** histogram plots event volume over time, one bar per time bucket, with the count on the Y axis.
 
-- **Drag to zoom** — select a region to narrow the window; the selection becomes a custom range.
+- **Drag to zoom**: select a region to narrow the window; the selection becomes a custom range.
 - **Back** and **Reset** step out of zoom levels.
-- **Anomaly overlay** — amber bands mark windows where findings occurred (±2.5 minutes).
+- **Anomaly overlay**: amber bands mark windows where findings occurred (±2.5 minutes).
 - Hovering a bucket shows its event count and time. 
 
 ---
@@ -52,12 +52,12 @@ Events load 200 at a time. Use **Show more** to fetch older events.
 
 ## Event list
 
-Below the scrubber is the event list. Despite being internally called a "process group" list, it's a **flat, chronological list — one row per event**, not grouped under process headers.
+Below the scrubber is the event list. Despite being internally called a "process group" list, it's a **flat, chronological list, one row per event**, not grouped under process headers.
 
 ### Toolbar
 
-- **Sort** — **Newest** or **Oldest** first.
+- **Sort**: **Newest** or **Oldest** first.
 - A {n} **loaded** count.
-- **Refresh** — manually reloads (the list does not auto-poll; anomaly markers do refresh every 30 seconds).
+- **Refresh**: manually reloads (the list does not auto-poll; anomaly markers do refresh every 30 seconds).
 
-The header title is **Investigate**, and the subtitle reflects how you got here — for example _"All hosts · 12,340 events"_, _"web-01 · 512 events"_, or, when arriving from a finding, _"Investigating: \<alert group\> - \<host\>"_ naming the finding's group and host.
+The header title is **Investigate**, and the subtitle reflects how you got here: for example _"All hosts · 12,340 events"_, _"web-01 · 512 events"_, or, when arriving from a finding, _"Investigating: \<alert group\> - \<host\>"_ naming the finding's group and host.

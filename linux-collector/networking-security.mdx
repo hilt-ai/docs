@@ -6,7 +6,7 @@ description: "Outbound network posture, airgapped operation, privilege model, an
 ## Outbound
 
 - Only one destination: `DAG_SHIP_URL` (the Hilt ingest PrivateLink endpoint in your account). Traffic is HTTPS with your CA chain; the endpoint presents an ACM certificate issued against your private zone.
-- No DNS leakage to public resolvers is required — the ingest domain is in a private Route 53 zone associated with your VPC, so resolution happens inside your VPC and the TCP path rides the PrivateLink endpoint service to the ingest NLB.
+- No DNS leakage to public resolvers is required. The ingest domain is in a private Route 53 zone associated with your VPC, so resolution happens inside your VPC and the TCP path rides the PrivateLink endpoint service to the ingest NLB.
 - **Firewall rule:** allow the agent's source CIDR to reach the PrivateLink endpoint on TCP/443. For cross-VPC rollouts the PrivateLink consumer endpoint is the gateway; for same-VPC rollouts traffic is purely intra-VPC.
 
 ## Airgapped / offline

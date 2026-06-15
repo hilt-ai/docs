@@ -6,10 +6,10 @@ description: "Cluster analysis and behavioral modeling across your host fleet."
 
 Groups your hosts by how they behave and shows how those groups shift over time. Hosts with similar activity form **clusters** (behavior groups); as behavior changes between periodic **refits**, hosts move between clusters. This page visualizes both the current grouping and the movement.
 
-- **Header** — title, the subtitle _"How hosts group and shift over time"_, and a `{N} clusters · {M} hosts` summary.
-- **Insight strip** — a card summarizing the most notable change (e.g. _"3 hosts moved into Network-heavy"_), with a top driver metric and an **Investigate Event** button when relevant.
-- **Canvas** (left) — the fleet visualization, with a refit timeline beneath it.
-- **Evidence rail** (right) — context panel that changes with your selection.
+- **Header**: title, the subtitle _"How hosts group and shift over time"_, and a `{N} clusters · {M} hosts` summary.
+- **Insight strip**: a card summarizing the most notable change (e.g. _"3 hosts moved into Network-heavy"_), with a top driver metric and an **Investigate Event** button when relevant.
+- **Canvas** (left): the fleet visualization, with a refit timeline beneath it.
+- **Evidence rail** (right): context panel that changes with your selection.
 
 ---
 
@@ -17,10 +17,10 @@ Groups your hosts by how they behave and shows how those groups shift over time.
 
 The canvas plots the current snapshot:
 
-- **Cluster bubbles** — one per behavior group, sized by host count and colored per cluster, with the label and host count shown. Large bubbles may include a short narrative. Emptied-but-referenced clusters appear as dimmed "ghost" bubbles.
-- **Idle** and **Returned** pools — special groupings (bottom corners) for hosts with insufficient telemetry and hosts that have reappeared.
-- **Movement arrows** — curved flows between clusters, with width scaled to the number of hosts and labeled `{N} hosts`.
-- **Host dots** — individual hosts inside their bubble (when the Hosts layer is on).
+- **Cluster bubbles**: one per behavior group, sized by host count and colored per cluster, with the label and host count shown. Large bubbles may include a short narrative. Emptied-but-referenced clusters appear as dimmed "ghost" bubbles.
+- **Idle** and **Returned** pools: special groupings (bottom corners) for hosts with insufficient telemetry and hosts that have reappeared.
+- **Movement arrows**: curved flows between clusters, with width scaled to the number of hosts and labeled `{N} hosts`.
+- **Host dots**: individual hosts inside their bubble (when the Hosts layer is on).
 
 ### Layers
 
@@ -41,7 +41,7 @@ A small toolbar (top-left of the canvas) toggles overlays. Clusters are always s
 
 Beneath the canvas (when there's more than one refit), a **Timeline** control scrubs through snapshots over time. Drag or click the track to jump to a refit, or use **Play** to replay the snapshots in sequence. Changing the refit clears the current selection.
 
-A refit is a periodic re-clustering of the fleet — each point on the timeline is one snapshot of how hosts were grouped at that time. (This control moves through time; it does not change clustering parameters.)
+A refit is a periodic re-clustering of the fleet: each point on the timeline is one snapshot of how hosts were grouped at that time. (This control moves through time; it does not change clustering parameters.)
 
 ---
 
@@ -51,7 +51,7 @@ The right rail shows different content depending on what's selected.
 
 ### Activity summary (default)
 
-With nothing selected, the rail shows **Activity summary** — the recent shifts (up to three flows, e.g. _"_{N} _hosts →_ {cluster}_"_ with a driver) and the main **behavior groups** with their host counts. If nothing moved since the previous refit, it says so.
+With nothing selected, the rail shows **Activity summary**: the recent shifts (up to three flows, e.g. _"_{N} _hosts →_ {cluster}_"_ with a driver) and the main **behavior groups** with their host counts. If nothing moved since the previous refit, it says so.
 
 ### Cluster detail
 

@@ -37,7 +37,7 @@ Unix UID 会按每台主机重映射为顺序整数。UID 0（root）保留为 0
 
 ### 最小主机数阈值
 
-主机数少于 5 台的导出会被拒绝。这可以防止从高度专门化的单主机环境导出数据 —— 在那种环境下，仅凭特征分布本身就可能识别出该工作负载。
+主机数少于 5 台的导出会被拒绝。这可以防止从高度专门化的单主机环境导出数据，在那种环境下，仅凭特征分布本身就可能识别出该工作负载。
 
 ## 运行一次导出
 
@@ -81,7 +81,7 @@ Unix UID 会按每台主机重映射为顺序整数。UID 0（root）保留为 0
     # export-2026-06-05.parquet.zst        (compressed Parquet)
     # export-2026-06-05.parquet.zst.sha256 (integrity hash)
     # manifest.json                        (schema, row count, date range, host count)
-    # host_map.json                        (host ID mapping — stays in customer bucket)
+    # host_map.json                        (host ID mapping, stays in customer bucket)
     ```
   </Step>
 </Steps>

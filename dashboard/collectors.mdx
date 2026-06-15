@@ -10,8 +10,8 @@ Lists every host running a Hilt collector, shows whether each one is reporting, 
 
 The page has two sections stacked vertically:
 
-1. **Fleet summary cards** — three filter cards at the top.
-2. **Host table** — searchable, sortable list of all matching hosts.
+1. **Fleet summary cards**: three filter cards at the top.
+2. **Host table**: searchable, sortable list of all matching hosts.
 
 Click any row to open that host's detail view.
 
@@ -19,7 +19,7 @@ Click any row to open that host's detail view.
 
 ## Fleet summary cards
 
-Three cards act as both status indicators and table filters. Only one filter is active at a time — the selected card gets a green border.
+Three cards act as both status indicators and table filters. Only one filter is active at a time, and the selected card gets a green border.
 
 | Card | Value | What it filters |
 | --- | --- | --- |
@@ -70,11 +70,11 @@ Click anywhere on a row (except the drag handle or actions menu) to open host de
 
 ### Table behavior
 
-- **Sorting** — default sort is by last seen (most recent first). Click column headers where supported.
-- **Drag to reorder** — use the grip handle on the left to rearrange rows. Pin order to keep your arrangement.
-- **Pagination** — 50 hosts per page with previous/next controls.
-- **Auto-refresh** — the table reloads every 30 seconds.
-- **Kubernetes grouping** — nodes in the same cluster collapse under a single expandable cluster row.
+- **Sorting**: default sort is by last seen (most recent first). Click column headers where supported.
+- **Drag to reorder**: use the grip handle on the left to rearrange rows. Pin order to keep your arrangement.
+- **Pagination**: 50 hosts per page with previous/next controls.
+- **Auto-refresh**: the table reloads every 30 seconds.
+- **Kubernetes grouping**: nodes in the same cluster collapse under a single expandable cluster row.
 
 ---
 
@@ -100,9 +100,9 @@ A horizontal bar showing collector availability over time. Each segment represen
 
 | Color | Meaning |
 | --- | --- |
-| Green | Online — events received in this bucket |
-| Amber | Offline — no activity in this bucket |
-| Red | Quarantined — host was isolated during this period |
+| Green | Online: events received in this bucket |
+| Amber | Offline: no activity in this bucket |
+| Red | Quarantined: host was isolated during this period |
 
 Hover a segment for the exact timestamp and event count. A summary line above the bar shows total uptime percentage and active hours (e.g. "Online for 6d 14h · 98.2% uptime").
 
@@ -124,8 +124,8 @@ Toggle between two views:
 
 | View | What it shows |
 | --- | --- |
-| **Cgroups** | Full kernel cgroup hierarchy — host → runtime → pod → container. Default view. |
-| **Workloads** | Flat list grouped by logical workload — one row per Kubernetes pod or Docker Compose service. |
+| **Cgroups** | Full kernel cgroup hierarchy: host → runtime → pod → container. Default view. |
+| **Workloads** | Flat list grouped by logical workload, one row per Kubernetes pod or Docker Compose service. |
 
 Each node displays event counts, byte transfer, and lineage depth. Expand nodes to see child processes and workloads. Use this to understand which containers or services on a host are generating the most activity.
 

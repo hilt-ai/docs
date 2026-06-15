@@ -24,8 +24,8 @@ Above the user list, three stat pills summarize the current scope:
 
 ### Filter and search
 
-- **Segmented toggle** — **All** or **At risk** (users whose risk level is _unusual_ or _critical_).
-- **Search** — filter by identity, identity source, or Okta name/email.
+- **Segmented toggle**: **All** or **At risk** (users whose risk level is _unusual_ or _critical_).
+- **Search**: filter by identity, identity source, or Okta name/email.
 
 Users are sorted by risk (critical → unusual → normal), then identity-source priority, then event count.
 
@@ -33,11 +33,11 @@ Users are sorted by risk (critical → unusual → normal), then identity-source
 
 Each user is a clickable card showing:
 
-- **Avatar** — initials, tinted red (critical) or amber (unusual) when at risk.
-- **Display name** — the Okta full name when known, otherwise the raw identity.
+- **Avatar**: initials, tinted red (critical) or amber (unusual) when at risk.
+- **Display name**: the Okta full name when known, otherwise the raw identity.
 - **Event count**, plus **· N alerts** when anomalies are present.
-- **Secondary line** — the raw identity (when different), relative last-seen time, and an identity-source hint such as **Okta verified**, **Teleport**, **Verified chain**, **Linux**, **Owner**, or **SSH / IP**.
-- **Type badges** — **Shared** or **Service** for non-personal accounts.
+- **Secondary line**: the raw identity (when different), relative last-seen time, and an identity-source hint such as **Okta verified**, **Teleport**, **Verified chain**, **Linux**, **Owner**, or **SSH / IP**.
+- **Type badges**: **Shared** or **Service** for non-personal accounts.
 
 The selected card is outlined (green for normal risk, red/amber for at-risk).
 

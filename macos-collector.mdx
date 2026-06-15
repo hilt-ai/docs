@@ -1,14 +1,14 @@
 ---
 title: "macOS Collector"
 sidebarTitle: "macOS (Early Access)"
-description: "Hilt's macOS endpoint collector — Endpoint Security framework and managed Chrome extension."
+description: "Hilt's macOS endpoint collector: Endpoint Security framework and managed Chrome extension."
 ---
 
 <Note>
 The macOS collector is in **early access**. Capabilities and configuration may change. Contact your account team to enable it for your deployment.
 </Note>
 
-The macOS collector extends Hilt's data detection and response coverage to macOS endpoints, complementing the Linux collector that covers server infrastructure. Together they provide visibility across your full environment — from cloud servers to employee workstations.
+The macOS collector extends Hilt's data detection and response coverage to macOS endpoints, complementing the Linux collector that covers server infrastructure. Together they provide visibility across your full environment, from cloud servers to employee workstations.
 
 ---
 
@@ -16,7 +16,7 @@ The macOS collector extends Hilt's data detection and response coverage to macOS
 
 | Surface | Technology | What it observes |
 | :-- | :-- | :-- |
-| **System activity** | Apple Endpoint Security framework | Process execution, file operations, network connections — the same event categories as the Linux collector |
+| **System activity** | Apple Endpoint Security framework | Process execution, file operations, network connections, the same event categories as the Linux collector |
 | **Browser activity** | Managed Chrome extension | Web navigation patterns and download activity relevant to data movement governance |
 
 ---
@@ -33,7 +33,7 @@ A macOS system extension using Apple's Endpoint Security (ES) framework. It obse
 - File opens, writes, renames, and deletes
 - Network connection establishment and data transfer
 
-The system extension runs as a user-space daemon with ES entitlements — no kernel extension (kext) required.
+The system extension runs as a user-space daemon with ES entitlements; no kernel extension (kext) required.
 
 ### Chrome extension (managed)
 
@@ -51,9 +51,9 @@ The extension operates in read-only mode and does not modify, block, or inject i
 
 The macOS collector is deployed through your MDM (Mobile Device Management) solution:
 
-1. **System extension** — distributed as a signed `.pkg` installer, approved via MDM profile for Endpoint Security entitlements
-2. **Chrome extension** — force-installed via Chrome enterprise policy through MDM
-3. **Configuration** — ingest endpoint and node identity configured via MDM preferences or a configuration profile
+1. **System extension**: distributed as a signed `.pkg` installer, approved via MDM profile for Endpoint Security entitlements
+2. **Chrome extension**: force-installed via Chrome enterprise policy through MDM
+3. **Configuration**: ingest endpoint and node identity configured via MDM preferences or a configuration profile
 
 ### Requirements
 
@@ -70,11 +70,11 @@ The macOS collector is deployed through your MDM (Mobile Device Management) solu
 
 Consistent with the Linux collector's design philosophy:
 
-- **Does not read file contents** — only metadata (path, operation type, size)
+- **Does not read file contents**: only metadata (path, operation type, size)
 - **Does not capture keystrokes or screen content**
-- **Does not block or modify activity** — strictly observational
-- **Does not require Full Disk Access** — operates within Endpoint Security framework permissions
-- **Does not capture packet payloads** — only connection metadata and byte counts
+- **Does not block or modify activity**: strictly observational
+- **Does not require Full Disk Access**: operates within Endpoint Security framework permissions
+- **Does not capture packet payloads**: only connection metadata and byte counts
 
 ---
 
@@ -95,7 +95,7 @@ macOS hosts appear in the [Collectors](/dashboard/collectors) fleet view alongsi
 
 | Limitation | Status |
 | :-- | :-- |
-| Auto-update | Not yet available — upgrades via MDM package push |
+| Auto-update | Not yet available: upgrades via MDM package push |
 | Quarantine response | Not yet supported on macOS (AWS security-group isolation is Linux/cloud only) |
 | Behavioral baselining | Supported, but model warm-up may take longer on highly variable workstation patterns |
 | Self-managed deployment | MDM-only during early access |

@@ -25,7 +25,7 @@ If the agent logs indicate “Ship mode” but events do not appear in the dashb
 
 1. Verify DNS resolution from the node using `getent hosts`. If the domain does not resolve, the Private Route 53 association may be missing.
 2. Confirm connectivity. If the request hangs, check that the PrivateLink security group allows traffic from the node’s security group.
-3. Ensure the configured URL is correct — only the base domain should be used, with no additional path.
+3. Ensure the configured URL is correct: only the base domain should be used, with no additional path.
 
 ## High ring buffer drop counts
 

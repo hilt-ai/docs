@@ -30,14 +30,14 @@ A **global admin** (an admin or owner with no team) can see everything. A **scop
 
 ## Creating a user
 
-There's no email invitation flow — you create the account directly. **New user** opens a drawer with:
+There's no email invitation flow. You create the account directly. **New user** opens a drawer with:
 
 - **Username**.
 - **Temporary password** (minimum 8 characters). In a live deployment this is a temporary password the user should replace under Settings after signing in.
 - **Role** (defaults to viewer).
-- **Teams** — which teams the user belongs to, controlling the hosts they can see. Scoped admins must pick at least one.
+- **Teams**: which teams the user belongs to, controlling the hosts they can see. Scoped admins must pick at least one.
 
-Submitting creates the account immediately. The password is the one you typed — it isn't emailed or shown again — so share it with the user securely. In a live deployment the account is flagged with a **temporary password** until the user sets their own.
+Submitting creates the account immediately. The password is the one you typed, and it isn't emailed or shown again, so share it with the user securely. In a live deployment the account is flagged with a **temporary password** until the user sets their own.
 
 ---
 
@@ -61,7 +61,7 @@ Sets a new temporary password (minimum 8 characters). The user must sign in agai
 
 ### Disabling vs deleting
 
-- **Disable** is reversible — disabled users can't sign in, but you can re-enable them anytime.
-- **Delete** is permanent — it removes the account and all its sessions. Audit history keeps entries under the username, but the account can't be recovered.
+- **Disable** is reversible: disabled users can't sign in, but you can re-enable them anytime.
+- **Delete** is permanent: it removes the account and all its sessions. Audit history keeps entries under the username, but the account can't be recovered.
 
 Both actions ask for confirmation first.

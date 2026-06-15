@@ -10,8 +10,8 @@ Custom _if-this-then-alert_ rules over live telemetry. When a rule's condition m
 
 Two permissions govern this page:
 
-- **Manage alerts** — required to see the page at all (in the nav and by URL). Without it the page is hidden.
-- **Manage rules** — required to create, edit, delete, enable/disable, use the AI builder, or save drafts. With view-only access, the list is read-only: the toggles are disabled and the create/edit/delete controls are hidden.
+- **Manage alerts**: required to see the page at all (in the nav and by URL). Without it the page is hidden.
+- **Manage rules**: required to create, edit, delete, enable/disable, use the AI builder, or save drafts. With view-only access, the list is read-only: the toggles are disabled and the create/edit/delete controls are hidden.
 
 ---
 
@@ -25,7 +25,7 @@ The list is a table:
 | --- | --- |
 | **On** | Enable/disable toggle (green when enabled) |
 | **Name** | Rule name, with its label in monospace beneath |
-| **Severity** | Badge — high, medium, or low |
+| **Severity** | Badge: high, medium, or low |
 | **Fires** | How many times the rule has fired |
 | **Last** | When it last fired (_Never_, _Just now_, _Xm ago_, …) |
 | **Action** | View anomalies, Edit, Delete |
@@ -46,8 +46,8 @@ A **Name** and a **Description** for the rule.
 
 A toggle between two modes:
 
-- **Per event** — the rule evaluates each event against a condition (built below).
-- **Time aggregate** — the rule counts or sums over a rolling window.
+- **Per event**: the rule evaluates each event against a condition (built below).
+- **Time aggregate**: the rule counts or sums over a rolling window.
 
 #### Aggregation builder
 
@@ -57,13 +57,13 @@ In **Time aggregate** mode you configure:
 | --- | --- |
 | **Function** | Count of events · Sum of a field · Average of a field |
 | **Event type / Field** | The event type to count, or the numeric field to sum/average |
-| **Over the last** | A window — seconds, minutes, or hours |
+| **Over the last** | A window: seconds, minutes, or hours |
 | **Trigger when** | A comparison: `>`, `≥`, `<`, `≤`, `=`, `≠` |
 | **Threshold** | The value to compare against (byte fields offer B/KB/MB/GB/TB units) |
 
 ### Condition (expression builder)
 
-The condition section is where you build the matching logic (it's labeled _"Condition (build the equation)"_ for per-event rules, or _"Filter (optional)"_ for aggregates — i.e. which events count).
+The condition section is where you build the matching logic (it's labeled _"Condition (build the equation)"_ for per-event rules, or _"Filter (optional)"_ for aggregates, i.e. which events count).
 
 ### Scope
 
@@ -71,7 +71,7 @@ Choose **All hosts** or **Selected hosts**. With selected hosts you pick the hos
 
 ### Schedule
 
-Choose **Always on** or **Time windows**. Time windows let you define recurring day/time windows in a chosen timezone, set to either **Suppress during** or **Active only during** those windows. (There's no run-frequency setting — rules evaluate continuously, subject to these windows.)
+Choose **Always on** or **Time windows**. Time windows let you define recurring day/time windows in a chosen timezone, set to either **Suppress during** or **Active only during** those windows. (There's no run-frequency setting; rules evaluate continuously, subject to these windows.)
 
 ### Response
 
@@ -97,8 +97,8 @@ Drafts are saved locally (per user) via **Save draft** and reopened from the **D
 
 The proposal appears under **Proposed rule**, summarizing the name, description, trigger, condition, scope, schedule, and response. From there you can:
 
-- **Create rule** — save it immediately, or
-- **Edit in full editor** — hand the draft off to the rule form drawer to fine-tune before saving.
+- **Create rule**: save it immediately, or
+- **Edit in full editor**: hand the draft off to the rule form drawer to fine-tune before saving.
 
 ---
 
@@ -110,6 +110,6 @@ The proposal appears under **Proposed rule**, summarizing the name, description,
 
 ## Managing rules
 
-- **Enable / disable** — the **On** toggle in the list activates or pauses a rule without deleting it.
-- **Edit** — reopens the rule in the form drawer.
-- **Delete** — removes the rule (with confirmation); findings it already produced remain on the Anomalies page.
+- **Enable / disable**: the **On** toggle in the list activates or pauses a rule without deleting it.
+- **Edit**: reopens the rule in the form drawer.
+- **Delete**: removes the rule (with confirmation); findings it already produced remain on the Anomalies page.

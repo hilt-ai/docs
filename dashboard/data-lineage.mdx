@@ -13,9 +13,9 @@ Traces process relationships and execution sessions for a host: which processes 
 The page header carries the controls and adapts to what you're looking at:
 
 - **Host selector** and **time range** (shared with the rest of the dashboard).
-- **Back link** — when a host is selected, an **All hosts** link returns you to the fleet view.
-- **View toggle** — appears once a host is selected: **Data Flow** / **Sessions**.
-- **Investigate events** — jumps to Investigate scoped to the current host and time window.
+- **Back link**: when a host is selected, an **All hosts** link returns you to the fleet view.
+- **View toggle**: appears once a host is selected: **Data Flow** / **Sessions**.
+- **Investigate events**: jumps to Investigate scoped to the current host and time window.
 
 A **metric summary strip** sits below the header with number of processes, network connections and file accesses along with identities and anomalies.
 
@@ -29,9 +29,9 @@ With no host selected, the page shows **Process Activity** across the fleet.
 
 ### Behavior
 
-- **Default sort** — Processes, highest first.
+- **Default sort**: Processes, highest first.
 - **Click a row** to drill into that host's Data Flow view.
-- **Kubernetes grouping** — nodes in the same cluster collapse under one expandable cluster row showing the node count.
+- **Kubernetes grouping**: nodes in the same cluster collapse under one expandable cluster row showing the node count.
 
 If there's no activity, the table prompts you to expand the time window.
 
@@ -47,7 +47,7 @@ Each node is a process card showing:
 
 - The command (`comm`) and the identity that ran it.
 - A behavior-group badge.
-- Activity summary — `N events · N execs`.
+- Activity summary: `N events · N execs`.
 
 Processes that are evidence for an anomaly are outlined with a red ring.
 
@@ -81,8 +81,8 @@ Switch the per-host toggle to **Sessions** to inspect execution sessions, recurr
 
 Sessions are organized by **grouping** (recurring exec shapes). Use the grouping control to find and load a run:
 
-- **Grouped sessions** — the recurring shapes in this time range.
-- **Select session in this grouping** — pick a specific run to load into the graph.
+- **Grouped sessions**: the recurring shapes in this time range.
+- **Select session in this grouping**: pick a specific run to load into the graph.
 - The groupings popover (**Groupings in this range**) lets you expand a row for sample sessions, then choose one.
 
 Each grouping (cluster) row shows the command chain (`parent_comm → comm`), a session count badge for multi-run groupings, and stats such as exec count and duration (or how far apart recurring runs are). Expanding a multi-run grouping reveals **Sample sessions** with session id, exec count, duration, identity, and container.
@@ -93,8 +93,8 @@ Low-signal groupings are tucked away as **background patterns** (single exec, si
 
 Once a session is selected, the view splits:
 
-- **Left** — the session execution graph, with the grouping picker beneath it.
-- **Right** — the **Events** panel for the session.
+- **Left**: the session execution graph, with the grouping picker beneath it.
+- **Right**: the **Events** panel for the session.
 
 The events panel lists process events with **Time**, **Type**, **Detail**, and **UID** columns, loading more as you scroll (infinite scroll). The session header shows the command chain, exec count, duration, identity, and container, along with **Selected from graph · reset** and an **Investigate** link.
 
