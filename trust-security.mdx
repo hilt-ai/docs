@@ -1,9 +1,19 @@
 ---
 title: "Trust & Security"
 sidebarTitle: "Trust & Security"
-description: "Hilt's security posture, data handling practices, and compliance roadmap for security reviewers."
+description: "Hilt's security posture, data handling practices, and compliance information."
 ---
 
-# Trust & Security
+This page will be expanded on June 16, 2026 with details on Hilt's security posture, data handling practices, and compliance information. Check back soon.
 
-This page will be available on June 15, 2026. Check back soon for details on Hilt's security posture, data handling practices, and compliance information.
+---
+
+## Security boundaries
+
+| Boundary | Implementation |
+| :-- | :-- |
+| **Network isolation** | All components in private subnets; ingest via private link only |
+| **Encryption in transit** | TLS 1.2+ on all connections |
+| **Encryption at rest** | Cloud-native encryption (KMS-managed keys) on all storage |
+| **Access control** | Hilt engineer access via your approval workflow only |
+| **No data egress** | Telemetry never leaves your cloud account (except opt-in anonymized exports) |

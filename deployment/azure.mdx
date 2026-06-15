@@ -1,0 +1,40 @@
+---
+title: "Azure"
+sidebarTitle: "Azure"
+description: "Hilt's single-tenant deployment architecture and provisioning on Azure."
+---
+
+Hilt runs as a single-tenant platform inside your own Azure subscription. A managed AKS cluster hosts the analytics engine (ClickHouse) and the dashboard, collectors on your hosts stream telemetry through a private Azure Private Link ingest endpoint into Event Hubs, and all traffic stays inside your subscription with no public internet exposure.
+
+---
+
+## Services
+
+| Service | Role |
+| :-- | :-- |
+| AKS | Managed Kubernetes for platform services |
+| Event Hubs | Event streaming (Kafka-compatible) |
+| Private Link | Private ingest endpoint |
+| Blob Storage | Long-term storage and data exports |
+| Azure Database for PostgreSQL | Dashboard database |
+| App Gateway / Front Door | TLS termination (private only) |
+
+---
+
+## Network topology
+
+- Collectors connect via an **Azure Private Link** endpoint
+- Platform runs in a private VNet with no public ingress
+- Uses Managed Identity for Azure service authentication
+- Outbound internet access only where needed for image pulls (configurable to use private registries)
+
+---
+
+## Provisioning
+
+Hilt provisions your Azure deployment using Terraform. The typical process:
+
+1. You provide a target Azure subscription with the agreed IAM permissions
+2. Hilt applies the Terraform configuration to create all infrastructure (AKS, Event Hubs, Azure Database for PostgreSQL, Blob Storage, Private Link, and networking)
+3. Private Link connectivity is established between your workload VNets and the platform VNet
+4. Collectors are deployed to your hosts using the guides in this documentation

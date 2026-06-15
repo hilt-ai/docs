@@ -11,19 +11,19 @@ DMG 采集器部署为单个 DaemonSet，每个节点一个 pod。该清单（ma
 | :-- | :-- | :-- |
 | ServiceAccount | `dag-agent` | DaemonSet pod 的身份 |
 | ClusterRole | `dag-agent-node-reader` | 获取节点以解析节点元数据 |
-| ClusterRoleBinding | — | 将 SA 绑定到该 ClusterRole |
+| ClusterRoleBinding | n/a | 将 SA 绑定到该 ClusterRole |
 | DaemonSet | `dag-agent` | 在每个节点上运行一个采集器 pod |
 
-该 DaemonSet 不会创建 Service 或 Ingress——代理没有监听端口。唯一的网络路径是从每个 pod 出站到 `DAG_SHIP_URL` 的 HTTPS 连接。
+该 DaemonSet 不会创建 Service 或 Ingress，代理没有监听端口。唯一的网络路径是从每个 pod 出站到 `DAG_SHIP_URL` 的 HTTPS 连接。
 
 ## 运行时配置
 
 该 DaemonSet 配置如下：
 
-- **`privileged: true`** —— `bpf(2)` 和 perf 环形缓冲区访问所必需。否则内核将拒绝加载这些程序。
-- **`hostPID: true`** —— 确保事件中的 `pid` 字段映射到真实的主机 PID，而非容器作用域内的 PID。否则仪表盘无法将代理上报的事件与你的运维人员实际通过 `ps`、`crictl` 或 `kubectl exec` 看到的进程相关联。
-- **`hostNetwork: true`** —— 允许在主机命名空间中进行网络观测。
-- **`dnsPolicy: ClusterFirstWithHostNet`** —— 确保正确的 DNS 解析（例如通过 VPC 的私有 Route 53）。
+- **`privileged: true`**：`bpf(2)` 和 perf 环形缓冲区访问所必需。否则内核将拒绝加载这些程序。
+- **`hostPID: true`**：确保事件中的 `pid` 字段映射到真实的主机 PID，而非容器作用域内的 PID。否则仪表盘无法将代理上报的事件与你的运维人员实际通过 `ps`、`crictl` 或 `kubectl exec` 看到的进程相关联。
+- **`hostNetwork: true`**：允许在主机命名空间中进行网络观测。
+- **`dnsPolicy: ClusterFirstWithHostNet`**：确保正确的 DNS 解析（例如通过 VPC 的私有 Route 53）。
 
 ## 主机挂载
 
@@ -67,7 +67,7 @@ DMG 采集器部署为单个 DaemonSet，每个节点一个 pod。该清单（ma
 
 ## 容忍度（Tolerations）与节点选择
 
-随附的清单会容忍标准的 `CriticalAddonsOnly` 污点（taint）。如果你的集群使用了专用节点池、带污点的系统池，或 GPU / 特殊硬件污点，请在 apply 前向 DaemonSet spec 中添加相应的 tolerations。该代理足够轻量，可以运行在集群中的每一个节点上——包括控制面节点和专用节点池。若某个污点未被容忍，将造成检测流水线无法填补的可见性缺口。
+随附的清单会容忍标准的 `CriticalAddonsOnly` 污点（taint）。如果你的集群使用了专用节点池、带污点的系统池，或 GPU / 特殊硬件污点，请在 apply 前向 DaemonSet spec 中添加相应的 tolerations。该代理足够轻量，可以运行在集群中的每一个节点上（包括控制面节点和专用节点池）。若某个污点未被容忍，将造成检测流水线无法填补的可见性缺口。
 
 如果你想排除特定节点，请添加 `nodeAffinity`。请确保将这些排除项记录在案，因为它们会造成明确的盲区。
 

@@ -32,7 +32,7 @@ Feature vectors are packed as Arrow List columns. Individual feature semantics a
 
 | Column | Type | Notes |
 | :-- | :-- | :-- |
-| `token_ids` | `List(UInt16)` | Closed vocabulary IDs — no raw strings, filenames, or IPs |
+| `token_ids` | `List(UInt16)` | Closed vocabulary IDs: no raw strings, filenames, or IPs |
 | `token_sub_epochs` | `List(UInt8)` | Sub-epoch index per token |
 | `token_counts` | `List(UInt16)` | Occurrence count per token |
 | `token_importances` | `List(Float32)` | Per-token anomaly importance weight |
@@ -50,7 +50,7 @@ Feature vectors are packed as Arrow List columns. Individual feature semantics a
 
 ## Explicitly excluded
 
-Every column not in the allowlist above is excluded. The export queries only aggregated scoring and token tables — it has no access to raw event data or application databases.
+Every column not in the allowlist above is excluded. The export queries only aggregated scoring and token tables. It has no access to raw event data or application databases.
 
 Excluded categories include:
 

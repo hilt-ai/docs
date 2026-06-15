@@ -1,0 +1,40 @@
+---
+title: "AWS"
+sidebarTitle: "AWS"
+description: "Hilt's single-tenant deployment architecture and provisioning on AWS."
+---
+
+Hilt runs as a single-tenant platform inside your own AWS account. A managed EKS cluster hosts the analytics engine (ClickHouse) and the dashboard, collectors on your hosts stream telemetry through a private PrivateLink ingest endpoint into MSK (Kafka), and all traffic stays inside your account with no public internet exposure.
+
+---
+
+## Services
+
+| Service | Role |
+| :-- | :-- |
+| EKS | Managed Kubernetes for platform services |
+| MSK (Kafka) | Event streaming |
+| PrivateLink | Private ingest endpoint: collectors connect without traversing the public internet |
+| S3 | Long-term storage and data exports |
+| RDS (PostgreSQL) | Dashboard database |
+| ACM + Route 53 | TLS certificates and private DNS |
+
+---
+
+## Network topology
+
+- Collectors connect to a **VPC Endpoint** (PrivateLink) in your account
+- All traffic stays within AWS private networking
+- No inbound internet access to any platform component
+- Outbound internet access only where needed for image pulls (configurable to use private registries)
+
+---
+
+## Provisioning
+
+Hilt provisions your AWS deployment using Terraform. The typical process:
+
+1. You provide a target AWS account with the agreed IAM permissions
+2. Hilt applies the Terraform configuration to create all infrastructure (EKS, MSK, RDS, S3, PrivateLink, and networking)
+3. PrivateLink connectivity is established between your workload VPCs and the platform VPC
+4. Collectors are deployed to your hosts using the guides in this documentation

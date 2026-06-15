@@ -6,7 +6,7 @@ description: "出站网络态势、隔离网络（airgapped）运行、特权模
 ## 出站
 
 - 只有一个目的地：`DAG_SHIP_URL`（即你账户中的 Hilt 接入 PrivateLink 端点）。流量为 HTTPS 并使用你的 CA 证书链；该端点出示一张针对你的私有区域签发的 ACM 证书。
-- 无需向公共解析器泄露任何 DNS——接入域名位于与你的 VPC 关联的私有 Route 53 区域中，因此解析在你的 VPC 内部完成，TCP 路径经由 PrivateLink 端点服务到达接入 NLB。
+- 无需向公共解析器泄露任何 DNS，接入域名位于与你的 VPC 关联的私有 Route 53 区域中，因此解析在你的 VPC 内部完成，TCP 路径经由 PrivateLink 端点服务到达接入 NLB。
 - **防火墙规则：** 允许代理（Agent）的源 CIDR 通过 TCP/443 访问 PrivateLink 端点。对于跨 VPC 的部署，PrivateLink 消费端端点即为网关；对于同 VPC 的部署，流量完全在 VPC 内部流转。
 
 ## 隔离网络 / 离线

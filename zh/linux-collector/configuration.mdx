@@ -10,9 +10,9 @@ description: "DMG 采集器的 CLI 标志、环境变量与配置文件键。"
 | `-s` | `DAG_SHIP_URL` | `ship_url` | 未设置 = 文件模式 | HTTPS 采集器 URL。 |
 | `-o` | `DAG_OUTPUT_PATH` | `output_path` | `/var/log/dag-agent/events.jsonl` | JSONL 输出。设为 `-` 可显式输出到 stdout。 |
 | `-n` | `DAG_NODE_ID` | `node_id` | `$(hostname)` / K8s 上为 `spec.nodeName` | 在仪表盘上显示的字符串主机标签。 |
-| `-b` | — | — | 关闭 | 基准测试模式；仅发送。 |
-| `-v` | — | — | 关闭 | 详细模式：将事件镜像输出到 stderr。 |
-| `-V` | — | — | — | 打印版本并退出。 |
-| — | — | `cpu_limit` | 无限制 | 在 systemd drop-in 中写入为 `CPUQuota=`。 |
-| — | — | `ram_limit` | 无限制 | 在 systemd drop-in 中写入为 `MemoryMax=`。 |
-| — | — | `ringbuf_size` | `1M` | 每 CPU 的 BPF 环形缓冲区大小。在繁忙主机上增大（`8M`、`16M`）。 |
+| `-b` | n/a | n/a | 关闭 | 基准测试模式；仅发送。 |
+| `-v` | n/a | n/a | 关闭 | 详细模式：将事件镜像输出到 stderr。 |
+| `-V` | n/a | n/a | n/a | 打印版本并退出。 |
+| n/a | n/a | `cpu_limit` | 无限制 | 在 systemd drop-in 中写入为 `CPUQuota=`。 |
+| n/a | n/a | `ram_limit` | 无限制 | 在 systemd drop-in 中写入为 `MemoryMax=`。 |
+| n/a | n/a | `ringbuf_size` | `1M` | 每 CPU 的 BPF 环形缓冲区大小。在繁忙主机上增大（`8M`、`16M`）。 |

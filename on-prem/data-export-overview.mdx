@@ -14,7 +14,7 @@ Hilt's detection models improve when trained on diverse, real-world behavioral p
 
 | Data category | Description | Why it's safe |
 | :-- | :-- | :-- |
-| **Aggregate numeric features** | Counts per 5-minute epoch (e.g., execution count, bytes transferred, unique destinations) | No raw values — only aggregate statistics |
+| **Aggregate numeric features** | Counts per 5-minute epoch (e.g., execution count, bytes transferred, unique destinations) | No raw values, only aggregate statistics |
 | **Derived statistical features** | Ratios, entropies, and mathematical transforms of the aggregate counts | Pure algebra on aggregates |
 | **Abstracted activity tokens** | Closed-vocabulary activity type sequences (no filenames, IPs, or commands) | All identifying information already removed at tokenization |
 | **Anomaly labels** | Binary anomaly flags and scoring-phase labels | No customer-specific context |

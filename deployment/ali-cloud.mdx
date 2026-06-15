@@ -1,0 +1,39 @@
+---
+title: "Ali Cloud"
+sidebarTitle: "Ali Cloud"
+description: "Hilt's single-tenant deployment architecture and provisioning on Ali Cloud."
+---
+
+Hilt runs as a single-tenant platform inside your own Ali Cloud account. A managed ACK cluster hosts the analytics engine (ClickHouse) and the dashboard, collectors on your hosts stream telemetry through a private PrivateLink ingest endpoint into Message Queue for Apache Kafka, and all traffic stays inside your account with no public internet exposure.
+
+---
+
+## Services
+
+| Service | Role |
+| :-- | :-- |
+| ACK | Managed Kubernetes for platform services |
+| Message Queue for Apache Kafka | Event streaming |
+| PrivateLink | Private ingest endpoint |
+| OSS | Long-term storage and data exports |
+| ApsaraDB RDS (PostgreSQL) | Dashboard database |
+
+---
+
+## Network topology
+
+- Collectors connect via a **PrivateLink** endpoint within your VPC
+- Platform deployed in a dedicated VSwitch with security group isolation
+- RAM roles for service-to-service authentication
+- Outbound internet access only where needed for image pulls (configurable to use private registries)
+
+---
+
+## Provisioning
+
+Hilt provisions your Ali Cloud deployment using Terraform. The typical process:
+
+1. You provide a target Ali Cloud account with the agreed RAM permissions
+2. Hilt applies the Terraform configuration to create all infrastructure (ACK, Message Queue for Apache Kafka, ApsaraDB RDS, OSS, PrivateLink, and networking)
+3. PrivateLink connectivity is established between your workload VPCs and the platform VPC
+4. Collectors are deployed to your hosts using the guides in this documentation

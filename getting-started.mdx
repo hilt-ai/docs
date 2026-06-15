@@ -1,7 +1,6 @@
 ---
 title: "Getting Started"
 sidebarTitle: "Getting Started"
-description: "From contract to first finding — deployment phases, responsibilities, and what to expect in week one."
 ---
 
 This page walks you through what happens between signing your contract and seeing your first security findings. It covers who does what, the deployment timeline, and what to expect while the platform learns your environment.
@@ -11,15 +10,15 @@ This page walks you through what happens between signing your contract and seein
 ## Deployment phases
 
 <Steps>
-  <Step title="Infrastructure provisioning (Day 1–2)">
+  <Step title="Infrastructure provisioning (Day 1)">
     Hilt provisions a single-tenant deployment in your cloud account (AWS, GCP, Azure, or Ali Cloud). This includes the analytics database, dashboard, and ingest endpoint.
 
     **Who:** Hilt engineering, with your cloud admin granting access.
 
     **You provide:** A VPC or network segment, IAM/service-account permissions per the deployment guide, and DNS delegation if using a custom subdomain.
   </Step>
-  <Step title="Collector deployment (Day 2–5)">
-    Deploy the Hilt collector to your hosts. The collector is a single static binary (Linux) or managed agent (macOS) — no dependencies, no kernel modules.
+  <Step title="Collector deployment (Day 1-3)">
+    Deploy the Hilt collector to your hosts. The collector is a single static binary (Linux) or managed agent (macOS) with no dependencies and no kernel modules.
 
     **Who:** Your infrastructure team, using provided guides:
     - [Deploy on Kubernetes](/linux-collector/deploy-kubernetes)
@@ -27,16 +26,16 @@ This page walks you through what happens between signing your contract and seein
 
     **Typical scope:** Start with a representative subset (10–50 hosts) covering your main workload types. Expand once baseline is established.
   </Step>
-  <Step title="Cold start & baseline (Week 1–2)">
+  <Step title="Cold start & baseline (Weeks 1-2)">
     The detection models begin learning your environment's normal behavior. During this phase:
 
-    - Telemetry flows into the dashboard immediately — you can browse activity from day one
+    - Telemetry flows into the dashboard immediately, so you can browse activity from day one
     - Anomaly scoring starts but operates in **cold-start mode** with elevated thresholds
     - The platform builds behavioral baselines per host and per user
 
-    **What to expect:** Few or no findings in week one. This is intentional — the models need to observe normal patterns before they can identify deviations.
+    **What to expect:** Few or no findings in week one. The model needs to observe normal patterns before it can identify deviations, so this is by design.
   </Step>
-  <Step title="Active scoring (Week 2+)">
+  <Step title="Active scoring (Week 3 and onwards)">
     Once baselines stabilize, scoring thresholds lower and findings begin appearing. The system continues to refine as you provide feedback (confirming or dismissing findings).
 
     **What to expect:** Initial findings will include both genuine anomalies and patterns that are normal for your environment. Reviewing these (via the [Anomalies](/dashboard/anomalies) page) trains the models to your specific context.
@@ -85,6 +84,6 @@ The warm-up period varies by environment complexity. Environments with highly re
 
 ## Next steps
 
-- [Linux Collector guide](/linux-collector/layout) — full deployment and configuration reference
-- [Dashboard overview](/dashboard/overview) — navigating the main interface
-- [Trust & Security](/trust-security) — security posture and compliance information
+- [Linux Collector guide](/linux-collector/layout): full deployment and configuration reference
+- [Dashboard overview](/dashboard/overview): navigating the main interface
+- [Trust & Security](/trust-security): security posture and compliance information

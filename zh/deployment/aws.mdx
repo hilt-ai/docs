@@ -1,0 +1,40 @@
+---
+title: "AWS"
+sidebarTitle: "AWS"
+description: "Hilt 在 AWS 上的单租户部署架构与预配。"
+---
+
+Hilt 作为单租户平台部署在您自己的 AWS 账户中。由托管 EKS 集群运行分析引擎（ClickHouse）和仪表板，部署在您主机上的采集器通过私有 PrivateLink 接入端点将遥测数据流式传输到 MSK（Kafka），所有流量都保持在您的账户内，不暴露于公共互联网。
+
+---
+
+## 服务
+
+| 服务 | 角色 |
+| :-- | :-- |
+| EKS | 托管 Kubernetes，运行平台服务 |
+| MSK (Kafka) | 事件流处理 |
+| PrivateLink | 私有接入端点，采集器无需经过公共互联网即可连接 |
+| S3 | 长期存储和数据导出 |
+| RDS (PostgreSQL) | 仪表板数据库 |
+| ACM + Route 53 | TLS 证书和私有 DNS |
+
+---
+
+## 网络拓扑
+
+- 采集器通过您账户中的 **VPC Endpoint**（PrivateLink）连接
+- 所有流量保持在 AWS 私有网络内
+- 任何平台组件均无入站互联网访问
+- 仅在需要拉取镜像时使用出站互联网访问（可配置为使用私有镜像仓库）
+
+---
+
+## 预配
+
+Hilt 使用 Terraform 来预配您的 AWS 部署。典型的流程如下：
+
+1. 您提供一个目标 AWS 账户，并配置约定的 IAM 权限
+2. Hilt 执行 Terraform 配置以创建所有基础设施（EKS、MSK、RDS、S3、PrivateLink 以及网络）
+3. 在您的工作负载 VPC 与平台 VPC 之间建立 PrivateLink 连接
+4. 按照本文档中的指南将采集器部署到您的主机上

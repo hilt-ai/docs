@@ -1,6 +1,6 @@
 ---
 title: "Event data model"
-description: "What the collector captures — and explicitly what it does not."
+description: "What the collector captures, and explicitly what it does not."
 ---
 
 Each event captures execution and system metadata, including:
@@ -27,4 +27,4 @@ The collector does **not** capture sensitive content. This includes:
 - Credentials
 - Any user data beyond what standard system tools like `ps`, `lsof`, or `ss` would expose
 
-In other words, the agent observes system activity at the metadata level only — it is not a content inspection tool.
+In other words, the agent observes system activity at the metadata level only; it is not a content inspection tool.

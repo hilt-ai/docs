@@ -4,7 +4,7 @@ sidebarTitle: "Quarantine"
 description: "Isolating compromised hosts from the network while preserving forensic access."
 ---
 
-Quarantine is Hilt's network isolation response. When a host shows signs of compromise or active data exfiltration, an authorized user can quarantine it — severing its network access to prevent lateral movement or continued data loss, while preserving the ability to investigate.
+Quarantine is Hilt's network isolation response. When a host shows signs of compromise or active data exfiltration, an authorized user can quarantine it, severing its network access to prevent lateral movement or continued data loss, while preserving the ability to investigate.
 
 ---
 
@@ -12,10 +12,10 @@ Quarantine is Hilt's network isolation response. When a host shows signs of comp
 
 When you quarantine a host:
 
-1. **Network isolation** — the host's security group (AWS) or equivalent network policy is replaced with a quarantine security group that blocks all inbound and outbound traffic except the Hilt collector's ingest path.
-2. **Collector continues** — the Hilt collector maintains its outbound connection, so telemetry continues flowing for forensic analysis.
-3. **State recorded** — the original security group IDs are saved so the action can be reversed.
-4. **Audit trail** — the quarantine action, the user who initiated it, and the timestamp are recorded in the audit log.
+1. **Network isolation**: the host's security group (AWS) or equivalent network policy is replaced with a quarantine security group that blocks all inbound and outbound traffic except the Hilt collector's ingest path.
+2. **Collector continues**: the Hilt collector maintains its outbound connection, so telemetry continues flowing for forensic analysis.
+3. **State recorded**: the original security group IDs are saved so the action can be reversed.
+4. **Audit trail**: the quarantine action, the user who initiated it, and the timestamp are recorded in the audit log.
 
 <Warning>
 Quarantine severs the host's network connections. Running workloads on the host will lose connectivity. Only use quarantine when the security risk of continued operation outweighs the availability impact.
@@ -27,9 +27,9 @@ Quarantine severs the host's network connections. Running workloads on the host 
 
 You can quarantine a host from multiple places in the dashboard:
 
-- **Anomalies page** — when viewing a finding, the action menu includes **Quarantine host**
-- **Collectors page** — the host detail panel includes a **Quarantine** action
-- **Finding detail** — confirmed findings show a quarantine option in the response actions
+- **Anomalies page**: when viewing a finding, the action menu includes **Quarantine host**
+- **Collectors page**: the host detail panel includes a **Quarantine** action
+- **Finding detail**: confirmed findings show a quarantine option in the response actions
 
 ### Requirements
 
@@ -65,9 +65,9 @@ The host's original security group is restored, re-establishing its previous net
 
 Before quarantining, the dashboard shows a blast-radius summary:
 
-- **Workloads affected** — services running on the host that will lose connectivity
-- **Dependent connections** — other hosts or services that connect to this host
-- **Active sessions** — users currently connected to the host
+- **Workloads affected**: services running on the host that will lose connectivity
+- **Dependent connections**: other hosts or services that connect to this host
+- **Active sessions**: users currently connected to the host
 
 This helps you make an informed decision about the availability impact of isolation.
 

@@ -32,7 +32,7 @@ description: "匿名化 Parquet 导出文件的 Schema。"
 
 | Column | Type | 说明 |
 | :-- | :-- | :-- |
-| `token_ids` | `List(UInt16)` | 封闭词汇表 ID——不含原始字符串、文件名或 IP |
+| `token_ids` | `List(UInt16)` | 封闭词汇表 ID，不含原始字符串、文件名或 IP |
 | `token_sub_epochs` | `List(UInt8)` | 每个令牌的子 epoch 索引 |
 | `token_counts` | `List(UInt16)` | 每个令牌的出现次数 |
 | `token_importances` | `List(Float32)` | 每个令牌的异常重要性权重 |
@@ -50,7 +50,7 @@ description: "匿名化 Parquet 导出文件的 Schema。"
 
 ## 明确排除的内容
 
-上述允许列表中未包含的每一列均被排除。导出查询仅涉及聚合评分和令牌表——无法访问原始事件数据或应用数据库。
+上述允许列表中未包含的每一列均被排除。导出查询仅涉及聚合评分和令牌表，无法访问原始事件数据或应用数据库。
 
 排除的类别包括：
 
