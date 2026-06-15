@@ -28,215 +28,243 @@
     "languages": [
       {
         "language": "en",
-        "products": [
+        "tabs": [
           {
-            "product": "Hilt",
-            "tabs": [
+            "tab": "Getting Started",
+            "pages": [
+              "getting-started",
               {
-                "tab": "Getting Started",
+                "group": "Deployment",
                 "pages": [
-                  "getting-started",
-                  "deployment-architecture"
-                ]
-              },
-              {
-                "tab": "Dashboard",
-                "pages": [
-                  "dashboard/layout",
-                  "dashboard/overview",
-                  "dashboard/collectors",
                   {
-                    "group": "Data Flow",
+                    "group": "Cloud",
                     "pages": [
-                      "dashboard/data-lineage",
-                      "dashboard/networks",
-                      "dashboard/files",
-                      "dashboard/users",
-                      "dashboard/query",
-                      "dashboard/mcp-server"
+                      "deployment/aws",
+                      "deployment/gcp",
+                      "deployment/azure",
+                      "deployment/ali-cloud"
                     ]
                   },
                   {
-                    "group": "Security",
+                    "group": "Endpoints",
                     "pages": [
-                      "dashboard/anomalies",
-                      "dashboard/detection-rules",
-                      "dashboard/fleet-behavior",
-                      "dashboard/investigate",
-                      "dashboard/quarantine"
+                      "deployment/macos"
                     ]
                   }
                 ]
-              },
+              }
+            ]
+          },
+          {
+            "tab": "Platform",
+            "pages": [
+              "dashboard/layout",
+              "dashboard/overview",
+              "dashboard/collectors",
               {
-                "tab": "Trust & Security",
+                "group": "Data Flow",
                 "pages": [
-                  "trust-security"
+                  "dashboard/data-lineage",
+                  "dashboard/networks",
+                  "dashboard/files",
+                  "dashboard/users",
+                  "dashboard/query",
+                  "dashboard/mcp-server"
                 ]
               },
               {
-                "tab": "Administration",
+                "group": "Security",
+                "pages": [
+                  "dashboard/anomalies",
+                  "dashboard/detection-rules",
+                  "dashboard/fleet-behavior",
+                  "dashboard/investigate",
+                  "dashboard/quarantine"
+                ]
+              },
+              {
+                "group": "Administration",
                 "pages": [
                   "administration/layout",
                   "administration/user-management",
                   "administration/teams",
                   "administration/reports"
                 ]
-              },
+              }
+            ]
+          },
+          {
+            "tab": "Linux Collector",
+            "pages": [
+              "linux-collector/layout",
+              "linux-collector/system-requirements",
+              "linux-collector/release-artifacts",
+              "linux-collector/deploy-kubernetes",
+              "linux-collector/deploy-vms",
+              "linux-collector/configuration",
+              "linux-collector/networking-security",
+              "linux-collector/event-data-model",
+              "linux-collector/agent-filtering",
+              "linux-collector/sizing-capacity",
+              "linux-collector/data-flow",
+              "linux-collector/troubleshooting"
+            ]
+          },
+          {
+            "tab": "MacOS Collector",
+            "pages": [
+              "macos-collector"
+            ]
+          },
+          {
+            "tab": "On-Prem Operations",
+            "pages": [
+              "on-prem/layout",
               {
-                "tab": "Linux Collector",
+                "group": "Auto-update agent",
                 "pages": [
-                  "linux-collector/layout",
-                  "linux-collector/system-requirements",
-                  "linux-collector/release-artifacts",
-                  "linux-collector/deploy-kubernetes",
-                  "linux-collector/deploy-vms",
-                  "linux-collector/configuration",
-                  "linux-collector/networking-security",
-                  "linux-collector/event-data-model",
-                  "linux-collector/agent-filtering",
-                  "linux-collector/sizing-capacity",
-                  "linux-collector/data-flow",
-                  "linux-collector/troubleshooting"
+                  "on-prem/auto-update-overview",
+                  "on-prem/auto-update-prerequisites",
+                  "on-prem/auto-update-workflow",
+                  "on-prem/auto-update-operations"
                 ]
               },
               {
-                "tab": "macOS Collector",
+                "group": "Anonymized data export",
                 "pages": [
-                  "macos-collector"
-                ]
-              },
-              {
-                "tab": "On-Prem Operations",
-                "pages": [
-                  "on-prem/layout",
-                  {
-                    "group": "Auto-update agent",
-                    "pages": [
-                      "on-prem/auto-update-overview",
-                      "on-prem/auto-update-prerequisites",
-                      "on-prem/auto-update-workflow",
-                      "on-prem/auto-update-operations"
-                    ]
-                  },
-                  {
-                    "group": "Anonymized data export",
-                    "pages": [
-                      "on-prem/data-export-overview",
-                      "on-prem/data-catalog",
-                      "on-prem/data-export-schema",
-                      "on-prem/data-export-implementation"
-                    ]
-                  }
+                  "on-prem/data-export-overview",
+                  "on-prem/data-catalog",
+                  "on-prem/data-export-schema",
+                  "on-prem/data-export-implementation"
                 ]
               }
+            ]
+          },
+          {
+            "tab": "Trust & Security",
+            "pages": [
+              "trust-security"
             ]
           }
         ]
       },
       {
         "language": "zh",
-        "products": [
+        "tabs": [
           {
-            "product": "Hilt",
-            "tabs": [
+            "tab": "快速入门",
+            "pages": [
+              "zh/getting-started",
               {
-                "tab": "快速入门",
+                "group": "部署",
                 "pages": [
-                  "zh/getting-started",
-                  "zh/deployment-architecture"
-                ]
-              },
-              {
-                "tab": "仪表盘",
-                "pages": [
-                  "zh/dashboard/layout",
-                  "zh/dashboard/overview",
-                  "zh/dashboard/collectors",
                   {
-                    "group": "数据流",
+                    "group": "云",
                     "pages": [
-                      "zh/dashboard/data-lineage",
-                      "zh/dashboard/networks",
-                      "zh/dashboard/files",
-                      "zh/dashboard/users",
-                      "zh/dashboard/query"
+                      "zh/deployment/aws",
+                      "zh/deployment/gcp",
+                      "zh/deployment/azure",
+                      "zh/deployment/ali-cloud"
                     ]
                   },
                   {
-                    "group": "安全",
+                    "group": "端点",
                     "pages": [
-                      "zh/dashboard/anomalies",
-                      "zh/dashboard/detection-rules",
-                      "zh/dashboard/fleet-behavior",
-                      "zh/dashboard/investigate",
-                      "zh/dashboard/quarantine"
+                      "zh/deployment/macos"
                     ]
                   }
                 ]
-              },
+              }
+            ]
+          },
+          {
+            "tab": "平台",
+            "pages": [
+              "zh/dashboard/layout",
+              "zh/dashboard/overview",
+              "zh/dashboard/collectors",
               {
-                "tab": "信任与安全",
+                "group": "数据流",
                 "pages": [
-                  "zh/trust-security"
+                  "zh/dashboard/data-lineage",
+                  "zh/dashboard/networks",
+                  "zh/dashboard/files",
+                  "zh/dashboard/users",
+                  "zh/dashboard/query"
                 ]
               },
               {
-                "tab": "系统管理",
+                "group": "安全",
+                "pages": [
+                  "zh/dashboard/anomalies",
+                  "zh/dashboard/detection-rules",
+                  "zh/dashboard/fleet-behavior",
+                  "zh/dashboard/investigate",
+                  "zh/dashboard/quarantine"
+                ]
+              },
+              {
+                "group": "系统管理",
                 "pages": [
                   "zh/administration/layout",
                   "zh/administration/user-management",
                   "zh/administration/teams",
                   "zh/administration/reports"
                 ]
-              },
+              }
+            ]
+          },
+          {
+            "tab": "Linux 采集器",
+            "pages": [
+              "zh/linux-collector/layout",
+              "zh/linux-collector/system-requirements",
+              "zh/linux-collector/release-artifacts",
+              "zh/linux-collector/deploy-kubernetes",
+              "zh/linux-collector/deploy-vms",
+              "zh/linux-collector/configuration",
+              "zh/linux-collector/networking-security",
+              "zh/linux-collector/event-data-model",
+              "zh/linux-collector/agent-filtering",
+              "zh/linux-collector/sizing-capacity",
+              "zh/linux-collector/data-flow",
+              "zh/linux-collector/troubleshooting"
+            ]
+          },
+          {
+            "tab": "MacOS 采集器",
+            "pages": [
+              "zh/macos-collector"
+            ]
+          },
+          {
+            "tab": "本地部署运维",
+            "pages": [
+              "zh/on-prem/layout",
               {
-                "tab": "Linux 采集器",
+                "group": "自动更新代理",
                 "pages": [
-                  "zh/linux-collector/layout",
-                  "zh/linux-collector/system-requirements",
-                  "zh/linux-collector/release-artifacts",
-                  "zh/linux-collector/deploy-kubernetes",
-                  "zh/linux-collector/deploy-vms",
-                  "zh/linux-collector/configuration",
-                  "zh/linux-collector/networking-security",
-                  "zh/linux-collector/event-data-model",
-                  "zh/linux-collector/agent-filtering",
-                  "zh/linux-collector/sizing-capacity",
-                  "zh/linux-collector/data-flow",
-                  "zh/linux-collector/troubleshooting"
+                  "zh/on-prem/auto-update-overview",
+                  "zh/on-prem/auto-update-prerequisites",
+                  "zh/on-prem/auto-update-workflow",
+                  "zh/on-prem/auto-update-operations"
                 ]
               },
               {
-                "tab": "macOS 采集器",
+                "group": "匿名化数据导出",
                 "pages": [
-                  "zh/macos-collector"
-                ]
-              },
-              {
-                "tab": "本地部署运维",
-                "pages": [
-                  "zh/on-prem/layout",
-                  {
-                    "group": "自动更新代理",
-                    "pages": [
-                      "zh/on-prem/auto-update-overview",
-                      "zh/on-prem/auto-update-prerequisites",
-                      "zh/on-prem/auto-update-workflow",
-                      "zh/on-prem/auto-update-operations"
-                    ]
-                  },
-                  {
-                    "group": "匿名化数据导出",
-                    "pages": [
-                      "zh/on-prem/data-export-overview",
-                      "zh/on-prem/data-catalog",
-                      "zh/on-prem/data-export-schema",
-                      "zh/on-prem/data-export-implementation"
-                    ]
-                  }
+                  "zh/on-prem/data-export-overview",
+                  "zh/on-prem/data-catalog",
+                  "zh/on-prem/data-export-schema",
+                  "zh/on-prem/data-export-implementation"
                 ]
               }
+            ]
+          },
+          {
+            "tab": "信任与安全",
+            "pages": [
+              "zh/trust-security"
             ]
           }
         ]
@@ -294,6 +322,16 @@
     {
       "source": "/untitled-page",
       "destination": "/on-prem/layout",
+      "permanent": true
+    },
+    {
+      "source": "/deployment-architecture",
+      "destination": "/deployment/aws",
+      "permanent": true
+    },
+    {
+      "source": "/zh/deployment-architecture",
+      "destination": "/zh/deployment/aws",
       "permanent": true
     }
   ]

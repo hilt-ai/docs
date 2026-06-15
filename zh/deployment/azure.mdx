@@ -1,0 +1,40 @@
+---
+title: "Azure"
+sidebarTitle: "Azure"
+description: "Hilt 在 Azure 上的单租户部署架构与预配。"
+---
+
+Hilt 作为单租户平台部署在您自己的 Azure 订阅中。由托管 AKS 集群运行分析引擎（ClickHouse）和仪表板，部署在您主机上的采集器通过私有 Azure Private Link 接入端点将遥测数据流式传输到 Event Hubs，所有流量都保持在您的订阅内，不暴露于公共互联网。
+
+---
+
+## 服务
+
+| 服务 | 角色 |
+| :-- | :-- |
+| AKS | 托管 Kubernetes，运行平台服务 |
+| Event Hubs | 事件流处理（兼容 Kafka） |
+| Private Link | 私有接入端点 |
+| Blob Storage | 长期存储和数据导出 |
+| Azure Database for PostgreSQL | 仪表板数据库 |
+| App Gateway / Front Door | TLS 终结（仅限私有） |
+
+---
+
+## 网络拓扑
+
+- 采集器通过 **Azure Private Link** 端点连接
+- 平台运行在无公共入口的私有 VNet 中
+- 使用 Managed Identity 进行 Azure 服务身份验证
+- 仅在需要拉取镜像时使用出站互联网访问（可配置为使用私有镜像仓库）
+
+---
+
+## 预配
+
+Hilt 使用 Terraform 来预配您的 Azure 部署。典型的流程如下：
+
+1. 您提供一个目标 Azure 订阅，并配置约定的 IAM 权限
+2. Hilt 执行 Terraform 配置以创建所有基础设施（AKS、Event Hubs、Azure Database for PostgreSQL、Blob Storage、Private Link 以及网络）
+3. 在您的工作负载 VNet 与平台 VNet 之间建立 Private Link 连接
+4. 按照本文档中的指南将采集器部署到您的主机上

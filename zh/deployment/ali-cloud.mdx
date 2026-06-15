@@ -1,0 +1,39 @@
+---
+title: "阿里云"
+sidebarTitle: "阿里云"
+description: "Hilt 在阿里云上的单租户部署架构与预配。"
+---
+
+Hilt 作为单租户平台部署在您自己的阿里云账户中。由托管 ACK 集群运行分析引擎（ClickHouse）和仪表板，部署在您主机上的采集器通过私有 PrivateLink 接入端点将遥测数据流式传输到 Message Queue for Apache Kafka，所有流量都保持在您的账户内，不暴露于公共互联网。
+
+---
+
+## 服务
+
+| 服务 | 角色 |
+| :-- | :-- |
+| ACK | 托管 Kubernetes，运行平台服务 |
+| Message Queue for Apache Kafka | 事件流处理 |
+| PrivateLink | 私有接入端点 |
+| OSS | 长期存储和数据导出 |
+| ApsaraDB RDS (PostgreSQL) | 仪表板数据库 |
+
+---
+
+## 网络拓扑
+
+- 采集器通过 VPC 内的 **PrivateLink** 端点连接
+- 平台部署在专用 VSwitch 中，使用安全组隔离
+- 使用 RAM 角色进行服务间身份验证
+- 仅在需要拉取镜像时使用出站互联网访问（可配置为使用私有镜像仓库）
+
+---
+
+## 预配
+
+Hilt 使用 Terraform 来预配您的阿里云部署。典型的流程如下：
+
+1. 您提供一个目标阿里云账户，并配置约定的 RAM 权限
+2. Hilt 执行 Terraform 配置以创建所有基础设施（ACK、Message Queue for Apache Kafka、ApsaraDB RDS、OSS、PrivateLink 以及网络）
+3. 在您的工作负载 VPC 与平台 VPC 之间建立 PrivateLink 连接
+4. 按照本文档中的指南将采集器部署到您的主机上
