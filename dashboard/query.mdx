@@ -6,6 +6,27 @@ description: "Natural language and structured queries against your Hilt telemetr
 
 Ask natural-language questions about telemetry, events, processes, file access, and network flows, and get answers back in a chat interface. Access requires the **run queries** permission.
 
+The agent also answers questions about **how Hilt itself works** — deployment, collectors, configuration, permissions, data handling, on-prem operations, quarantine, and more — by searching the Hilt documentation that ships with your deployment. It decides per question whether to use live telemetry, the documentation, or both.
+
+---
+
+## Answering product and how-to questions
+
+Alongside telemetry, the agent can answer questions about how Hilt works, drawn from the product documentation bundled into your deployment:
+
+- _"How do I deploy the Linux collector on Kubernetes?"_
+- _"What permissions do I need to run queries?"_
+- _"How does the on-prem auto-update agent work?"_
+- _"What data does Hilt store, and what does it not capture?"_
+
+When it answers from documentation, the agent **cites the source** page and section so you can read more. For hybrid questions — for example, _"Why isn't my collector showing up?"_ — it combines the documentation (expected collector behavior) with live telemetry (which hosts are actually reporting).
+
+The documentation is bundled locally, so this works fully offline in on-prem deployments with no outbound internet. If the documentation does not cover something, the agent tells you it could not find it rather than guessing.
+
+<Note>
+The bundled documentation matches the version of Hilt you have deployed. Answers reflect that version; very new features documented after your release may not yet be available.
+</Note>
+
 ---
 
 ## Chat history
