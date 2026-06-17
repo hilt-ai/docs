@@ -4,7 +4,7 @@ sidebarTitle: "MCP Server"
 description: "Connect AI assistants to Hilt telemetry with the MCP server."
 ---
 
-The Hilt query service ships with a built-in [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server. It exposes the same 15 telemetry tools that power the [Query](/dashboard/query) page, so any MCP-compatible client (Cursor, Claude Desktop, or your own agent) can search events, investigate anomalies, and draft detection rules directly against your Hilt data.
+The Hilt query service ships with a built-in [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server. It exposes the same tools that power the [Query](/dashboard/query) page — the 15 telemetry tools plus 2 documentation tools — so any MCP-compatible client (Cursor, Claude Desktop, or your own agent) can search events, investigate anomalies, draft detection rules, and look up how Hilt works directly against your Hilt data.
 
 <Note>
 The MCP server is currently in **early access**. It is intended for use within your secured environment by authorized operators. Contact your account team for access and configuration guidance.
@@ -14,7 +14,7 @@ The MCP server is currently in **early access**. It is intended for use within y
 
 ## Capabilities
 
-The MCP server provides read-only access to your telemetry through 15 structured tools:
+The MCP server provides read-only access through 15 telemetry tools and 2 documentation tools:
 
 ### Discovery and events
 
@@ -55,6 +55,15 @@ The MCP server provides read-only access to your telemetry through 15 structured
 | Tool | What it does |
 | --- | --- |
 | `build_detection_rule` | Validates a detection-rule draft and returns it. **Does not save the rule.** Take the draft to the [Detection Rules](/dashboard/detection-rules) page to review and create it |
+
+### Documentation
+
+These tools answer product and how-to questions ("how does Hilt work") from the documentation bundled with your deployment. They contain no customer data and work fully offline.
+
+| Tool | What it does |
+| --- | --- |
+| `search_docs` | Search the Hilt product documentation and return ranked sections with their page path and section, for citation |
+| `get_doc_page` | Return the full text of a documentation page (or a single section) by its path |
 
 ---
 
