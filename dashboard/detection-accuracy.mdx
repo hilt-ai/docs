@@ -1,0 +1,134 @@
+---
+title: "Detection & Accuracy"
+sidebarTitle: "Detection & Accuracy"
+description: "How Hilt detects threats, what the accuracy metrics mean, and how detection improves over time."
+---
+
+How Hilt finds threats, how it measures its own performance, and what you can do to make it sharper.
+
+---
+
+## How Hilt detects threats
+
+Hilt does not rely on signatures or known-bad lists. Instead, it learns what **normal behavior** looks like for each host in your environment — processes launched, network destinations contacted, files accessed — and flags deviations from that baseline.
+
+This approach catches novel and insider threats that signature-based tools miss, but it means the system needs time to learn before it can score accurately. That learning period is the **cold-start phase** described in [Getting Started](/getting-started).
+
+### What the model observes
+
+Every five minutes, Hilt's collectors summarize host activity into a **behavioral snapshot** (an _epoch_). Each epoch captures:
+
+- **Process activity**: execution counts, unique binaries, parent–child relationships
+- **Network activity**: bytes transferred, unique destinations and ports
+- **File activity**: access patterns, sensitive-file interactions, novel binaries
+
+The detection model compares each epoch against the host's learned baseline. When a snapshot deviates significantly from what the model expects, it produces a **finding** on the [Anomalies](/dashboard/anomalies) page.
+
+### Confidence levels
+
+Each finding carries a **confidence** rating — High, Medium, or Low — reflecting how strongly the behavior deviates from the baseline and how much corroborating evidence exists across process, network, and file dimensions. Higher confidence means the model has more independent signals pointing to the same anomaly.
+
+---
+
+## Understanding your accuracy metrics
+
+The **Model Lifecycle** page (under Administration) tracks three metrics that together tell you how well the detection model is performing in your environment. These are updated each time a new model version is trained.
+
+### Threats caught
+
+_"What percentage of known attack scenarios does the model detect?"_
+
+Hilt maintains an internal **benchmark suite** — a curated set of attack scenarios spanning lateral movement, privilege escalation, data exfiltration, and other threat categories. Each time a model is retrained, Hilt replays this benchmark and measures how many scenarios the model correctly flags.
+
+This metric is the model's **recall** against the benchmark: `threats caught = flagged attack scenarios / total attack scenarios`.
+
+A higher percentage means broader coverage. Because the benchmark is controlled and consistent, this metric lets you compare model versions directly — if Threats caught goes up from one version to the next, the new model is catching attacks the old one missed.
+
+### Real threats still caught
+
+_"When the model updates, does it still catch the threats my team already confirmed?"_
+
+This metric comes from your team's **feedback**. When analysts confirm a finding as a real threat, that confirmation becomes a test case for future model versions. Hilt checks whether the new model would still flag those confirmed incidents.
+
+`real threats still caught = confirmed threats still flagged / total confirmed threats`
+
+This protects against regression: a model update that catches new attack types but silently drops threats you've already validated would show a decline here. Until your team has reviewed enough findings, this metric shows _"still maturing"_.
+
+### False alarms avoided
+
+_"Is the model learning from dismissed findings?"_
+
+When analysts dismiss a finding, they're telling the model that this pattern is normal for the environment. Hilt tracks whether future model versions would have surfaced those same dismissed findings.
+
+`false alarms avoided = dismissed findings no longer raised / total dismissed findings`
+
+A rising number means the model is absorbing your team's feedback and producing less noise. Like the metric above, this shows _"still maturing"_ until enough dismissed findings accumulate.
+
+### Model verdicts
+
+After evaluation, each model version receives a verdict:
+
+| Verdict | Meaning |
+| :-- | :-- |
+| **Strengthened** | The new model catches more benchmark threats and retains confirmed real threats. It is promoted automatically. |
+| **No change** | Performance is equivalent to the previous version. The new model is promoted. |
+| **Held back** | The new model regressed on one or more metrics. The previous model stays active and Hilt flags the issue for review. |
+
+---
+
+## Time to detect
+
+Time to detect (TTD) measures **how quickly Hilt flags a threat after the anomalous behavior begins**. It is expressed in epochs (five-minute windows).
+
+### What affects detection speed
+
+| Factor | Effect on TTD |
+| :-- | :-- |
+| **Baseline maturity** | A well-established baseline (4+ weeks of observation) produces faster, more confident detections. A host still in cold-start may delay flagging until thresholds lower. |
+| **Attack subtlety** | Bold deviations (a burst of lateral movement, a spike in outbound data) are flagged in the first epoch. Subtle, low-and-slow patterns take longer because the statistical evidence accumulates over multiple epochs. |
+| **Feedback history** | Confirmed real threats sharpen the model's sensitivity to similar patterns, reducing TTD for repeat attack types. |
+| **Host behavior regularity** | Hosts with consistent workloads have tighter baselines, so deviations are detected faster. Highly variable hosts (e.g., build servers with bursty workloads) have wider baselines and may take one or two more epochs. |
+
+### What to expect
+
+For most environments with established baselines:
+
+- **Obvious threats** (large behavioral spikes, novel lateral movement): detected within **1–2 epochs** (5–10 minutes)
+- **Moderate threats** (unusual network destinations, atypical process trees): detected within **2–5 epochs** (10–25 minutes)
+- **Subtle threats** (slow data exfiltration, gradual privilege escalation): detected within **5–15 epochs** (25–75 minutes) as statistical evidence builds
+
+These are typical ranges, not guarantees. The actual TTD depends on the factors above and the specific characteristics of the threat.
+
+---
+
+## How detection improves over time
+
+Hilt's accuracy is not static. Three mechanisms drive continuous improvement:
+
+### 1. Analyst feedback
+
+Every finding your team confirms or dismisses feeds back into the next model training cycle. Confirmed threats become test cases the model must continue to catch; dismissed findings teach the model what's normal in your specific environment. This is why triaging findings matters — each review directly improves future detection.
+
+### 2. Automatic retraining
+
+Hilt periodically retrains models using updated behavioral data from your environment. Each retrained model is evaluated against the benchmark suite and your team's feedback history before it can replace the active model. If a retrained model regresses, it is held back automatically.
+
+You can see the training and evaluation history on the **Model Lifecycle** page, including which models were promoted and which were held back.
+
+### 3. Baseline adaptation
+
+Host baselines evolve as your environment changes. New software deployments, infrastructure changes, and workload shifts are incorporated into the baseline over time, so the model doesn't keep flagging legitimate changes as anomalies.
+
+---
+
+## Key terms
+
+| Term | Definition |
+| :-- | :-- |
+| **Epoch** | A five-minute window of host activity. The fundamental unit of behavioral observation. |
+| **Baseline** | The model's learned picture of normal behavior for a specific host. Built during cold-start and refined continuously. |
+| **Cold-start** | The initial 1–2 week period where the model is learning baselines. Scoring thresholds are elevated to suppress noise. |
+| **Finding** | A behavioral deviation flagged by the model (or a detection rule). Appears on the Anomalies page for review. |
+| **Benchmark suite** | A curated set of attack scenarios used to measure model recall. Controlled by Hilt and updated as new threat categories emerge. |
+| **Retraining** | Periodic model updates using fresh behavioral data. Each retrained model must pass evaluation before promotion. |
+| **TTD** | Time to detect — the number of epochs between the start of anomalous behavior and the first finding. |
