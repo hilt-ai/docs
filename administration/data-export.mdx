@@ -1,0 +1,119 @@
+---
+title: "Data Export"
+sidebarTitle: "Data Export"
+description: "Review, approve, or delete anonymized data exports staged in your own S3 bucket before anything is shared with Hilt."
+---
+
+Review staged anonymized exports before they leave your infrastructure. Each export is an anonymized statistical snapshot of your telemetry, written to your own S3 bucket, that you can inspect, approve (consent to share with Hilt), or delete. Nothing is transferred until you approve it. Route: `/admin/data-export`.
+
+This page documents the in-dashboard review UI. For the export pipeline itself (what is collected, how it is anonymized, and the artifact schema) see [Anonymized data export](/on-prem/data-export-overview), [Implementation](/on-prem/data-export-implementation), and [Schema](/on-prem/data-export-schema).
+
+## Permissions
+
+The page requires the **view audit** permission to open (in the nav and by URL). Without it the page is hidden.
+
+The **Approve export** and **Delete (reject)** actions additionally require the **user-management** permission. Without it, both buttons are disabled and their tooltip reads _"Requires user-management permission"_; you can still browse exports, the manifest, and the sample.
+
+---
+
+## Enabling the feature
+
+Data export is opt-in and OFF by default. When it is disabled (or the listing fails), the page shows **Could not load data exports** with the enablement command:
+
+```
+terraform -chdir=envs/app apply -var data_export_enabled=true
+```
+
+Once enabled, exports are produced by a scheduled CronJob. The list refreshes every 30 seconds.
+
+---
+
+## Empty state
+
+When the feature is enabled but no exports are staged, the page shows **No staged exports** and how to trigger one on demand:
+
+```
+kubectl create job --from=cronjob/dag-data-export dag-data-export-$(date +%s)
+```
+
+Artifacts land in your S3 bucket under `exports/` and appear here for review.
+
+---
+
+## Export picker
+
+When exports exist, a row of buttons at the top lets you switch between them. Each button shows the **export ID** (monospace, for example `exp-20260610-001`) and a status icon:
+
+| Icon | Meaning |
+| --- | --- |
+| Green check | Approved |
+| Amber clock | Awaiting review |
+
+The first export is selected by default. Selecting an export loads its manifest and a fresh sample below.
+
+---
+
+## Manifest panel
+
+The selected export's manifest is shown as a header of status pills followed by a field grid.
+
+### Status pills
+
+| Pill | Meaning |
+| --- | --- |
+| _anonymized_ (green) | Host/uid remap and temporal jitter have been applied |
+| _not anonymized_ (amber) | Anonymization has not run; approval is blocked |
+| _approved by &lt;user&gt; · &lt;time&gt;_ (green) | Consent recorded, with the approver and timestamp |
+| _awaiting review_ (slate) | Not yet approved |
+| _transferred to Hilt · &lt;time&gt;_ (sky) | An approved export that has been shipped to Hilt, with the time |
+
+The _transferred_ pill appears only after the CronJob's transfer sweep has shipped an approved export.
+
+### Manifest fields
+
+| Field | Content |
+| --- | --- |
+| **Created** | When the export was generated |
+| **Date range** | Start → end of the telemetry window covered |
+| **Rows** | Row count in the export |
+| **Hosts** | Distinct host count |
+| **Temporal jitter** | Uniform offset (in hours) subtracted from every timestamp, recorded so you can reconstruct real times |
+| **Archive size** | Size of the export archive (B/KB/MB/GB/TB) |
+| **Format** | Artifact format (for example, `parquet`) |
+| **SHA-256** | Checksum of the archive (monospace) |
+
+### Columns
+
+Below the grid, **Columns (&lt;n&gt;)** lists every exported column as monospace chips. Two notes may follow:
+
+- **Zero-filled slots**: columns present in the schema but written as zero for this export.
+- **Never exported**: a reminder of categories that are stripped before export (for example, raw IPs, usernames, file paths, command lines).
+
+---
+
+## Actions
+
+Below the manifest, an actions bar explains the consequences and offers two buttons:
+
+> Approving records consent in the manifest. The data stays in your bucket either way; deleting removes every staged file so nothing ever reaches Hilt.
+
+| Action | Effect |
+| --- | --- |
+| **Approve export** | Records that you reviewed this export and consent to share it. Approval is what lets the transfer sweep ship it to Hilt. |
+| **Delete (reject)** | Removes every staged file for this export from your bucket, so nothing reaches Hilt. |
+
+Each action requires a second confirmation: the button is replaced by **Confirm approve** / **Confirm delete** alongside **Cancel**. After a successful action a toast confirms it (deletion also reports how many objects were removed).
+
+**Approve export** is disabled when:
+
+- you lack the **user-management** permission,
+- the export is _not anonymized_ (tooltip: _"Approval is blocked: this export has not been anonymized (host/uid remap + temporal jitter)"_), or
+- the export is already approved (tooltip names the approver).
+
+---
+
+## Sample (first 20 rows)
+
+The **Sample (first 20 rows)** table previews the actual exported rows so you can verify anonymization before approving. Columns follow the manifest's column order. Cells render compactly: array values (such as the packed `zscores` vector) are abbreviated, and empty values show as a dash.
+
+If the sample cannot be loaded, the table shows **Could not load the sample for this export.**; if there are no rows it shows **No sample rows found.**

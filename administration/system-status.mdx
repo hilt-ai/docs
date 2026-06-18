@@ -1,0 +1,124 @@
+---
+title: "System Status"
+sidebarTitle: "System Status"
+description: "Check the live health and 90-day uptime of the detection services behind your dashboard."
+---
+
+Monitor the live health of the services that power detection and enrichment, see why a service is degraded, and review 90 days of per-day uptime. This page requires the **manage users** permission.
+
+The page polls automatically every 60 seconds, so an active tab tracks recovery without a manual refresh.
+
+---
+
+## Page layout
+
+The page is a single stacked list of service cards under a header and a status rollup bar.
+
+### Header
+
+- **Title:** _System Status_, with the subtitle "Live health of the services behind your dashboard".
+- **checked _<time>_**: how long ago the status was last fetched (hidden on narrow screens).
+- **Refresh**: re-runs the status check immediately. The icon spins while a fetch is in progress and the button is disabled until it finishes.
+
+### Rollup bar
+
+A summary strip beneath the header:
+
+- **Left:** a colored dot and the overall status label, rolled up from the worst individual service (see [Overall status](#overall-status)).
+- **Right:** "Uptime over the past 90 days", labeling the per-day history shown on each card.
+
+### Body states
+
+| State | What you see |
+| --- | --- |
+| Loading | A centered spinner while the first fetch runs. |
+| Error | "Couldn't load system status. Try refreshing." Use **Refresh** to retry. |
+| Empty | "No services are being monitored yet." when no services are reported. |
+| Loaded | One [service card](#service-cards) per monitored service. |
+
+---
+
+## Statuses
+
+Every service and the overall rollup use the same set of statuses. The dot color is shared across the rollup bar, the card status pill, and the history candles.
+
+| Status | Dot | Meaning |
+| --- | --- | --- |
+| _Operational_ | Green | The service is healthy and processing normally. |
+| _Degraded_ | Amber | The service is delayed, partially covering hosts, or recovering. It catches up automatically. |
+| _Action needed_ | Red | The service is stopped or blocked and needs attention or configuration. |
+| _Disabled_ | Slate | The service is turned off for this deployment. |
+| _No data_ | Slate | The service has no activity to process yet, or is waiting for input. |
+
+### Overall status
+
+The rollup label reflects the worst service status:
+
+| Condition | Rollup label |
+| --- | --- |
+| All services operational (or no data) | _All systems operational_ |
+| Some services disabled, none worse | _Some services disabled_ |
+| One service degraded or action needed | _1 service needs attention_ |
+| Several degraded or action needed | _N services need attention_ |
+| No services monitored | _No services monitored_ |
+
+---
+
+## Service cards
+
+Each card describes one service top to bottom:
+
+- **Icon and name:** the service icon and its name (for example _Anomaly Narratives_, _Behavioral Anomaly Detection_, _Event Enrichment_).
+- **Status pill:** the colored dot and status label for the service right now.
+- **Detail line:** a plain-language sentence describing what the service does, or why it is degraded or needs attention.
+- **History candles:** a strip of up to 90 daily cells, one per day, colored by that day's status. Hover a cell for its date and a status summary with that day's metrics. Days before monitoring began render as _No data_; quiet days after monitoring began count as healthy. The strip is labeled "90 days ago" on the left and "today" on the right.
+- **Footer:** the time of the service's last activity (for example "Last summary 4m ago", "Last score 1m ago", "Last enriched event 15s ago"). If there has been no activity, it reads "No ... yet" when operational or "No recent ..." otherwise.
+- **Remediation link:** when a service needs configuration, the footer shows a link that opens the relevant help or settings in a new tab.
+
+### Monitored services
+
+| Service | Tracks | Healthy footer |
+| --- | --- | --- |
+| **Anomaly Narratives** | Plain-language summaries generated for each detected anomaly. | Last summary |
+| **Behavioral Anomaly Detection** | The behavioral model scoring fleet activity for anomalies. | Last score |
+| **Event Enrichment** | Workload, session, and process-lineage enrichment applied to events. | Last enriched event |
+
+Other services may appear with a generic icon and "Service status" history label if the backend reports a service the dashboard does not yet have specific copy for.
+
+### What each status means per service
+
+**Anomaly Narratives**
+
+| Status | When it shows | Detail |
+| --- | --- | --- |
+| _Operational_ | Summaries are generating normally. | Plain-language summary of each detected anomaly. |
+| _Degraded_ | Generation is paused and retrying, or recovering. | Temporarily unavailable, retrying automatically. |
+| _Action needed_ | No model is configured, or the configured model isn't accessible. | Needs a model configured, or model access enabled in your cloud account. Contact Hilt support for help. |
+| _Disabled_ | Narratives are turned off for this deployment. | Anomaly narratives are turned off. |
+
+**Behavioral Anomaly Detection**
+
+| Status | When it shows | Detail |
+| --- | --- | --- |
+| _Operational_ | Scores are landing across the fleet. | The behavioral model is scoring activity for anomalies. |
+| _Degraded_ | Scoring is delayed or only covering some active hosts. | Catching up automatically. |
+| _Action needed_ | Hosts are active but no scores are landing. | The behavioral detection service may be down. |
+| _Disabled_ | Behavioral detection is turned off. | Turned off for this deployment. |
+| _No data_ | No host activity to score yet. | Waiting for host activity. |
+
+**Event Enrichment**
+
+| Status | When it shows | Detail |
+| --- | --- | --- |
+| _Operational_ | Enrichment is keeping up. | Workloads, sessions, and process lineage are being enriched onto your events. |
+| _Degraded_ | Enrichment is lagging or the workload-identity miss rate is elevated. | Lagging or elevated miss rate. |
+| _Action needed_ | Events are arriving but enrichment appears stopped. | Workload identity isn't being applied. |
+| _Disabled_ | Enrichment is turned off. | Turned off for this deployment. |
+| _No data_ | No events to enrich yet. | Waiting for events. |
+
+---
+
+## Related pages
+
+- [User Management](/administration/user-management): manage the accounts that can reach this page.
+- [Teams](/administration/teams): scope what users can see.

@@ -1,0 +1,65 @@
+---
+title: "Auto-Update"
+sidebarTitle: "Auto-Update"
+description: "Turn the collector auto-update agent on or off for this deployment from the dashboard."
+---
+
+A single in-dashboard switch for the collector auto-update agent. When the agent is on, it checks for new Hilt releases on its own schedule and rolls them out; when off, it stays scheduled but takes no action. The page reads and writes one setting and shows who last changed it.
+
+This page is in-dashboard. For the operational side of the agent (how it runs, its version policy, and rollout workflow) see the on-prem guide: [Auto-update agent overview](/on-prem/auto-update-overview), [Prerequisites](/on-prem/auto-update-prerequisites), [Workflow](/on-prem/auto-update-workflow), and [Operations](/on-prem/auto-update-operations).
+
+## Permissions
+
+- **View audit**: required to open the page (in the nav and by URL at `/admin/auto-update`). Without it the page is hidden.
+- **Manage users**: required to change the switch. With view-only access you can see the current state and history, but the On/Off control will refuse the change.
+
+When you can view but not change the setting, an amber note reads _"You can view this setting but need user-management permission to change it."_
+
+---
+
+## Availability
+
+Auto-update is only present when the deployment provisions the agent. If it isn't provisioned, the page shows:
+
+> **Auto-update is not available on this deployment**
+
+followed by the reason returned by the backend. There is nothing to configure in that case.
+
+---
+
+## Status card
+
+When the agent is available, the page shows one card with the current state and a toggle.
+
+| Element | Content |
+| --- | --- |
+| **State icon** | A power icon, green when on, muted when off |
+| **Automatic updates on / off** | The current state in plain text |
+| **State description** | _"The agent checks for new releases on its schedule and rolls them out."_ when on, or _"The agent stays scheduled but takes no action until you turn it back on."_ when off |
+| **On / Off toggle** | The segmented control that changes the setting |
+
+The page refreshes the state about every 30 seconds, so a change made elsewhere appears on its own.
+
+---
+
+## Turning auto-update on or off
+
+Use the **On** / **Off** segmented toggle on the right of the card.
+
+- Selecting the state it's already in does nothing.
+- A successful change shows a toast (_"Auto-update enabled"_ or _"Auto-update disabled"_) and the card updates in place.
+- A spinner appears next to the toggle while the change is saving.
+- Without the **manage users** permission, the change is refused with the toast _"Requires user-management permission to change this"_ and the state is left unchanged.
+
+The agent is **on by default** from the moment the deployment is created.
+
+---
+
+## Change history
+
+A line at the bottom of the card records the last change:
+
+- **Last changed _time_ by _user_.** once the setting has been changed, naming when and who.
+- **On by default since deployment.** when it has never been changed.
+
+This is the only history shown on the page; there is no per-version log here. For rollout status and run history, use the on-prem [Operations](/on-prem/auto-update-operations) guide.

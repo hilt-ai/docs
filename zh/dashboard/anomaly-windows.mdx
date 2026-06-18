@@ -1,0 +1,65 @@
+---
+title: "异常窗口"
+sidebarTitle: "异常窗口"
+description: "在周期性时间窗口内，对全主机群范围内的行为（ML）异常进行静默。"
+---
+
+一项全局控制，用于在周期性的每周窗口内静默行为（机器学习）异常，例如每晚的维护批处理，或某个总会触发模型的已知每周任务。当某个窗口处于活动状态时，这些异常会对所有主机从 [异常](/zh/dashboard/anomalies) 页面隐藏。在应用中，此页面位于「安全」导航下的 **Anomaly Windows**；其标头显示为 **Behavioral Anomaly Suppression**。
+
+## 权限
+
+此页面需要 **Manage alerts** 权限。没有它，此页面会从导航和 URL 中被隐藏。
+
+---
+
+## 抑制的作用
+
+当某个窗口处于活动状态时，行为（ML）异常会从「异常」页面隐藏。**检测规则告警和原始异常分数不受影响**；仅静默由模型驱动的发现项，且仅在排定的窗口内。抑制是全局的：它应用于主机群中的每一台主机，而非选定的子集。
+
+这与「异常」页面上的逐发现项 **Suppressed** 过滤器不同，后者隐藏的是你通过反馈忽略的单个发现项。
+
+---
+
+## 状态
+
+**Status** 开关决定是否启用抑制：
+
+| 选项 | 行为 |
+| --- | --- |
+| **Always show anomalies** | 不抑制；每个行为异常都会显示在「异常」页面上。这是默认值。 |
+| **Suppress on a schedule** | 在下方定义的窗口内隐藏行为异常。 |
+
+选择 **Suppress on a schedule** 会显示排期构建器。
+
+---
+
+## 排期
+
+排期定义周期性的每周窗口，并在所选时区内进行评估。
+
+- **窗口何时生效**：一个 **Suppress during** / **Active only during** 开关（标记为 _When the rule should_）。**Suppress during** 在窗口内静默异常，其余时间显示；**Active only during** 则相反。默认为 **Suppress during**。
+- **Timezone**：用于评估窗口的 IANA 时区。默认为你浏览器的时区。
+
+### 窗口
+
+每个 **Window** 是一组工作日加一个时间范围：
+
+- **星期按钮**：**Mon** 到 **Sun**；选中的日期以绿色高亮。新窗口默认为 **Mon–Fri**。
+- **From** / **To**：一天中的开始与结束时间。新窗口默认为 *09:00–17:00*。如果 **To** 等于或早于 **From**，该窗口会跨越午夜延续到次日（页面内会提示）。
+- **Add window**：追加另一个窗口。一旦存在多个窗口，每个窗口都会带有一个垃圾桶图标用于移除。
+
+构建器底部会显示一行摘要，用通俗的语言重述其效果：*The rule is suppressed during the windows above and fires at all other times (evaluated in <你的时区>)*；在 **Active only during** 模式下则为 *The rule can only fire during the windows above*。
+
+---
+
+## 保存
+
+如果该设置此前被编辑过，页脚会显示 **Last changed by** *(姓名)*，旁边是 **Save** 按钮。保存成功后会以 *Suppression window saved* 提示确认。
+
+当选择 **Suppress on a schedule** 时，排期会先经过校验：
+
+| 提示 | 原因 |
+| --- | --- |
+| _Add at least one time window._ | 未定义任何窗口 |
+| _Each window needs at least one day selected._ | 某个窗口未选择工作日 |
+| _Window start and end times must differ._ | 某个窗口的 **From** 与 **To** 相同 |

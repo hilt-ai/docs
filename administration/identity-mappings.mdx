@@ -1,0 +1,122 @@
+---
+title: "Identity Mapping"
+sidebarTitle: "Identity Mapping"
+description: "Link machine identities to Okta directory users, review suggested matches, and label account types."
+---
+
+Resolve who-is-who by linking the raw identities seen on your hosts (Linux usernames, Teleport sessions, SSH IPs) to people in your Okta corporate directory. Confirm or reject suggested matches, classify each identity's account type, and add manual mappings. This page requires the **manage users** permission.
+
+---
+
+## Okta directory bar
+
+A bar at the top of the page reports the state of your Okta sync:
+
+- **Okta Directory** with a **N users** badge: how many directory users were pulled in the last sync.
+- **Last sync**: relative time since the directory was last synced (or _Never_).
+- **Sync Now**: trigger an on-demand Okta sync. The button spins while the sync runs, and mappings are re-evaluated automatically after each sync.
+
+The sync status refreshes on its own about every 30 seconds.
+
+---
+
+## Stats summary
+
+Below the directory bar, a one-line summary counts the current mappings:
+
+| Stat | Meaning |
+| --- | --- |
+| **N mappings** | Total identity mappings |
+| **N confirmed** | Mappings an operator has confirmed (green) |
+| **N needs review** | Suggested mappings awaiting review (amber) |
+| **Type: N** | A per-type count for each account type present (_Verified_, _Machine_, _Shared_, _Service_, _Unknown_) |
+
+---
+
+## Filters
+
+A toolbar above the table narrows the list:
+
+- **Status toggle**: _All_, _Needs Review_ (unconfirmed suggestions), or _Confirmed_.
+- **Search**: filter by identity. Matches the raw identity text.
+- **Type**: filter by account type, or _All types_. Options are _Verified_, _Machine_, _Shared_, _Service_, and _Unknown_.
+- **Manual Mapping**: opens the create form (see [Create a manual mapping](#create-a-manual-mapping)).
+
+The list loads up to 200 mappings. When more exist, a footer reads `Showing N of M`.
+
+---
+
+## Mappings table
+
+Each row is one resolved identity:
+
+| Column | Contents |
+| --- | --- |
+| **Identity** | The raw identity seen on hosts, shown in monospace |
+| **Source** | Where the identity came from (see source values below) |
+| **Mapped To** | The matched Okta user as `Full name (email)`, the email alone, or `—` when unmapped |
+| **Match** | How the link was made (see match values below) |
+| **Type** | An editable account-type pill (see [Account type](#account-type)) |
+| **Status** | _Confirmed_ (green) or _Suggested_ (amber) |
+| **Actions** | Confirm, reject, and delete controls |
+
+### Source values
+
+| Source | Origin |
+| --- | --- |
+| **Linux** | Linux username on the host |
+| **Teleport** | Teleport session |
+| **PPID chain** | Resolved through the parent-process chain |
+| **Owner** | Teleport session owner |
+| **SSH IP** | Inferred from the SSH source IP |
+
+### Match values
+
+| Match | Meaning |
+| --- | --- |
+| **Email match** | Exact email match against the directory |
+| **Login match** | Matched on login name |
+| **Manual** | Created or linked by an operator |
+| **None** | No directory match |
+
+### Account type
+
+The **Type** cell is a dropdown you can change in place. Updating it re-labels the identity immediately.
+
+| Type | Color | Use for |
+| --- | --- | --- |
+| _Verified_ | Green | A confirmed individual person |
+| _Machine_ | Gray | A machine or automation account |
+| _Shared_ | Blue | A shared account used by multiple people |
+| _Service_ | Purple | A service or daemon account |
+| _Unknown_ | Gray | Not yet classified |
+
+### Row actions
+
+Controls on the right of each row:
+
+| Action | When shown | Effect |
+| --- | --- | --- |
+| **Confirm** (check) | Suggested rows only | Accepts the mapping and marks it _Confirmed_ |
+| **Reject** (X) | Suggested rows only | Rejects the suggested match |
+| **Delete** (trash) | Always | Removes the mapping |
+
+Confirmed rows show only the delete control.
+
+### Empty states
+
+- When no mappings exist yet: _No identity mappings yet. Mappings are created automatically after each Okta sync._
+- When filters exclude everything: _No mappings match your filters._
+
+---
+
+## Create a manual mapping
+
+**Manual Mapping** opens an inline form (toggle it again or the **X** to close). Use it to label an identity yourself or link one to a specific Okta user. Fields:
+
+- **Identity** (required): the raw identity to map, for example `dev`.
+- **Source**: _Linux Username_, _Teleport Session_, _PPID Chain_, _Teleport Owner_, or _SSH IP_. Defaults to _Linux Username_.
+- **Okta User**: pick a directory user to link, or _None (label only)_ to classify the identity without linking it to a person.
+- **Type**: _Verified User_, _Shared Account_, _Service Account_, or _Unknown_. Defaults to _Unknown_.
+
+**Create** saves the mapping and adds it to the table. Identity is required; submitting without it shows an error.
