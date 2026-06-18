@@ -1,0 +1,91 @@
+---
+title: "Data collection & handling"
+sidebarTitle: "Data handling"
+description: "What Hilt collectors capture, what they never capture, how events are filtered, where data lives, and retention."
+---
+
+Hilt collectors observe system activity at the metadata level. They record what ran, what connected, and what was read or written, but never the contents of files, packets, or memory. This page describes the data Hilt handles, where it lives, and how long it is kept.
+
+---
+
+## What is collected
+
+The collector captures execution and system metadata for each event:
+
+- Timestamps
+- Process and user identifiers (PID, UID)
+- Command name, binary path, and arguments
+- File paths (for file events)
+- Network details such as the connection 5-tuple and byte counts (for network events)
+- Container and cgroup identifiers
+- The configured node label
+
+This metadata lets activity be correlated across hosts and workloads. For the full schema, see [Event data model](/linux-collector/event-data-model).
+
+---
+
+## What is never collected
+
+The collector is not a content inspection tool. It never captures:
+
+| Category | Detail |
+| :-- | :-- |
+| **File contents** | Only the path and operation type, never the bytes in the file |
+| **Packet payloads** | Only the connection 5-tuple and byte counts, never packet data |
+| **Memory and process memory** | No reads of process memory or memory regions |
+| **Environment variables** | Process environment is not captured |
+| **Credentials** | No passwords, keys, or token values |
+| **Anything beyond standard tools** | Nothing past what `ps`, `lsof`, or `ss` would expose |
+
+The macOS collector follows the same design: it does not read file contents, capture keystrokes or screen content, or capture packet payloads, and it operates strictly observationally. See [macOS Collector](/macos-collector).
+
+---
+
+## Filtering and minimization
+
+The collector reduces raw kernel telemetry to a security-relevant stream before anything is stored. On a busy host, raw syscall volume can exceed 100k events per second; a two-tier eBPF and userspace filter typically drops well over 90% of that as OS housekeeping noise.
+
+Two properties matter for data handling:
+
+- **No content inspection in filtering.** Filters operate on metadata only (path prefix, process name, CIDR), never on file or packet contents.
+- **Security-relevant events are preserved.** Process executions, file writes, container lifecycle events, and reads of sensitive paths (credential files, tokens, secrets) always pass the filter.
+
+For the filtering architecture and configuration, see [Agent filtering](/linux-collector/agent-filtering).
+
+---
+
+## Where data lives
+
+Each data class stays inside your cloud account.
+
+| Data class | Location |
+| :-- | :-- |
+| Raw events in flight | Collector host buffer, then the private ingest endpoint |
+| Buffered events | Streaming buffer (Kafka, Pub/Sub, or Event Hubs) in your account |
+| Normalized telemetry and findings | Analytics database (ClickHouse) in your account |
+| Dashboard accounts, teams, and audit records | Dashboard database (PostgreSQL) in your account |
+| Reports and exports | Object storage (S3, Cloud Storage, Blob, or OSS) in your account |
+
+No copy of this data is sent to or stored by Hilt. See [Architecture and data flow](/trust-security/architecture) for the component map.
+
+---
+
+## Collector privilege
+
+The collector requires elevated privileges to read kernel telemetry. The exact requirement depends on the deployment path (root for systemd, a privileged DaemonSet on Kubernetes). These privileges grant observation only; the collector does not modify host state, terminate processes, or block activity. The privilege model is documented in [Networking and security](/linux-collector/networking-security).
+
+---
+
+## Retention
+
+Telemetry retention is set per deployment. The analytics database and object storage are sized to your agreed retention window, and you control retention because the storage lives in your account. Confirm the configured retention period for your deployment with your Hilt representative.
+
+When you delete a dashboard user, their account and sessions are removed; audit history keeps entries under the username so the record of past actions is preserved. See [User Management](/administration/user-management).
+
+---
+
+## Opt-in anonymized export
+
+The only path by which any data leaves your account is the anonymized export pipeline, which is off by default. When enabled, it exports aggregate numeric features, derived statistics, and abstracted activity tokens, never file paths, IP addresses, hostnames, usernames, cloud resource IDs, or detection rule logic. Identifying values are stripped or remapped before export, exports are rejected below a minimum host threshold, and you review a manifest and sample and approve each transfer.
+
+For the full data catalog, anonymization method, and customer controls, see [Anonymized data export](/on-prem/data-export-overview).

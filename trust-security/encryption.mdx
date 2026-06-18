@@ -1,0 +1,54 @@
+---
+title: "Encryption & key management"
+sidebarTitle: "Encryption"
+description: "How Hilt encrypts data in transit and at rest, how certificates are handled, and who holds the keys."
+---
+
+Hilt encrypts data in transit and at rest using the native capabilities of your cloud provider. Because the platform runs in your account, the encryption keys live in your account too.
+
+---
+
+## In transit
+
+- **TLS 1.2+ on all connections.** Collector-to-ingest traffic, dashboard access, and internal service traffic use TLS 1.2 or higher.
+- **Private networking.** Collector telemetry rides a private link path (PrivateLink, Private Service Connect, or Private Link) and never traverses the public internet. See [Architecture and data flow](/trust-security/architecture).
+- **Collector to ingest.** The collector connects over HTTPS on TCP/443 to the ingest endpoint. The endpoint presents a certificate issued against your private zone, and the collector validates it against your CA chain. See [Networking and security](/linux-collector/networking-security).
+
+---
+
+## Certificates
+
+Certificates are managed with each cloud's native certificate service: ACM on AWS, Certificate Manager on GCP, and the equivalent service on Azure and Ali Cloud. The ingest certificate is issued against the private DNS zone associated with your VPC, so name resolution and TLS validation both happen inside your account.
+
+---
+
+## At rest
+
+All persistent storage is encrypted with cloud-native, KMS-managed keys:
+
+| Storage layer | Encryption |
+| :-- | :-- |
+| Analytics database (ClickHouse) | Encrypted at rest on the underlying volumes |
+| Streaming buffer (Kafka, Pub/Sub, Event Hubs) | Provider-managed encryption at rest |
+| Dashboard database (PostgreSQL) | KMS-managed encryption (RDS, Cloud SQL, or equivalent) |
+| Object storage (S3, Cloud Storage, Blob, OSS) | KMS-managed server-side encryption |
+
+Encryption at rest is on by default for every storage layer in the deployment.
+
+---
+
+## Key ownership
+
+Because the deployment runs in your cloud account, encryption keys reside in your account's key management service (AWS KMS, Cloud KMS, Azure Key Vault, or Ali Cloud KMS). Hilt does not hold or escrow your keys outside your account.
+
+Whether storage uses provider-managed keys or customer-managed keys (CMKs) can vary by cloud and by your configuration. To use CMKs with key rotation and access policies you define, raise it during provisioning and confirm per-resource support with your Hilt representative.
+
+<Note>
+Revoking or restricting a key in your KMS affects the platform's access to the data it protects, because the keys are yours. Coordinate key policy changes with your Hilt representative to avoid disrupting the deployment.
+</Note>
+
+---
+
+## Secrets in the deployment
+
+Platform secrets (database credentials and service identities) are provisioned by Terraform into your cloud's native secret and identity services and are scoped to the deployment. Service-to-service authentication uses cloud-native workload identity (IAM roles on AWS, Workload Identity on GCP, Managed Identity on Azure, RAM roles on Ali Cloud) rather than long-lived shared credentials where the platform supports it. See the deployment guides for [AWS](/deployment/aws), [GCP](/deployment/gcp), [Azure](/deployment/azure), and [Ali Cloud](/deployment/ali-cloud).

@@ -1,0 +1,118 @@
+---
+title: "架构与数据流"
+sidebarTitle: "架构"
+description: "Hilt 的单租户部署模型、组件构成、各云服务、网络边界以及端到端数据流。"
+---
+
+Hilt 以单租户平台的形式部署在您自有的云账户中。采集器、摄取端点、流式缓冲、分析数据库和仪表盘全部运行在 Hilt 于您账户中预配的基础设施内。没有任何平台组件跨客户共享，默认情况下也没有任何组件暴露到公网。
+
+---
+
+## 部署模型
+
+- **每账户一个租户。** 每位客户在自己的 AWS 账户、GCP 项目、Azure 订阅或阿里云账户中获得一套专属部署。不存在共享的多租户平面，Hilt 端也不保留您数据的副本。
+- **使用 Terraform 预配。** Hilt 应用一套 Terraform 配置，在您指定的账户中创建平台基础设施（计算、流式、数据库、存储与私有网络）。
+- **您授予受限访问权限。** 您按部署指南提供一个具有约定 IAM（或 RAM）权限的目标账户。Hilt 在该范围内运维。
+
+有关各云的预配与 IAM 细节，参见部署指南：[AWS](/zh/deployment/aws)、[GCP](/zh/deployment/gcp)、[Azure](/zh/deployment/azure) 和 [阿里云](/zh/deployment/ali-cloud)。
+
+---
+
+## 组件
+
+一套部署由以下逻辑组件构成，全部位于您的账户内：
+
+| 组件 | 作用 |
+| :-- | :-- |
+| **采集器** | 您主机上生成元数据层面遥测的代理（Linux 静态二进制、macOS 托管代理） |
+| **摄取端点** | 终结采集器连接的私有链路端点；唯一的入站路径 |
+| **流式缓冲** | 将摄取与处理解耦的持久化事件流 |
+| **富化与评分** | 对事件进行归一化、富化和评分，并评估模型漂移的工作负载 |
+| **分析数据库** | 保存归一化遥测与发现项的列式存储 |
+| **仪表盘** | 用于调查、检测规则和系统管理的 Web 应用，通过私有网络访问 |
+| **导出管道（可选）** | 默认关闭；生成经您批准的、可选加入的匿名化导出 |
+
+---
+
+## 各云服务
+
+上述组件作用在每个云上映射到原生托管服务。所有变体都将流量保留在您的账户内，无公网暴露。
+
+| 作用 | AWS | GCP | Azure | 阿里云 |
+| :-- | :-- | :-- | :-- | :-- |
+| 平台计算 | EKS | GKE | AKS | ACK |
+| 事件流式 | MSK (Kafka) | Pub/Sub | Event Hubs | 消息队列 Kafka 版 |
+| 私有摄取 | PrivateLink | Private Service Connect | Private Link | PrivateLink |
+| 分析数据库 | ClickHouse | ClickHouse | ClickHouse | ClickHouse |
+| 仪表盘数据库 | RDS (PostgreSQL) | Cloud SQL (PostgreSQL) | Azure Database for PostgreSQL | ApsaraDB RDS (PostgreSQL) |
+| 对象存储 | S3 | Cloud Storage | Blob Storage | OSS |
+| TLS 与 DNS | ACM、Route 53 | Certificate Manager | App Gateway / Front Door | PrivateLink、私有 DNS |
+| 服务身份 | IAM 角色 | Workload Identity | Managed Identity | RAM 角色 |
+
+---
+
+## 网络边界
+
+- **仅私有摄取。** 采集器连接到您账户中的私有链路端点（PrivateLink、Private Service Connect 或 Private Link）。不存在公网摄取端点。
+- **无入站公网。** 没有任何平台组件接受来自公网的入站连接。
+- **受控出站。** 出站公网访问仅在拉取容器镜像等必要场景使用，且可配置为使用私有镜像仓库。
+- **采集器单一目的地。** 采集器恰好只有一个出站目的地：摄取端点，通过 HTTPS 走 TCP/443。DNS 在您的 VPC 内经私有区域解析，因此不会有 DNS 查询泄露给公共解析器。
+
+有关采集器的出站态势、隔离网络运行和特权模型，参见[网络与安全](/zh/linux-collector/networking-security)。
+
+---
+
+## 数据流
+
+事件沿单一方向流动，从您的主机进入您的分析存储和仪表盘，不会离开您的账户。
+
+```text
+  YOUR CLOUD ACCOUNT
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                                                                       │
+  │   Hosts                                                               │
+  │   ┌──────────────┐                                                    │
+  │   │  Collector   │  metadata events                                   │
+  │   │ (Linux/macOS)│ ──────────────┐                                    │
+  │   └──────────────┘   HTTPS 443    │                                   │
+  │                      (private link)│                                  │
+  │                                    ▼                                  │
+  │                          ┌──────────────────┐                        │
+  │                          │  Ingest endpoint  │                       │
+  │                          └─────────┬─────────┘                       │
+  │                                    ▼                                  │
+  │                          ┌──────────────────┐                        │
+  │                          │ Streaming buffer  │  (Kafka / Pub-Sub)    │
+  │                          └─────────┬─────────┘                       │
+  │                                    ▼                                  │
+  │                          ┌──────────────────┐                        │
+  │                          │  Enrichment and   │                       │
+  │                          │     scoring       │                       │
+  │                          └─────────┬─────────┘                       │
+  │                                    ▼                                  │
+  │                          ┌──────────────────┐      ┌──────────────┐  │
+  │                          │ Analytics database│◀────▶│  Dashboard   │  │
+  │                          │   (ClickHouse)    │      │ (private ALB) │  │
+  │                          └─────────┬─────────┘      └──────────────┘  │
+  │                                    ┊                                  │
+  │                                    ┊ opt-in, anonymized, approved     │
+  │                                    ▼                                  │
+  │                          ┌──────────────────┐                        │
+  │                          │  Export pipeline  │ ┄┄▶ to Hilt (opt-in)  │
+  │                          │   (off by default)│                       │
+  │                          └──────────────────┘                        │
+  │                                                                       │
+  └─────────────────────────────────────────────────────────────────────┘
+```
+
+图中虚线路径（导出管道）是任何数据离开您账户的唯一途径，且仅在您选择加入并批准每次传输时运行。流经该管道的内容参见[数据采集与处理](/zh/trust-security/data-handling)，导出控制参见[匿名数据导出](/zh/on-prem/data-export-overview)。
+
+<Note>
+服务名称因云而异（例如流式缓冲在 AWS 上是 MSK，在 GCP 上是 Pub/Sub），但数据流和信任边界完全一致：遥测数据保留在您的账户内。
+</Note>
+
+---
+
+## 数据驻留
+
+遥测数据不会离开您的云账户。Hilt 不会接收、镜像您的事件，也无法以任何带外方式访问它们。唯一例外是[匿名数据导出](/zh/on-prem/data-export-overview)，它默认关闭，在启用时也只在您审核并批准后传输匿名化的统计特征。

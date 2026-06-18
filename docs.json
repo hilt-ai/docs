@@ -143,7 +143,14 @@
           {
             "tab": "Trust & Security",
             "pages": [
-              "trust-security"
+              "trust-security",
+              "trust-security/architecture",
+              "trust-security/data-handling",
+              "trust-security/access-control",
+              "trust-security/encryption",
+              "trust-security/operations",
+              "trust-security/compliance",
+              "trust-security/incident-response"
             ]
           }
         ]
@@ -264,7 +271,14 @@
           {
             "tab": "信任与安全",
             "pages": [
-              "zh/trust-security"
+              "zh/trust-security",
+              "zh/trust-security/architecture",
+              "zh/trust-security/data-handling",
+              "zh/trust-security/access-control",
+              "zh/trust-security/encryption",
+              "zh/trust-security/operations",
+              "zh/trust-security/compliance",
+              "zh/trust-security/incident-response"
             ]
           }
         ]

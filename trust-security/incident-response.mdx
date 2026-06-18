@@ -1,0 +1,70 @@
+---
+title: "Incident response & vulnerability disclosure"
+sidebarTitle: "Incident response"
+description: "How to report a security incident or a vulnerability to Hilt, and what to expect in response."
+---
+
+This page covers two reporting paths: a security incident affecting your Hilt deployment, and a vulnerability you have found in Hilt's software. Both route through your Hilt representative or account team.
+
+<Note>
+Notification timelines and response commitments are defined in your agreement. This page describes the process and the information to include, not the contractual service levels.
+</Note>
+
+---
+
+## Reporting an incident
+
+If you suspect a security incident affecting your deployment, report it to your Hilt representative or account team.
+
+<Steps>
+  <Step title="Contain on your side if needed">
+    Because the platform runs in your account, you hold the immediate response controls. You can quarantine an affected host to sever its network access while preserving forensic telemetry (see [Quarantine](/dashboard/quarantine)), and you can revoke Hilt access through your cloud IAM controls.
+  </Step>
+  <Step title="Report to Hilt">
+    Contact your Hilt representative with the deployment identifier, the time window, the hosts or components involved, and what you observed. Findings and the audit log in your dashboard help establish the timeline.
+  </Step>
+  <Step title="Investigate together">
+    Hilt investigates platform-side aspects under your approval workflow. Because telemetry stays in your account, evidence does not need to leave your environment for analysis.
+  </Step>
+</Steps>
+
+---
+
+## Severity
+
+Incidents are assessed jointly to set priority. A typical framing:
+
+| Tier | Description |
+| :-- | :-- |
+| **Critical** | Active compromise or data loss affecting the platform or its data |
+| **High** | A vulnerability or failure that could lead to compromise if unaddressed |
+| **Medium** | A limited-impact issue with a workaround or compensating control |
+| **Low** | A minor issue with no immediate security impact |
+
+The exact tier definitions, notification timelines, and response targets that apply to your deployment are set out in your agreement.
+
+---
+
+## What Hilt provides
+
+- **Notification** of incidents affecting the platform, per your agreement.
+- **Investigation** of platform-side components, conducted under your approval workflow.
+- **Remediation** through the versioned release and update process (see [Security operations](/trust-security/operations)).
+
+Because your telemetry and audit log stay in your account, you retain independent visibility throughout an incident.
+
+---
+
+## Reporting a vulnerability
+
+To report a vulnerability in Hilt's software (collectors, dashboard, or platform components), contact your Hilt representative or account team. Include:
+
+- The affected component and version (collector release tags follow `vMAJOR.MINOR.PATCH`)
+- A description of the issue and its impact
+- Steps to reproduce, and any proof-of-concept detail
+
+---
+
+## Coordinated disclosure
+
+Hilt asks reporters to follow coordinated disclosure: report the issue privately and allow time for a fix before any public disclosure. Hilt will work with you on remediation and on the timing of any disclosure. Avoid testing that could affect other customers' deployments or the availability of a production environment.

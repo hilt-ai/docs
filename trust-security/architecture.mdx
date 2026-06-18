@@ -1,0 +1,118 @@
+---
+title: "Architecture & data flow"
+sidebarTitle: "Architecture"
+description: "Hilt's single-tenant deployment model, component map, per-cloud services, network boundaries, and end-to-end data flow."
+---
+
+Hilt deploys as a single-tenant platform inside your own cloud account. Collectors, the ingest endpoint, the streaming buffer, the analytics database, and the dashboard all run in infrastructure Hilt provisions in your account. No platform component is shared across customers, and no component is exposed to the public internet by default.
+
+---
+
+## Deployment model
+
+- **One tenant per account.** Each customer receives a dedicated deployment in their own AWS account, GCP project, Azure subscription, or Ali Cloud account. There is no shared multi-tenant plane and no Hilt-side copy of your data.
+- **Provisioned with Terraform.** Hilt applies a Terraform configuration to create the platform infrastructure (compute, streaming, database, storage, and private networking) in the account you nominate.
+- **You grant scoped access.** You provide a target account with the agreed IAM (or RAM) permissions per the deployment guide. Hilt operates within that scope.
+
+For cloud-specific provisioning and IAM detail, see the deployment guides: [AWS](/deployment/aws), [GCP](/deployment/gcp), [Azure](/deployment/azure), and [Ali Cloud](/deployment/ali-cloud).
+
+---
+
+## Components
+
+A deployment is made up of these logical components, all inside your account:
+
+| Component | Role |
+| :-- | :-- |
+| **Collectors** | Agents on your hosts that produce metadata-level telemetry (Linux static binary, macOS managed agent) |
+| **Ingest endpoint** | Private link endpoint that terminates collector connections; the only inbound path |
+| **Streaming buffer** | Durable event stream that decouples ingest from processing |
+| **Enrichment and scoring** | Workloads that normalize, enrich, and score events, and evaluate model drift |
+| **Analytics database** | Column store that holds normalized telemetry and findings |
+| **Dashboard** | Web application for investigation, detection rules, and administration, reached over private networking |
+| **Export pipeline (optional)** | Off by default; produces the opt-in anonymized export you approve |
+
+---
+
+## Per-cloud services
+
+The component roles above map to native managed services on each cloud. All variants keep traffic inside your account with no public internet exposure.
+
+| Role | AWS | GCP | Azure | Ali Cloud |
+| :-- | :-- | :-- | :-- | :-- |
+| Platform compute | EKS | GKE | AKS | ACK |
+| Event streaming | MSK (Kafka) | Pub/Sub | Event Hubs | Message Queue for Apache Kafka |
+| Private ingest | PrivateLink | Private Service Connect | Private Link | PrivateLink |
+| Analytics database | ClickHouse | ClickHouse | ClickHouse | ClickHouse |
+| Dashboard database | RDS (PostgreSQL) | Cloud SQL (PostgreSQL) | Azure Database for PostgreSQL | ApsaraDB RDS (PostgreSQL) |
+| Object storage | S3 | Cloud Storage | Blob Storage | OSS |
+| TLS and DNS | ACM, Route 53 | Certificate Manager | App Gateway / Front Door | PrivateLink, private DNS |
+| Service identity | IAM roles | Workload Identity | Managed Identity | RAM roles |
+
+---
+
+## Network boundaries
+
+- **Private ingest only.** Collectors connect to a private link endpoint (PrivateLink, Private Service Connect, or Private Link) in your account. There is no public ingest endpoint.
+- **No inbound internet.** No platform component accepts inbound connections from the public internet.
+- **Controlled outbound.** Outbound internet access is used only where needed for container image pulls, and is configurable to use private registries.
+- **Single collector destination.** A collector has exactly one outbound destination: the ingest endpoint, over HTTPS on TCP/443. DNS resolves inside your VPC through a private zone, so no DNS query leaks to public resolvers.
+
+For the collector's outbound posture, airgapped operation, and privilege model, see [Networking and security](/linux-collector/networking-security).
+
+---
+
+## Data flow
+
+Events travel one direction, from your hosts into your analytics store and dashboard, without leaving your account.
+
+```text
+  YOUR CLOUD ACCOUNT
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                                                                       │
+  │   Hosts                                                               │
+  │   ┌──────────────┐                                                    │
+  │   │  Collector   │  metadata events                                   │
+  │   │ (Linux/macOS)│ ──────────────┐                                    │
+  │   └──────────────┘   HTTPS 443    │                                   │
+  │                      (private link)│                                  │
+  │                                    ▼                                  │
+  │                          ┌──────────────────┐                        │
+  │                          │  Ingest endpoint  │                       │
+  │                          └─────────┬─────────┘                       │
+  │                                    ▼                                  │
+  │                          ┌──────────────────┐                        │
+  │                          │ Streaming buffer  │  (Kafka / Pub-Sub)    │
+  │                          └─────────┬─────────┘                       │
+  │                                    ▼                                  │
+  │                          ┌──────────────────┐                        │
+  │                          │  Enrichment and   │                       │
+  │                          │     scoring       │                       │
+  │                          └─────────┬─────────┘                       │
+  │                                    ▼                                  │
+  │                          ┌──────────────────┐      ┌──────────────┐  │
+  │                          │ Analytics database│◀────▶│  Dashboard   │  │
+  │                          │   (ClickHouse)    │      │ (private ALB) │  │
+  │                          └─────────┬─────────┘      └──────────────┘  │
+  │                                    ┊                                  │
+  │                                    ┊ opt-in, anonymized, approved     │
+  │                                    ▼                                  │
+  │                          ┌──────────────────┐                        │
+  │                          │  Export pipeline  │ ┄┄▶ to Hilt (opt-in)  │
+  │                          │   (off by default)│                       │
+  │                          └──────────────────┘                        │
+  │                                                                       │
+  └─────────────────────────────────────────────────────────────────────┘
+```
+
+The dotted path is the only route by which any data leaves your account, and it runs only when you opt in and approve each transfer. See [Data collection and handling](/trust-security/data-handling) for what flows through this pipeline and [Anonymized data export](/on-prem/data-export-overview) for the export controls.
+
+<Note>
+Service names vary by cloud (for example, the streaming buffer is MSK on AWS and Pub/Sub on GCP), but the data flow and trust boundary are identical: telemetry stays in your account.
+</Note>
+
+---
+
+## Data residency
+
+Telemetry does not leave your cloud account. Hilt does not receive, mirror, or hold out-of-band access to your events. The single exception is the [anonymized data export](/on-prem/data-export-overview), which is off by default and, when enabled, transfers only anonymized statistical features after your review and approval.

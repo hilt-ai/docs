@@ -1,0 +1,54 @@
+---
+title: "加密与密钥管理"
+sidebarTitle: "加密"
+description: "Hilt 如何对传输中和静态的数据加密、如何处理证书，以及密钥由谁持有。"
+---
+
+Hilt 使用您云提供商的原生能力对传输中和静态的数据进行加密。由于平台运行在您的账户中，加密密钥也保存在您的账户内。
+
+---
+
+## 传输中
+
+- **所有连接使用 TLS 1.2+。** 采集器到摄取的流量、仪表盘访问和内部服务流量均使用 TLS 1.2 或更高版本。
+- **私有网络。** 采集器遥测走私有链路路径（PrivateLink、Private Service Connect 或 Private Link），绝不穿越公网。参见[架构与数据流](/zh/trust-security/architecture)。
+- **采集器到摄取。** 采集器通过 HTTPS 走 TCP/443 连接到摄取端点。端点出示一张针对您私有区域签发的证书，采集器据您的 CA 证书链对其进行校验。参见[网络与安全](/zh/linux-collector/networking-security)。
+
+---
+
+## 证书
+
+证书使用各云的原生证书服务管理：AWS 上的 ACM、GCP 上的 Certificate Manager，以及 Azure 和阿里云上的等效服务。摄取证书针对与您 VPC 关联的私有 DNS 区域签发，因此名称解析和 TLS 校验都在您的账户内完成。
+
+---
+
+## 静态
+
+所有持久化存储都使用云原生的 KMS 托管密钥加密：
+
+| 存储层 | 加密 |
+| :-- | :-- |
+| 分析数据库（ClickHouse） | 在底层卷上静态加密 |
+| 流式缓冲（Kafka、Pub/Sub、Event Hubs） | 提供商托管的静态加密 |
+| 仪表盘数据库（PostgreSQL） | KMS 托管加密（RDS、Cloud SQL 或等效服务） |
+| 对象存储（S3、Cloud Storage、Blob、OSS） | KMS 托管的服务端加密 |
+
+部署中每个存储层默认启用静态加密。
+
+---
+
+## 密钥归属
+
+由于部署运行在您的云账户中，加密密钥位于您账户的密钥管理服务（AWS KMS、Cloud KMS、Azure Key Vault 或阿里云 KMS）中。Hilt 不会在您账户之外持有或托管您的密钥。
+
+存储使用提供商托管密钥还是客户托管密钥（CMK），可能因云和您的配置而异。若要使用由您定义轮换和访问策略的 CMK，请在预配时提出，并向您的 Hilt 代表确认各资源的支持情况。
+
+<Note>
+在您的 KMS 中撤销或限制某个密钥，会影响平台对其所保护数据的访问，因为这些密钥归您所有。请与您的 Hilt 代表协调密钥策略变更，以免中断部署。
+</Note>
+
+---
+
+## 部署中的密钥与凭据
+
+平台密钥与凭据（数据库凭据和服务身份）由 Terraform 预配到您云的原生密钥与身份服务中，并限定在该部署范围内。在平台支持的情况下，服务间认证使用云原生的工作负载身份（AWS 上的 IAM 角色、GCP 上的 Workload Identity、Azure 上的 Managed Identity、阿里云上的 RAM 角色），而非长期的共享凭据。参见部署指南：[AWS](/zh/deployment/aws)、[GCP](/zh/deployment/gcp)、[Azure](/zh/deployment/azure) 和 [阿里云](/zh/deployment/ali-cloud)。

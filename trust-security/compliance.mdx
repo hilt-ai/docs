@@ -1,0 +1,62 @@
+---
+title: "Compliance & legal"
+sidebarTitle: "Compliance"
+description: "How Hilt's deployment model shapes data residency, processing roles, privacy, certifications, and subprocessors."
+---
+
+Hilt's single-tenant, customer-owned deployment model shapes its compliance posture: your telemetry stays in your account, and the data Hilt itself processes is limited to the opt-in anonymized export. This page explains that posture and points to the materials available under NDA.
+
+<Note>
+This page is informational and does not replace your agreement with Hilt. The binding terms for data processing, certifications, and notification are in your contract and data processing agreement.
+</Note>
+
+---
+
+## Data residency and ownership
+
+Telemetry is generated, processed, and stored entirely within your cloud account. Hilt does not receive, mirror, or hold out-of-band access to your events. The data lives in the region of the account you provision, so data residency follows your own cloud footprint. See [Architecture and data flow](/trust-security/architecture).
+
+The single exception is the [anonymized data export](/on-prem/data-export-overview), which is off by default and, when enabled, transfers only anonymized statistical features after your review.
+
+---
+
+## Data processing roles
+
+Because the deployment runs in your account, you control the personal data within it. Two distinct cases apply:
+
+| Scenario | Hilt's role |
+| :-- | :-- |
+| Platform operating in your account | You own and control the telemetry; Hilt operates the platform under approval-gated access and does not hold a separate copy |
+| Opt-in anonymized export enabled | Hilt processes only the anonymized features you approve for transfer, which exclude identifiers (see what is never exported in the [export overview](/on-prem/data-export-overview)) |
+
+The formal controller and processor designations for your engagement are set out in your data processing agreement.
+
+---
+
+## Privacy
+
+Hilt's design minimizes exposure of personal data:
+
+- The collector captures metadata only, never file contents, packet payloads, environment variables, or credentials. See [Data collection and handling](/trust-security/data-handling).
+- Telemetry does not leave your account except through the opt-in export, which strips or remaps identifying values (host IDs, user IDs, and identity strings) before any transfer.
+- You can delete telemetry and exported data from your account at any time, because the storage is yours.
+
+For region-specific privacy commitments (for example, GDPR), request the relevant terms and the data processing agreement from your Hilt representative.
+
+---
+
+## Certifications and audit reports
+
+Certification status and third-party audit reports (for example, a SOC 2 report or a penetration test executive summary) are shared under NDA where available. Contact your Hilt representative to request the current set of attestations and reports for your evaluation. Hilt does not represent any certification it has not been formally awarded.
+
+---
+
+## Subprocessors
+
+The cloud provider you deploy on (AWS, GCP, Azure, or Ali Cloud) processes your data as part of running the infrastructure in your account, under your agreement with that provider. For any subprocessors Hilt itself uses in delivering and supporting the platform, request the current subprocessor list from your Hilt representative.
+
+---
+
+## Personnel access
+
+Hilt engineers reach your environment only through your approval workflow, with no standing access, and you can revoke that access through your own IAM controls. See [Access and identity](/trust-security/access-control). For commitments on personnel location or background screening, contact your Hilt representative.
