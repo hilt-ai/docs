@@ -1,0 +1,121 @@
+---
+title: "模型生命周期"
+sidebarTitle: "模型生命周期"
+description: "跟踪本地部署的 TRACE 检测模型：当前活动版本、更新进度、健康检查，以及版本的提升与回滚。"
+---
+
+展示本地部署的 **TRACE** 检测模型的生命周期：当前活动的版本、正在进行的更新、决定何时重新训练的自动健康检查，以及模型更新的历史记录。拥有相应权限的运维人员可以将影子版本提升为活动版本，或将活动版本回滚。页面标题为 **Model Lifecycle**，副标题为 _On-prem TRACE detection model: status, updates, and health checks_。
+
+## 权限
+
+本页面需要 **view audit** 权限。没有该权限时，本页面会从导航中隐藏，且无法通过 URL 访问。
+
+在本页面中，**view audit** 仅授予查看权限。**Promote shadow → active** 和 **Roll back active model** 控件还额外需要 **manage users**（用户管理）权限；缺少该权限时这两个按钮都会被禁用，并通过工具提示说明原因。
+
+视图会自动刷新：更新进行期间每 5 秒刷新一次，其余情况下每 30 秒刷新一次。
+
+---
+
+## Detection model（状态卡片）
+
+顶部卡片汇总当前唯一的活动模型。右上角的状态徽标反映整体健康状况：
+
+| 徽标 | 含义 |
+| --- | --- |
+| _Healthy_ | 已发布活动模型，且最近一次更新无异常 |
+| _Updating_ | 有训练运行正在进行 |
+| _Needs attention_ | 活动模型已被回滚，或最近一次更新失败或被搁置 |
+| _Not set up_ | 尚无活动模型 |
+
+### 空闲时
+
+没有更新正在运行时，卡片显示活动模型的详细信息：
+
+- **Active version**（活动版本）：模型版本字符串（等宽字体）。
+- **Published**（发布时间）：激活至今的时长（例如 _3 hr ago_）。
+- **Previous**（上一版本）：当前版本所接替的版本（如果存在，等宽字体）。
+
+如果尚无活动模型，卡片会显示 _No active model yet: the first training run will set one up._
+
+### 更新进行中
+
+当有训练运行正在进行时，卡片切换为实时进度：
+
+- 一行说明正在更新的版本（或 _No active version yet · first-time setup_）。
+- **Reason**（原因）：触发本次更新的原因（如有）。
+- 一条进度条，显示当前阶段标签、完成百分比，以及预计时间（_estimating…_、形如 _~N min left_ / _~N hr left_ 的估计，或在进度停滞时显示 _still working…_）。
+- 一个阶段清单（见下文）。
+
+#### 更新阶段
+
+每次更新经历四个阶段，以清单形式呈现，分别用对勾（已完成）、旋转图标（进行中）或空心圆（待处理）标记：
+
+| 阶段 | 含义 |
+| --- | --- |
+| _Preparing data_ | 组装训练数据集 |
+| _Learning_ | 训练候选模型 |
+| _Validating_ | 对候选模型运行质量检查 |
+| _Publishing_ | 激活通过验证的模型 |
+
+### 提升与回滚
+
+卡片底部有两个控件。两者都采用两步确认：第一次点击会显示 **Confirm promote** / **Confirm rollback** 以及一个 **Cancel** 按钮。
+
+| 控件 | 作用 | 启用条件 |
+| --- | --- | --- |
+| **Promote shadow → active** | 将影子模型设为活动模型 | 存在影子模型且你拥有 **manage users** 权限 |
+| **Roll back active model** | 恢复上一版本，或在没有可重新激活的归档版本时恢复内置的基础模型 | 存在活动模型且你拥有 **manage users** 权限 |
+
+成功时会通过 toast 确认结果（例如 _Promoted &lt;version&gt; to active_、_Rolled back to &lt;version&gt;_，或 _Rolled back to baked-in base model_）。失败时会通过 toast 报告错误，并重置该控件。
+
+---
+
+## Health checks（健康检查）
+
+一个可折叠卡片，汇总决定模型是否需要重新训练的自动检查。卡片头部显示 _All healthy_ 或 _N need attention_、检查总数，以及上次评估的时间。
+
+展开卡片会加载检查日志，按时间倒序排列，每页 10 条，提供 **Prev** / **Next** 翻页。每一行显示时间、决策，以及原因（如有）：
+
+| 图标 | 决策 |
+| --- | --- |
+| 绿色对勾 | _Update recommended_（该检查会触发重新训练） |
+| 灰色时钟 | _No update needed_ |
+| 红色叉号 | 已阻止（被阻止触发的检查） |
+
+如果没有任何记录，卡片会显示 _No health checks recorded._
+
+---
+
+## Updates（更新）
+
+一个列出过往及进行中模型更新的列表，按时间倒序排列，每次显示 10 条，并提供 **Show N more** 按钮。每一行以状态图标和时间戳开头：
+
+| 图标 | 状态 | 标题 |
+| --- | --- | --- |
+| 旋转图标 | 进行中 | _Update in progress_ |
+| 红色叉号 | 失败 | _Failed_，下方附带失败原因 |
+| 琥珀色三角 | 已搁置 | _Update held back: failed quality checks_（保留了上一版本） |
+| 绿色对勾 | 成功 | 结果标签（例如 _Update complete_） |
+
+副标题显示数据集规模（_N hosts · N samples_），失败运行则显示失败原因。
+
+### 更新详情
+
+点击某一行会展开为详情面板：
+
+- **Reason**：本次更新运行的原因。
+- **Outcome**：结果标签。
+- **Dataset**：使用的主机数与样本数。
+- **New version**：候选模型版本（等宽字体），运行期间显示为 _pending_。
+- **Failure**：失败原因，仅在失败运行中出现。
+- **Progress**：该次运行的四阶段清单，并在适用时标记失败的阶段。
+
+如果尚无更新，列表会显示 _No model updates yet._
+
+---
+
+## 空状态与错误状态
+
+- 页面加载时显示一个旋转图标。
+- 如果无法加载模型注册表，页面会显示 _Could not load the model registry._
+- 如果无法加载健康检查，展开的卡片会显示 _Could not load health checks._

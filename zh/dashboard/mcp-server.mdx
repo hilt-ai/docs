@@ -1,0 +1,114 @@
+---
+title: "MCP 服务器"
+sidebarTitle: "MCP 服务器"
+description: "通过 MCP 服务器将 AI 助手连接到 Hilt 遥测数据。"
+---
+
+Hilt 查询服务内置了一个 [Model Context Protocol](https://modelcontextprotocol.io)（MCP）服务器。它暴露与 [查询](/zh/dashboard/query) 页面相同的工具（15 个遥测工具加 2 个文档工具），因此任何兼容 MCP 的客户端（Cursor、Claude Desktop 或你自己的智能体）都可以搜索事件、调查异常、起草检测规则，并直接针对你的 Hilt 数据查询 Hilt 的工作原理。
+
+<Note>
+MCP 服务器目前处于**早期访问（early access）**阶段。它面向你受保护环境内的授权操作员使用。请联系你的客户团队获取访问权限和配置指导。
+</Note>
+
+---
+
+## 能力
+
+MCP 服务器通过 15 个遥测工具和 2 个文档工具提供只读访问：
+
+### 发现与事件
+
+| 工具 | 作用 |
+| --- | --- |
+| `list_hosts` | 列出受监控的主机及其最后一次出现的时间 |
+| `search_events` | 按过滤条件（事件类型、命令、身份、目的地址、文件前缀）搜索原始内核遥测数据 |
+| `get_event_detail` | 按复合键返回单个事件的完整载荷 |
+| `summarize_activity` | 高层计数：事件类型、事件总数、唯一用户/进程/主机数 |
+
+### 进程与用户
+
+| 工具 | 作用 |
+| --- | --- |
+| `get_process_tree` | 某主机在某时间窗口内的父子进程层级 |
+| `get_process_events` | 某个进程所做的一切：文件、网络、子进程 |
+| `list_users` | 活跃用户及其事件计数和主机访问模式 |
+| `user_activity` | 单个身份的详细活动：文件、进程、连接 |
+
+### 异常与调查
+
+| 工具 | 作用 |
+| --- | --- |
+| `get_anomaly_alerts` | 超过检测阈值的精选告警 |
+| `get_anomaly_scores` | 按检测分组的逐周期（per-epoch）异常分数 |
+| `get_alert_context` | 某告警前后时间窗口内的原始事件 |
+| `investigate_alert` | 一次调用的调查包：活动摘要、进程树、网络流和异常分数 |
+
+### 数据流
+
+| 工具 | 作用 |
+| --- | --- |
+| `get_network_flows` | 聚合的连接摘要：哪些进程到达了哪些目的地址、传输的字节数 |
+| `get_file_activity` | 文件的读取、打开、删除、重命名和权限更改，可按路径前缀过滤 |
+
+### 检测规则
+
+| 工具 | 作用 |
+| --- | --- |
+| `build_detection_rule` | 校验一份检测规则草稿并返回它。**不会保存该规则。** 请将草稿带到 [检测规则](/zh/dashboard/detection-rules) 页面进行审阅与创建 |
+
+### 文档
+
+这些工具根据随你的部署一同打包的文档来回答产品和操作类问题（“Hilt 如何工作”）。它们不含任何客户数据，并可完全离线工作。
+
+| 工具 | 作用 |
+| --- | --- |
+| `search_docs` | 搜索 Hilt 产品文档，返回带有页面路径和章节的排序结果，便于引用 |
+| `get_doc_page` | 按路径返回某文档页面的完整文本（或单个章节） |
+
+---
+
+## 客户端配置
+
+一个典型的 MCP 客户端条目（Cursor、Claude Desktop 或类似工具）：
+
+```json
+{
+  "mcpServers": {
+    "hilt": {
+      "command": "/path/to/hilt-query",
+      "env": {
+        "MODE": "mcp"
+      }
+    }
+  }
+}
+```
+
+请联系你的客户团队，以获取适用于你部署的正确二进制文件路径和环境配置。
+
+---
+
+## 示例提示词
+
+连接之后，你可以向你的 AI 助手提出这样的问题：
+
+- “过去 24 小时内有哪些主机处于活跃状态？”
+- “显示从 web-01 到外部目的地址的网络流”
+- “调查最近的一条异常告警。发生了什么？”
+- “列出今天 prod-db-03 上 /etc/ 下的所有文件活动”
+- “为午夜后连接到新外部 IP 的进程起草一条检测规则”
+
+---
+
+## 验证服务器
+
+你可以用一次 JSON-RPC 握手对协议进行冒烟测试：
+
+```bash
+MODE=mcp ./hilt-query <<'EOF'
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
+{"jsonrpc":"2.0","id":2,"method":"tools/list"}
+EOF
+```
+
+一个健康的服务器会返回握手响应和工具目录。

@@ -1,0 +1,112 @@
+---
+title: "Audit Log"
+sidebarTitle: "Audit Log"
+description: "Review who signed in and what authentication and administrative actions they took, grouped by session."
+---
+
+The audit trail for account activity. The Audit Log records authentication events and administrative actions (who did what, and when), groups them into per-user sessions, and lets you filter by time, username, and action type. This page requires the **view audit** permission.
+
+<Note>
+The Audit Log is currently reachable only on demo backends. On a live deployment the route redirects to [Overview](/dashboard/overview). The page reads from the real `/admin/audit` endpoint when available, so it documents an actual feature, not placeholder UI.
+</Note>
+
+---
+
+## Header
+
+The header shows the title **Audit Log** and the subtitle _"Authentication and administrative actions grouped by session"_, with a time-range toggle on the right.
+
+### Time range
+
+A segmented toggle scopes the log to recent activity:
+
+| Option | Window |
+| --- | --- |
+| **All time** | No time bound |
+| **5m** | Last 5 minutes |
+| **15m** | Last 15 minutes |
+| **1h** | Last hour |
+| **6h** | Last 6 hours |
+| **24h** | Last 24 hours (default) |
+
+The window is anchored to the current time and refreshes automatically.
+
+---
+
+## Filter bar
+
+Below the header, a filter bar narrows what's shown:
+
+- **Search by username**: a text box that matches usernames by case-insensitive substring. Input is debounced before it applies.
+- **Action filter**: a dropdown defaulting to **All actions**. Selecting a single action keeps only sessions that contain at least one entry of that type (see [Action types](#action-types)).
+- A count summary reads _"{n} sessions · {n} entries"_, reflecting the current filters.
+
+The list refreshes every 30 seconds and after any filter change.
+
+---
+
+## Sessions list
+
+Entries are grouped into sessions per user. A session normally runs from a **login** to the matching **logout**; an unclosed login is shown as still active, and administrative actions that have no surrounding login are collected into a separate **Admin actions** group. Sessions are ordered newest first, and the topmost session is expanded by default.
+
+### Session header
+
+Each session is a card. The header row shows:
+
+- A round **avatar** with the user's first initial.
+- The **username**.
+- A **status badge**:
+
+| Badge | Meaning |
+| --- | --- |
+| _Active_ | Session has a login but no logout yet |
+| _Ended_ | Session has both a login and a logout |
+| _Admin actions_ | Administrative actions with no login anchor |
+
+- A **relative time** (for example _"2h ago"_), prefixed with a sign-in icon for normal sessions or a clock icon for the **Admin actions** group.
+- When collapsed, an inline **event strip**: a left-to-right row of colored dots and short action labels summarizing the session's entries.
+
+Click anywhere on the header to expand or collapse the session.
+
+### Session timeline
+
+Expanding a session reveals a vertical timeline of its entries in chronological order. Each entry shows:
+
+- An **action badge**, colored by action type.
+- A monospace **timestamp** (hour:minute:second).
+- An optional **detail** line describing the action.
+
+When a session spans more than one day, a **date separator** (for example _Today_, _Yesterday_, or a weekday-month-day label) marks where the date changes.
+
+---
+
+## Action types
+
+Each entry carries an action. The action filter and the badges use these types:
+
+| Action | Group |
+| --- | --- |
+| _Login_ | Authentication |
+| _Logout_ | Authentication |
+| _Run query_ | Analyst activity |
+| _View report_ | Analyst activity |
+| _View investigation_ | Analyst activity |
+| _Acknowledge alert_ | Analyst activity |
+| _Export data_ | Analyst activity |
+| _Create user_ | Admin action |
+| _Update user_ | Admin action |
+| _Reset password_ | Admin action |
+| _Delete user_ | Admin action |
+| _Create team_ | Admin action |
+| _Update team_ | Admin action |
+| _Delete team_ | Admin action |
+| _Set team nodes_ | Admin action |
+
+Colors are consistent between the collapsed event strip and the expanded timeline badges, so an action looks the same wherever it appears. The administrative actions correspond to operations on the [User Management](/administration/user-management) and [Teams](/administration/teams) pages.
+
+---
+
+## States
+
+- **Loading**: a centered spinner while the log loads.
+- **Empty**: a shield icon and _"No sessions match your filters."_ when nothing matches the current time range, username, and action filter.

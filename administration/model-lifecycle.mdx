@@ -1,0 +1,121 @@
+---
+title: "Model Lifecycle"
+sidebarTitle: "Model Lifecycle"
+description: "Track the on-prem TRACE detection model: its active version, update progress, health checks, and promote or roll back versions."
+---
+
+Shows the lifecycle of the on-prem **TRACE** detection model: the version that is currently active, any update in progress, the automatic health checks that decide when to retrain, and the history of model updates. Operators with the right permission can promote a shadow version to active or roll the active version back. The page header reads **Model Lifecycle**, with the subtitle _On-prem TRACE detection model: status, updates, and health checks_.
+
+## Permissions
+
+This page requires the **view audit** permission. Without it the page is hidden from the nav and by URL.
+
+Viewing is all that **view audit** grants here. The **Promote shadow → active** and **Roll back active model** controls additionally require the **manage users** (user-management) permission; without it both buttons are disabled, with a tooltip explaining why.
+
+The view refreshes on its own: every 5 seconds while an update is running, and every 30 seconds otherwise.
+
+---
+
+## Detection model (status hero)
+
+The top card summarizes the single active model. A status pill in its top-right corner reflects overall health:
+
+| Pill | Meaning |
+| --- | --- |
+| _Healthy_ | An active model is published and the last update was clean |
+| _Updating_ | A training run is in progress |
+| _Needs attention_ | The active model was rolled back, or the last update failed or was held back |
+| _Not set up_ | No active model yet |
+
+### When idle
+
+With no update running, the card shows the active model's details:
+
+- **Active version**: the model version string (monospace).
+- **Published**: how long ago it was activated (for example, _3 hr ago_).
+- **Previous**: the version it succeeded, when one exists (monospace).
+
+If there is no active model yet, the card reads _No active model yet: the first training run will set one up._
+
+### While updating
+
+When a training run is in progress, the card switches to live progress:
+
+- A line naming the version being updated (or _No active version yet · first-time setup_).
+- **Reason**: why the update was triggered, when available.
+- A progress bar with the current phase label, percent complete, and an ETA (_estimating…_, a _~N min left_ / _~N hr left_ estimate, or _still working…_ if progress has stalled).
+- A phase checklist (see below).
+
+#### Update phases
+
+Each update moves through four phases, shown as a checklist with a tick (done), a spinner (active), or an empty circle (pending):
+
+| Phase | Meaning |
+| --- | --- |
+| _Preparing data_ | Assembling the training dataset |
+| _Learning_ | Training the candidate model |
+| _Validating_ | Running quality checks on the candidate |
+| _Publishing_ | Activating the validated model |
+
+### Promote and roll back
+
+Two controls sit at the bottom of the card. Each uses a two-step confirm: the first click reveals **Confirm promote** / **Confirm rollback** alongside a **Cancel** button.
+
+| Control | What it does | Enabled when |
+| --- | --- | --- |
+| **Promote shadow → active** | Makes the shadow model the active one | A shadow model exists and you have **manage users** |
+| **Roll back active model** | Restores the previous version, or the baked-in base model when there is no archived version to reactivate | An active model exists and you have **manage users** |
+
+On success a toast confirms the result (for example, _Promoted &lt;version&gt; to active_, _Rolled back to &lt;version&gt;_, or _Rolled back to baked-in base model_). On failure a toast reports the error and the control resets.
+
+---
+
+## Health checks
+
+A collapsible card summarizing the automatic checks that decide whether the model should retrain. The header shows either _All healthy_ or _N need attention_, the total number of checks, and when checks were last evaluated.
+
+Expanding the card loads the check log, newest first, 10 per page with **Prev** / **Next** paging. Each row shows the time, the decision, and (when present) the reason:
+
+| Icon | Decision |
+| --- | --- |
+| Green tick | _Update recommended_ (the check would trigger a retrain) |
+| Grey clock | _No update needed_ |
+| Red cross | Blocked (a check that was prevented from triggering) |
+
+If nothing is recorded, the card reads _No health checks recorded._
+
+---
+
+## Updates
+
+A list of past and in-progress model updates, newest first, showing 10 at a time with a **Show N more** button. Each row leads with a status icon and a timestamp:
+
+| Icon | State | Title |
+| --- | --- | --- |
+| Spinner | Running | _Update in progress_ |
+| Red cross | Failed | _Failed_, with the failure reason beneath |
+| Amber triangle | Held back | _Update held back: failed quality checks_ (the previous version was kept) |
+| Green tick | Succeeded | The outcome label (for example, _Update complete_) |
+
+The subtitle shows the dataset size (_N hosts · N samples_), or for a failed run the failure reason.
+
+### Update detail
+
+Clicking a row expands it to a detail panel:
+
+- **Reason**: why the update ran.
+- **Outcome**: the result label.
+- **Dataset**: hosts and samples used.
+- **New version**: the candidate model version (monospace), or _pending_ while it runs.
+- **Failure**: the failure reason, on failed runs only.
+- **Progress**: the four-phase checklist for that run, with the failed phase marked when applicable.
+
+If there are no updates yet, the list reads _No model updates yet._
+
+---
+
+## Empty and error states
+
+- While the page loads, a spinner is shown.
+- If the model registry cannot be loaded, the page reads _Could not load the model registry._
+- If health checks cannot be loaded, the expanded card reads _Could not load health checks._

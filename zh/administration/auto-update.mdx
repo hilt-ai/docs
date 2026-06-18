@@ -1,0 +1,65 @@
+---
+title: "Auto-Update"
+sidebarTitle: "Auto-Update"
+description: "从仪表盘开启或关闭本部署的采集器自动更新代理。"
+---
+
+用于控制采集器自动更新代理的单一面板内开关。代理开启时，会按其自身的计划检查新的 Hilt 版本并推出更新；关闭时，代理仍保持计划状态，但在重新开启前不执行任何操作。本页面读取并写入这一项设置，并显示最近一次修改者。
+
+本页面位于面板内。关于代理的运行机制（其运行方式、版本策略和推出流程），请参阅本地部署指南：[自动更新代理概览](/zh/on-prem/auto-update-overview)、[前提条件](/zh/on-prem/auto-update-prerequisites)、[工作流](/zh/on-prem/auto-update-workflow) 以及 [运维](/zh/on-prem/auto-update-operations)。
+
+## 权限
+
+- **View audit**（查看审计）：打开本页面所必需（用于在导航中显示以及通过 URL `/admin/auto-update` 访问）。缺少该权限时页面会被隐藏。
+- **Manage users**（管理用户）：修改该开关所必需。仅有只读访问权限时，你可以查看当前状态和历史记录，但 On/Off 控件将拒绝修改。
+
+当你可以查看但无法修改该设置时，会显示一条琥珀色提示：_"You can view this setting but need user-management permission to change it."_（你可以查看此设置，但需要用户管理权限才能修改）。
+
+---
+
+## 可用性
+
+只有当部署已配置该代理时，自动更新功能才会出现。如果未配置，页面会显示：
+
+> **Auto-update is not available on this deployment**（此部署不支持自动更新）
+
+随后附上后端返回的原因。这种情况下没有任何可配置项。
+
+---
+
+## 状态卡片
+
+当代理可用时，页面会显示一张展示当前状态和开关的卡片。
+
+| 元素 | 内容 |
+| --- | --- |
+| **状态图标** | 一个电源图标，开启时为绿色，关闭时为灰色 |
+| **Automatic updates on / off** | 以纯文本显示的当前状态 |
+| **状态说明** | 开启时为 _"The agent checks for new releases on its schedule and rolls them out."_（代理按其计划检查新版本并推出更新），关闭时为 _"The agent stays scheduled but takes no action until you turn it back on."_（代理保持计划状态，但在你重新开启前不执行任何操作） |
+| **On / Off 开关** | 用于修改该设置的分段控件 |
+
+页面大约每 30 秒刷新一次状态，因此在别处所做的修改会自动显示出来。
+
+---
+
+## 开启或关闭自动更新
+
+使用卡片右侧的 **On** / **Off** 分段开关。
+
+- 选择当前已处于的状态不会有任何效果。
+- 修改成功后会显示一条提示（_"Auto-update enabled"_ 或 _"Auto-update disabled"_），卡片随即就地更新。
+- 修改保存期间，开关旁会出现一个加载指示器。
+- 若缺少 **manage users**（管理用户）权限，修改将被拒绝，并显示提示 _"Requires user-management permission to change this"_（修改此项需要用户管理权限），状态保持不变。
+
+代理在部署创建之时起即**默认开启**。
+
+---
+
+## 修改历史
+
+卡片底部的一行会记录最近一次修改：
+
+- **Last changed _时间_ by _用户_.**：设置被修改后显示，标明修改的时间与修改者。
+- **On by default since deployment.**：从未被修改时显示。
+
+这是本页面显示的唯一历史记录；此处没有按版本划分的日志。关于推出状态和运行历史，请使用本地部署的 [运维](/zh/on-prem/auto-update-operations) 指南。

@@ -1,0 +1,120 @@
+name: Auto-document new dashboard pages
+
+# Keeps the docs in sync with the Hilt dashboard frontend. On a schedule (or
+# when the frontend repo pings us, or on manual run) it diffs the app's sidebar
+# nav against this repo. If a page in the app has no docs, Claude drafts the
+# English + Chinese pages, wires up the navigation, and opens a PR for review.
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions):
+#   ANTHROPIC_API_KEY    - API key for the drafting step
+#   FRONTEND_REPO_TOKEN  - PAT (or GitHub App token) with read access to
+#                          hilt-ai/dag-frontend, used to check it out here
+#
+# To have a frontend merge trigger this immediately, add a workflow in
+# dag-frontend that sends a repository_dispatch of type `frontend-page-added`
+# to this repo (see AUTODOCS.md).
+
+on:
+  schedule:
+    - cron: "0 7 * * 1" # Mondays 07:00 UTC
+  workflow_dispatch: {}
+  repository_dispatch:
+    types: [frontend-page-added]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      gaps: ${{ steps.detect.outputs.gaps }}
+    steps:
+      - name: Checkout docs
+        uses: actions/checkout@v4
+
+      - name: Checkout dashboard frontend
+        uses: actions/checkout@v4
+        with:
+          repository: hilt-ai/dag-frontend
+          token: ${{ secrets.FRONTEND_REPO_TOKEN }}
+          path: .frontend
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Detect undocumented pages
+        id: detect
+        run: |
+          set +e
+          node scripts/detect-undocumented-pages.mjs --frontend .frontend --json > report.json
+          code=$?
+          echo "----- coverage report -----"
+          cat report.json
+          if [ "$code" -eq 1 ]; then
+            echo "gaps=true" >> "$GITHUB_OUTPUT"
+          elif [ "$code" -eq 0 ]; then
+            echo "gaps=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Detector errored (exit $code)"; exit "$code"
+          fi
+
+      - name: Upload report
+        if: steps.detect.outputs.gaps == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: report.json
+
+  draft:
+    needs: detect
+    if: needs.detect.outputs.gaps == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout docs
+        uses: actions/checkout@v4
+
+      - name: Checkout dashboard frontend
+        uses: actions/checkout@v4
+        with:
+          repository: hilt-ai/dag-frontend
+          token: ${{ secrets.FRONTEND_REPO_TOKEN }}
+          path: .frontend
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Download report
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+
+      - name: Draft docs and open PR
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # The coverage report is at ./report.json; the frontend is at ./.frontend
+          prompt: |
+            You are maintaining the Hilt client-facing docs repo. Follow the
+            standard operating procedure in .github/docs-agent/new-page-docs-prompt.md
+            exactly. The deterministic coverage report listing the new/undocumented
+            pages is in ./report.json. The dashboard frontend source is checked out
+            at ./.frontend (research each page under ./.frontend/src/pages).
+
+            For every page in report.json "gaps":
+              1. Research the page component to learn its real UI.
+              2. Create the English doc and a faithful Chinese translation.
+              3. Update dashboard/layout.mdx + zh/dashboard/layout.mdx (or the
+                 administration equivalents) and docs.json navigation in both
+                 languages, in the correct sidebar group.
+            Then run `node scripts/detect-undocumented-pages.mjs --frontend .frontend`
+            and confirm it exits 0. Create a new branch, commit, and open ONE pull
+            request titled "docs: add documentation for new dashboard pages" that
+            lists each page added. Do not touch unrelated files.
+          claude_args: "--allowedTools Read,Write,Edit,Glob,Grep,Bash"

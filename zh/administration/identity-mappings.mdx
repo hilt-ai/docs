@@ -1,0 +1,122 @@
+---
+title: "Identity Mapping"
+sidebarTitle: "Identity Mapping"
+description: "将机器身份关联到 Okta 目录用户，审核建议的匹配，并标注账户类型。"
+---
+
+通过将主机上观察到的原始身份（Linux 用户名、Teleport 会话、SSH IP）关联到 Okta 企业目录中的人员，来厘清「谁是谁」。确认或拒绝建议的匹配，为每个身份分类账户类型，并添加手动映射。本页面需要 **manage users** 权限。
+
+---
+
+## Okta 目录栏
+
+页面顶部有一个状态栏，展示 Okta 同步的状态：
+
+- **Okta Directory** 及 **N users** 徽章：上次同步拉取到的目录用户数量。
+- **Last sync**：自上次同步以来的相对时间（若从未同步则为 _Never_）。
+- **Sync Now**：触发一次按需 Okta 同步。同步运行期间按钮会旋转，每次同步后都会自动重新评估映射。
+
+同步状态会自行刷新，约每 30 秒一次。
+
+---
+
+## 统计汇总
+
+在目录栏下方，有一行汇总统计当前映射：
+
+| 统计项 | 含义 |
+| --- | --- |
+| **N mappings** | 身份映射总数 |
+| **N confirmed** | 操作员已确认的映射（绿色） |
+| **N needs review** | 等待审核的建议映射（琥珀色） |
+| **Type: N** | 当前存在的每种账户类型的计数（_Verified_、_Machine_、_Shared_、_Service_、_Unknown_） |
+
+---
+
+## 过滤
+
+表格上方的工具栏用于缩小列表范围：
+
+- **状态切换**：_All_、_Needs Review_（未确认的建议）或 _Confirmed_。
+- **搜索**：按身份过滤，匹配原始身份文本。
+- **类型（Type）**：按账户类型过滤，或选择 _All types_。选项为 _Verified_、_Machine_、_Shared_、_Service_ 和 _Unknown_。
+- **Manual Mapping**：打开创建表单（见 [创建手动映射](#创建手动映射)）。
+
+列表最多加载 200 条映射。当存在更多时，页脚显示 `Showing N of M`。
+
+---
+
+## 映射表格
+
+每行对应一个已解析的身份：
+
+| 列 | 内容 |
+| --- | --- |
+| **Identity** | 主机上观察到的原始身份，以等宽字体显示 |
+| **Source** | 身份的来源（见下方来源取值） |
+| **Mapped To** | 匹配的 Okta 用户，形式为 `全名 (邮箱)`、仅邮箱，或在未映射时显示 `—` |
+| **Match** | 关联建立的方式（见下方匹配取值） |
+| **Type** | 可编辑的账户类型标签（见 [账户类型](#账户类型)） |
+| **Status** | _Confirmed_（绿色）或 _Suggested_（琥珀色） |
+| **Actions** | 确认、拒绝和删除控件 |
+
+### 来源取值
+
+| 来源 | 出处 |
+| --- | --- |
+| **Linux** | 主机上的 Linux 用户名 |
+| **Teleport** | Teleport 会话 |
+| **PPID chain** | 通过父进程链解析 |
+| **Owner** | Teleport 会话属主 |
+| **SSH IP** | 根据 SSH 源 IP 推断 |
+
+### 匹配取值
+
+| 匹配 | 含义 |
+| --- | --- |
+| **Email match** | 与目录的邮箱精确匹配 |
+| **Login match** | 按登录名匹配 |
+| **Manual** | 由操作员创建或关联 |
+| **None** | 无目录匹配 |
+
+### 账户类型
+
+**Type** 单元格是一个可就地修改的下拉框。更新后会立即为该身份重新打标签。
+
+| 类型 | 颜色 | 适用于 |
+| --- | --- | --- |
+| _Verified_ | 绿色 | 已确认的个人 |
+| _Machine_ | 灰色 | 机器或自动化账户 |
+| _Shared_ | 蓝色 | 多人共用的共享账户 |
+| _Service_ | 紫色 | 服务或守护进程账户 |
+| _Unknown_ | 灰色 | 尚未分类 |
+
+### 行操作
+
+每行右侧的控件：
+
+| 操作 | 显示时机 | 效果 |
+| --- | --- | --- |
+| **Confirm**（对勾） | 仅建议行 | 接受映射并标记为 _Confirmed_ |
+| **Reject**（X） | 仅建议行 | 拒绝建议的匹配 |
+| **Delete**（垃圾桶） | 始终 | 移除映射 |
+
+已确认的行只显示删除控件。
+
+### 空状态
+
+- 当尚无任何映射时：_No identity mappings yet. Mappings are created automatically after each Okta sync._
+- 当过滤条件排除了所有内容时：_No mappings match your filters._
+
+---
+
+## 创建手动映射
+
+**Manual Mapping** 会打开一个内联表单（再次点击或点击 **X** 即可关闭）。用它来自行为身份打标签，或将某个身份关联到指定的 Okta 用户。字段包括：
+
+- **Identity**（必填）：要映射的原始身份，例如 `dev`。
+- **Source**：_Linux Username_、_Teleport Session_、_PPID Chain_、_Teleport Owner_ 或 _SSH IP_。默认为 _Linux Username_。
+- **Okta User**：选择一个目录用户进行关联，或选择 _None (label only)_ 以仅为身份分类而不关联到具体人员。
+- **Type**：_Verified User_、_Shared Account_、_Service Account_ 或 _Unknown_。默认为 _Unknown_。
+
+**Create** 保存映射并将其加入表格。Identity 为必填项；未填写即提交会显示错误。

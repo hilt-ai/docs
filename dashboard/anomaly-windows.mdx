@@ -1,0 +1,65 @@
+---
+title: "Anomaly Windows"
+sidebarTitle: "Anomaly Windows"
+description: "Mute behavioral (ML) anomalies fleet-wide during recurring time windows."
+---
+
+A global control for muting behavioral (machine-learning) anomalies during recurring weekly windows, such as a nightly maintenance batch or a known weekly job that always trips the models. While a window is active, those anomalies are hidden from the [Anomalies](/dashboard/anomalies) page for every host. In the app this page sits under **Anomaly Windows** in the Security nav; its header reads **Behavioral Anomaly Suppression**.
+
+## Permissions
+
+This page requires the **manage alerts** permission. Without it, the page is hidden from the nav and by URL.
+
+---
+
+## What suppression does
+
+While a window is active, behavioral (ML) anomalies are hidden from the Anomalies page. **Detection-rule alerts and raw anomaly scores are unaffected**; only the model-driven findings are muted, and only during the scheduled windows. Suppression is global: it applies to every host in the fleet, not a selected subset.
+
+This is separate from the per-finding **Suppressed** filter on the Anomalies page, which hides individual findings you have dismissed through feedback.
+
+---
+
+## Status
+
+The **Status** toggle chooses whether suppression is active at all:
+
+| Option | Behavior |
+| --- | --- |
+| **Always show anomalies** | No suppression; every behavioral anomaly surfaces on the Anomalies page. This is the default. |
+| **Suppress on a schedule** | Hide behavioral anomalies during the windows defined below. |
+
+Selecting **Suppress on a schedule** reveals the schedule builder.
+
+---
+
+## Schedule
+
+The schedule defines the recurring weekly windows, evaluated in a chosen timezone.
+
+- **When the windows apply**: a **Suppress during** / **Active only during** toggle (labeled _When the rule should_). **Suppress during** mutes anomalies inside the windows and shows them the rest of the time; **Active only during** inverts that. Defaults to **Suppress during**.
+- **Timezone**: the IANA timezone the windows are evaluated in. Defaults to your browser's zone.
+
+### Windows
+
+Each **Window** is a set of weekdays plus a time range:
+
+- **Day buttons**: **Mon** through **Sun**; selected days are highlighted green. A new window defaults to **Mon–Fri**.
+- **From** / **To**: the start and end time of day. A new window defaults to *09:00–17:00*. If **To** is at or before **From**, the window wraps past midnight into the next day (noted inline).
+- **Add window**: append another window. Once more than one exists, each carries a trash icon to remove it.
+
+A summary line at the bottom of the builder restates the effect in plain language: *The rule is suppressed during the windows above and fires at all other times (evaluated in your timezone)*, or, in **Active only during** mode, *The rule can only fire during the windows above*.
+
+---
+
+## Saving
+
+The footer shows **Last changed by** *(name)* once the setting has been edited before, alongside the **Save** button. A successful save confirms with a *Suppression window saved* toast.
+
+When **Suppress on a schedule** is selected, the schedule is validated before it saves:
+
+| Message | Cause |
+| --- | --- |
+| _Add at least one time window._ | No windows are defined |
+| _Each window needs at least one day selected._ | A window has no weekdays |
+| _Window start and end times must differ._ | A window's **From** and **To** are identical |

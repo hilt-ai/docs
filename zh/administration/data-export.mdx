@@ -1,0 +1,119 @@
+---
+title: "Data Export"
+sidebarTitle: "Data Export"
+description: "在任何数据共享给 Hilt 之前，审查、批准或删除暂存于您自有 S3 存储桶中的匿名化数据导出。"
+---
+
+在暂存的匿名化导出离开您的基础设施之前对其进行审查。每个导出都是您遥测数据的匿名化统计快照，写入您自有的 S3 存储桶，您可以对其进行检查、批准（即同意共享给 Hilt）或删除。在您批准之前，不会传输任何内容。路由：`/admin/data-export`。
+
+本页面介绍仪表盘内的审查 UI。关于导出管道本身（采集了哪些数据、如何匿名化以及产物 schema），请参阅[匿名化数据导出](/zh/on-prem/data-export-overview)、[实现](/zh/on-prem/data-export-implementation)和[Schema](/zh/on-prem/data-export-schema)。
+
+## 权限
+
+打开本页面（在导航中及通过 URL 访问）需要 **view audit** 权限。没有该权限时，本页面将被隐藏。
+
+**Approve export** 和 **Delete (reject)** 操作还额外需要 **user-management** 权限。没有该权限时，这两个按钮均被禁用，其提示为 _"Requires user-management permission"_；但您仍可浏览导出、清单（manifest）以及样本。
+
+---
+
+## 启用该功能
+
+数据导出为可选启用项，默认处于关闭状态。当其被禁用（或列表加载失败）时，本页面会显示 **Could not load data exports**，并附带启用命令：
+
+```
+terraform -chdir=envs/app apply -var data_export_enabled=true
+```
+
+启用后，导出由一个定时 CronJob 生成。列表每 30 秒刷新一次。
+
+---
+
+## 空状态
+
+当功能已启用但没有暂存的导出时，本页面会显示 **No staged exports**，并说明如何按需触发一次导出：
+
+```
+kubectl create job --from=cronjob/dag-data-export dag-data-export-$(date +%s)
+```
+
+产物会落入您 S3 存储桶的 `exports/` 目录下，并在此处显示以供审查。
+
+---
+
+## 导出选择器
+
+当存在导出时，页面顶部会有一排按钮，供您在各个导出之间切换。每个按钮显示 **export ID**（等宽字体，例如 `exp-20260610-001`）以及一个状态图标：
+
+| 图标 | 含义 |
+| --- | --- |
+| 绿色对勾 | 已批准 |
+| 琥珀色时钟 | 等待审查 |
+
+默认选中第一个导出。选择某个导出后，会在下方加载其清单和一份新的样本。
+
+---
+
+## 清单面板（Manifest）
+
+所选导出的清单以一排状态药丸（pill）开头，随后是一个字段网格。
+
+### 状态药丸
+
+| 药丸 | 含义 |
+| --- | --- |
+| _anonymized_（绿色） | 已应用主机/uid 重映射和时间抖动 |
+| _not anonymized_（琥珀色） | 尚未进行匿名化；批准被阻止 |
+| _approved by &lt;user&gt; · &lt;time&gt;_（绿色） | 已记录同意，附带批准人及时间戳 |
+| _awaiting review_（石板色） | 尚未批准 |
+| _transferred to Hilt · &lt;time&gt;_（天蓝色） | 已批准且已传输给 Hilt 的导出，附带时间 |
+
+_transferred_ 药丸仅在 CronJob 的传输扫描已将某个已批准的导出发送出去后才会出现。
+
+### 清单字段
+
+| 字段 | 内容 |
+| --- | --- |
+| **Created** | 导出生成的时间 |
+| **Date range** | 所覆盖遥测时间窗口的开始 → 结束 |
+| **Rows** | 导出中的行数 |
+| **Hosts** | 不同主机的数量 |
+| **Temporal jitter** | 从每个时间戳中减去的统一偏移量（以小时计），记录此值以便您重建真实时间 |
+| **Archive size** | 导出归档的大小（B/KB/MB/GB/TB） |
+| **Format** | 产物格式（例如 `parquet`） |
+| **SHA-256** | 归档的校验和（等宽字体） |
+
+### 列（Columns）
+
+网格下方的 **Columns (&lt;n&gt;)** 以等宽字体的标签块列出每个导出的列。其后可能跟随两条说明：
+
+- **Zero-filled slots**：schema 中存在但本次导出写为零的列。
+- **Never exported**：提醒在导出前被剥离的数据类别（例如原始 IP、用户名、文件路径、命令行）。
+
+---
+
+## 操作
+
+清单下方有一个操作栏，说明操作后果并提供两个按钮：
+
+> Approving records consent in the manifest. The data stays in your bucket either way; deleting removes every staged file so nothing ever reaches Hilt.
+
+| 操作 | 效果 |
+| --- | --- |
+| **Approve export** | 记录您已审查该导出并同意共享。批准正是允许传输扫描将其发送给 Hilt 的前提。 |
+| **Delete (reject)** | 从您的存储桶中移除该导出的每一个暂存文件，使其不会到达 Hilt。 |
+
+每个操作都需要二次确认：按钮会被替换为 **Confirm approve** / **Confirm delete** 以及 **Cancel**。操作成功后会有一条 toast 提示确认（删除还会报告移除了多少个对象）。
+
+在以下情况下，**Approve export** 被禁用：
+
+- 您缺少 **user-management** 权限，
+- 该导出处于 _not anonymized_ 状态（提示：_"Approval is blocked: this export has not been anonymized (host/uid remap + temporal jitter)"_），或
+- 该导出已被批准（提示会注明批准人）。
+
+---
+
+## 样本（前 20 行）
+
+**Sample (first 20 rows)** 表格预览实际导出的行，便于您在批准前验证匿名化。各列遵循清单的列顺序。单元格以紧凑方式渲染：数组值（例如打包的 `zscores` 向量）会被缩略显示，空值则显示为短横线。
+
+如果样本无法加载，表格会显示 **Could not load the sample for this export.**；如果没有任何行，则显示 **No sample rows found.**
