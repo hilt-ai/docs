@@ -12,9 +12,9 @@ How Hilt finds threats, how it measures its own performance, and what you can do
 
 Hilt does not rely on signatures or known-bad lists. Instead, two complementary engines work together to detect threats:
 
-A **statistical engine** builds a rolling behavioral baseline for each host — tracking process execution patterns, network destinations, file access, data movement, and dozens of derived behavioral signals. It scores each new observation against that baseline using statistical methods tuned for count data, temporal patterns, and correlated features. When behavior deviates from the baseline, the statistical engine quantifies how unusual it is.
+A **statistical engine** builds a rolling behavioral baseline for each host, tracking process execution patterns, network destinations, file access, data movement, and dozens of derived behavioral signals. It scores each new observation against that baseline using statistical methods tuned for count data, temporal patterns, and correlated features. When behavior deviates from the baseline, the statistical engine quantifies how unusual it is.
 
-A **detection model** trained on your environment's behavioral data learns deeper temporal patterns that statistical baselines alone cannot capture — sequences of activity that look individually normal but are collectively anomalous, or subtle shifts that emerge over multiple observation windows. The model scores each epoch independently and combines its assessment with the statistical engine's output using a mathematically rigorous combination method that accounts for dependencies between signals.
+A **detection model** trained on your environment's behavioral data learns deeper temporal patterns that statistical baselines alone cannot capture: sequences of activity that look individually normal but are collectively anomalous, or subtle shifts that emerge over multiple observation windows. The model scores each epoch independently and combines its assessment with the statistical engine's output using a mathematically rigorous combination method that accounts for dependencies between signals.
 
 Together, these engines catch a wider range of threats than either could alone. The statistical engine is fast and interpretable; the detection model adds judgment about patterns that require learning from data. A **finding** appears on the [Anomalies](/dashboard/anomalies) page when both engines agree that something is unusual enough to warrant investigation.
 
@@ -28,7 +28,7 @@ Every five minutes, Hilt's collectors summarize host activity into a **behaviora
 - **Data movement**: correlated read-then-send patterns, sensitive data exfiltration signals
 - **Temporal structure**: wavelet-based analysis of activity rhythms at multiple time scales
 
-These raw features are combined with derived behavioral signals — entropy measures, transition probabilities, novelty scores, and temporal correlations — giving each epoch a rich behavioral fingerprint that the engines score against the host's history.
+These raw features are combined with derived behavioral signals (entropy measures, transition probabilities, novelty scores, and temporal correlations), giving each epoch a rich behavioral fingerprint that the engines score against the host's history.
 
 ### The cold-start period
 
@@ -42,15 +42,15 @@ Each finding on the [Anomalies](/dashboard/anomalies) page carries three ratings
 
 ### Severity
 
-**Critical**, **High**, **Medium**, or **Low** — reflecting how statistically extreme the anomaly is. A critical finding represents behavior that is extraordinarily unlikely under the host's normal profile; a low finding is a detectable deviation but within a range that could occur naturally in some environments. Severity drives sort order and helps your team focus on the most pronounced anomalies first.
+**Critical**, **High**, **Medium**, or **Low**. Severity reflects how statistically extreme the anomaly is. A critical finding represents behavior that is extraordinarily unlikely under the host's normal profile; a low finding is a detectable deviation but within a range that could occur naturally in some environments. Severity drives sort order and helps your team focus on the most pronounced anomalies first.
 
 ### Confidence
 
-**High**, **Medium**, or **Low** — reflecting how many independent scoring channels in the detection model agree that the behavior is anomalous. High confidence means all channels independently flagged the epoch; low confidence means only one channel fired. Think of it as corroboration: a finding with high confidence has multiple independent reasons to believe the behavior is unusual, not just one.
+**High**, **Medium**, or **Low**. Confidence reflects how many independent scoring channels in the detection model agree that the behavior is anomalous. High confidence means all channels independently flagged the epoch; low confidence means only one channel fired. Think of it as corroboration: a finding with high confidence has multiple independent reasons to believe the behavior is unusual, not just one.
 
 ### Urgency
 
-An additional dimension based on the types of evidence present in the finding — the nature of the events involved, not just their statistical magnitude. Urgency helps distinguish findings where the evidence types themselves are concerning (novel lateral movement, sensitive file access) from those driven primarily by volume changes.
+An additional dimension based on the types of evidence present in the finding. Urgency considers the nature of the events involved, not just their statistical magnitude. Urgency helps distinguish findings where the evidence types themselves are concerning (novel lateral movement, sensitive file access) from those driven primarily by volume changes.
 
 These three ratings are independent: a finding can be high severity but low confidence (a large spike on a single signal), or medium severity but high confidence (a moderate deviation confirmed across all channels). The [Anomalies](/dashboard/anomalies) page lets you filter and sort by any combination.
 
@@ -64,11 +64,11 @@ The **Model Lifecycle** page (under Administration) tracks three metrics that to
 
 _"What percentage of known attack scenarios does the model detect?"_
 
-Hilt maintains an internal **benchmark suite** — a curated set of attack scenarios spanning lateral movement, privilege escalation, data exfiltration, and other threat categories at varying levels of subtlety. Each time a model is retrained, Hilt replays this benchmark and measures how many scenarios the model correctly flags.
+Hilt maintains an internal **benchmark suite**: a curated set of attack scenarios spanning lateral movement, privilege escalation, data exfiltration, and other threat categories at varying levels of subtlety. Each time a model is retrained, Hilt replays this benchmark and measures how many scenarios the model correctly flags.
 
 This metric is the model's **recall** against the benchmark: `threats caught = flagged attack scenarios / total attack scenarios`.
 
-A higher percentage means broader coverage. Because the benchmark is controlled and consistent across model versions, this metric lets you compare versions directly — if Threats caught goes up, the new model is catching attacks the old one missed. The benchmark itself is updated as new threat categories emerge, so coverage evolves alongside the threat landscape.
+A higher percentage means broader coverage. Because the benchmark is controlled and consistent across model versions, this metric lets you compare versions directly. If Threats caught goes up, the new model is catching attacks the old one missed. The benchmark itself is updated as new threat categories emerge, so coverage evolves alongside the threat landscape.
 
 ### Real threats still caught
 
@@ -102,7 +102,7 @@ After evaluation against both the benchmark and your team's feedback, each model
 | **No change** | Performance is equivalent to the previous version. The new model is promoted. |
 | **Held back** | The new model regressed on one or more metrics. The previous model stays active and Hilt flags the issue for review. |
 
-A model must pass a multi-stage evaluation before it can replace the active model. This evaluation includes the benchmark replay and HITL (human-in-the-loop) replay described above, plus internal consistency checks on the model's scoring behavior. Models that fail any gate are held back automatically — no manual intervention required.
+A model must pass a multi-stage evaluation before it can replace the active model. This evaluation includes the benchmark replay and HITL (human-in-the-loop) replay described above, plus internal consistency checks on the model's scoring behavior. Models that fail any gate are held back automatically, with no manual intervention required.
 
 ---
 
@@ -115,7 +115,7 @@ Time to detect (TTD) measures **how quickly Hilt flags a threat after the anomal
 | Factor | Effect on TTD |
 | :-- | :-- |
 | **Baseline maturity** | A well-established baseline (1–2 weeks of observation) produces faster, more confident detections. Hosts still in cold-start have elevated thresholds, which may delay flagging until enough behavioral history accumulates. |
-| **Attack subtlety** | Bold deviations — a burst of lateral movement, a spike in outbound data — are flagged in the first epoch. Subtle, low-and-slow patterns take longer because the detection model needs to observe multiple epochs before the statistical evidence becomes convincing. |
+| **Attack subtlety** | Bold deviations (a burst of lateral movement, a spike in outbound data) are flagged in the first epoch. Subtle, low-and-slow patterns take longer because the detection model needs to observe multiple epochs before the statistical evidence becomes convincing. |
 | **Environmental noise** | When your team dismisses false positives, those patterns are suppressed in future scoring. A cleaner signal means real threats stand out faster against less background noise. |
 | **Host behavior regularity** | Hosts with consistent workloads have tighter baselines, so deviations are detected faster. Highly variable hosts (e.g., build servers with bursty workloads) have wider baselines and may take one or two more epochs to cross the detection threshold. |
 
@@ -139,21 +139,21 @@ Hilt's accuracy is not static. Three mechanisms drive continuous improvement:
 
 Every finding your team reviews directly influences future detection quality — but the mechanism differs for confirmed versus dismissed findings.
 
-**Dismissed findings** feed into a real-time suppression layer. When your team marks a finding as a false positive, Hilt builds a behavioral fingerprint of that pattern and uses it to suppress similar future findings. This suppression is immediate (active within minutes) and specific — it targets the pattern your analyst identified, not broad categories of behavior. Over time, this cleans up noise that is unique to your environment, letting real threats surface more clearly.
+**Dismissed findings** feed into a real-time suppression layer. When your team marks a finding as a false positive, Hilt builds a behavioral fingerprint of that pattern and uses it to suppress similar future findings. This suppression is immediate (active within minutes) and specific. It targets the pattern your analyst identified, not broad categories of behavior. Over time, this cleans up noise that is unique to your environment, letting real threats surface more clearly.
 
-**Confirmed findings** become test cases. When a new model version is evaluated, Hilt replays your confirmed threats against it and checks whether it would still catch them. This is how the "Real threats still caught" metric works — your team's confirmations become a regression test suite that every future model must pass.
+**Confirmed findings** become test cases. When a new model version is evaluated, Hilt replays your confirmed threats against it and checks whether it would still catch them. This is how the "Real threats still caught" metric works. Your team's confirmations become a regression test suite that every future model must pass.
 
 This is why triaging findings matters: each review either removes a specific source of noise or adds a regression test for a real threat.
 
 ### Model retraining
 
-Hilt retrains the detection model when it detects signs that the current model's fit to your environment is degrading — feature drift, anomaly rate changes, or calibration degradation. Retraining is not on a fixed schedule; it is triggered by data-driven signals with a maximum interval as a backstop. This means the model updates when it needs to, not on an arbitrary calendar.
+Hilt retrains the detection model when it detects signs that the current model's fit to your environment is degrading: feature drift, anomaly rate changes, or calibration degradation. Retraining is not on a fixed schedule; it is triggered by data-driven signals with a maximum interval as a backstop. This means the model updates when it needs to, not on an arbitrary calendar.
 
-Each retrained model goes through a multi-stage evaluation — including the benchmark replay and your team's feedback history — before it can replace the active model. If a candidate model regresses on any metric, it is held back automatically. You can see the full training and evaluation history on the **Model Lifecycle** page, including which models were promoted, which were held back, and why.
+Each retrained model goes through a multi-stage evaluation, including the benchmark replay and your team's feedback history, before it can replace the active model. If a candidate model regresses on any metric, it is held back automatically. You can see the full training and evaluation history on the **Model Lifecycle** page, including which models were promoted, which were held back, and why.
 
 ### Baseline adaptation
 
-The statistical engine's baselines are rolling windows that evolve as your environment changes. New software deployments, infrastructure changes, and workload shifts are incorporated into the baseline over time, so the system does not keep flagging legitimate changes as anomalies. Anomalous epochs are excluded from baseline updates to prevent attacks from poisoning the normal profile — with a safety valve that forces an update if the baseline has been frozen for too long, preventing a false-positive spiral from locking the baseline indefinitely.
+The statistical engine's baselines are rolling windows that evolve as your environment changes. New software deployments, infrastructure changes, and workload shifts are incorporated into the baseline over time, so the system does not keep flagging legitimate changes as anomalies. Anomalous epochs are excluded from baseline updates to prevent attacks from poisoning the normal profile. If the baseline has been frozen for too long, a safety valve forces an update to prevent a false-positive spiral from locking the baseline indefinitely.
 
 ---
 
