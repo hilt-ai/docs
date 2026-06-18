@@ -1,0 +1,171 @@
+---
+title: "Detection & Accuracy"
+sidebarTitle: "Detection & Accuracy"
+description: "How Hilt detects threats, what the accuracy metrics mean, and how detection improves over time."
+---
+
+How Hilt finds threats, how it measures its own performance, and what you can do to make it sharper.
+
+---
+
+## What Hilt watches and how it decides
+
+Hilt does not rely on signatures or known-bad lists. Instead, two complementary engines work together to detect threats:
+
+A **statistical engine** builds a rolling behavioral baseline for each host, tracking process execution patterns, network destinations, file access, data movement, and dozens of derived behavioral signals. It scores each new observation against that baseline using statistical methods tuned for count data, temporal patterns, and correlated features. When behavior deviates from the baseline, the statistical engine quantifies how unusual it is.
+
+A **detection model** trained on your environment's behavioral data learns deeper temporal patterns that statistical baselines alone cannot capture: sequences of activity that look individually normal but are collectively anomalous, or subtle shifts that emerge over multiple observation windows. The model scores each epoch independently and combines its assessment with the statistical engine's output using a combination method that accounts for dependencies between signals.
+
+Together, these engines catch a wider range of threats than either could alone. The statistical engine is fast and interpretable; the detection model adds judgment about patterns that require learning from data. A **finding** appears on the [Anomalies](/dashboard/anomalies) page when both engines agree that something is unusual enough to warrant investigation.
+
+### What gets observed
+
+Every five minutes, Hilt's collectors summarize host activity into a **behavioral snapshot** (an _epoch_). Each epoch captures dozens of features across these dimensions:
+
+- **Process activity**: execution counts, unique binaries, parent–child relationships, session behavior, fork patterns
+- **Network activity**: bytes transferred, unique destinations and ports, novel connections, cross-cluster communication
+- **File activity**: access patterns, sensitive-file interactions, write operations, destructive operations
+- **Data movement**: correlated read-then-send patterns, sensitive data exfiltration signals
+- **Temporal structure**: wavelet-based analysis of activity rhythms at multiple time scales
+
+These raw features are combined with derived behavioral signals (entropy measures, transition probabilities, novelty scores, and temporal correlations), giving each epoch a rich behavioral fingerprint that the engines score against the host's history.
+
+### The cold-start period
+
+Because Hilt learns what's normal before it can identify what's unusual, new hosts go through a **cold-start phase**. Basic scoring begins within hours of deployment, but detection quality improves as the baseline fills in over the first one to two weeks. During this period, scoring thresholds are elevated to suppress noise while the system is still learning. See [Getting Started](/getting-started) for the full deployment timeline.
+
+---
+
+## Severity, confidence, and what they mean on a finding
+
+Each finding on the [Anomalies](/dashboard/anomalies) page carries three ratings that help you prioritize:
+
+### Severity
+
+**Critical**, **High**, **Medium**, or **Low**. Severity reflects how statistically extreme the anomaly is. A critical finding represents behavior that is extraordinarily unlikely under the host's normal profile; a low finding is a detectable deviation but within a range that could occur naturally in some environments. Severity drives sort order and helps your team focus on the most pronounced anomalies first.
+
+### Confidence
+
+**High**, **Medium**, or **Low**. Confidence reflects how many independent scoring channels in the detection model agree that the behavior is anomalous. High confidence means all channels independently flagged the epoch; low confidence means only one channel fired. Think of it as corroboration: a finding with high confidence has multiple independent reasons to believe the behavior is unusual, not just one.
+
+### Urgency
+
+An additional dimension based on the types of evidence present in the finding. Urgency considers the nature of the events involved, not just their statistical magnitude. Urgency helps distinguish findings where the evidence types themselves are concerning (novel lateral movement, sensitive file access) from those driven primarily by volume changes.
+
+These three ratings are independent: a finding can be high severity but low confidence (a large spike on a single signal), or medium severity but high confidence (a moderate deviation confirmed across all channels). The [Anomalies](/dashboard/anomalies) page lets you filter and sort by any combination.
+
+---
+
+## Understanding your accuracy metrics
+
+The **Model Lifecycle** page (under Administration) tracks three metrics that together tell you how well the detection model is performing in your environment. These are updated each time a new model version is evaluated.
+
+### Threats caught
+
+_"What percentage of known attack scenarios does the model detect?"_
+
+Hilt maintains an internal **benchmark suite**: a curated set of attack scenarios spanning lateral movement, privilege escalation, data exfiltration, and other threat categories at varying levels of subtlety. Each time a model is retrained, Hilt replays this benchmark and measures how many scenarios the model correctly flags.
+
+This metric is the model's **recall** against the benchmark: `threats caught = flagged attack scenarios / total attack scenarios`.
+
+A higher percentage means broader coverage. Because the benchmark is controlled and consistent across model versions, this metric lets you compare versions directly. If Threats caught goes up, the new model is catching attacks the old one missed. The benchmark itself is updated as new threat categories emerge, so coverage evolves alongside the threat landscape.
+
+### Real threats still caught
+
+_"When the model updates, does it still catch the threats my team already confirmed?"_
+
+This metric comes from your team's **feedback**. When analysts confirm a finding as a real threat, that confirmation becomes a test case for future model versions. Hilt replays those confirmed incidents against the candidate model and checks whether it would still flag them.
+
+`real threats still caught = confirmed threats still flagged / total confirmed threats`
+
+This protects against regression: a model update that catches new attack types but silently drops threats you've already validated would show a decline here. Until your team has reviewed enough findings, this metric shows _"still maturing"_.
+
+### False alarms avoided
+
+_"Is the new model producing less noise than the old one?"_
+
+When analysts dismiss a finding, they're identifying a pattern that is normal for their environment. Hilt tracks whether a new model version would still surface those same dismissed findings — or whether it has learned to avoid them.
+
+`false alarms avoided = dismissed findings no longer raised / total dismissed findings`
+
+This is a **noise reduction rate** scoped to patterns your team has already reviewed. It relates to precision (true positives / all alerts) but is narrower: precision measures quality across all findings, while this metric measures improvement on the subset your analysts have marked as false positives. A rising number means the model is absorbing your feedback and producing less noise on known false positives.
+
+Like Real threats still caught, this shows _"still maturing"_ until enough dismissed findings accumulate.
+
+### Model verdicts
+
+After evaluation against both the benchmark and your team's feedback, each model version receives a verdict:
+
+| Verdict | Meaning |
+| :-- | :-- |
+| **Strengthened** | The new model improved on one or more metrics without regressing on others. It is promoted automatically. |
+| **No change** | Performance is equivalent to the previous version. The new model is promoted. |
+| **Held back** | The new model regressed on one or more metrics. The previous model stays active and Hilt flags the issue for review. |
+
+A model must pass a multi-stage evaluation before it can replace the active model. This evaluation includes the benchmark replay and HITL (human-in-the-loop) replay described above, plus internal consistency checks on the model's scoring behavior. Models that fail any gate are held back automatically.
+
+---
+
+## How fast does Hilt detect threats
+
+Time to detect (TTD) measures **how quickly Hilt flags a threat after the anomalous behavior begins**, expressed in epochs (five-minute windows). Hilt measures TTD during model evaluation as the number of epochs between the start of an attack scenario and the first finding.
+
+### What affects detection speed
+
+| Factor | Effect on TTD |
+| :-- | :-- |
+| **Baseline maturity** | A well-established baseline (1–2 weeks of observation) produces faster, more confident detections. Hosts still in cold-start have elevated thresholds, which may delay flagging until enough behavioral history accumulates. |
+| **Attack subtlety** | Bold deviations (a burst of lateral movement, a spike in outbound data) are flagged in the first epoch. Subtle, low-and-slow patterns take longer because the detection model needs to observe multiple epochs before the statistical evidence becomes convincing. |
+| **Environmental noise** | When your team dismisses false positives, those patterns are suppressed in future scoring. A cleaner signal means real threats stand out faster against less background noise. |
+| **Host behavior regularity** | Hosts with consistent workloads have tighter baselines, so deviations are detected faster. Highly variable hosts (e.g., build servers with bursty workloads) have wider baselines and may take one or two more epochs to cross the detection threshold. |
+
+### What to expect
+
+For environments with established baselines, typical ranges observed in internal benchmarks:
+
+- **Obvious threats** (large behavioral spikes, novel lateral movement): detected within **1–2 epochs** (5–10 minutes)
+- **Moderate threats** (unusual network destinations, atypical process trees): detected within **2–5 epochs** (10–25 minutes)
+- **Subtle threats** (slow data exfiltration, gradual privilege escalation): detected within **5–15 epochs** (25–75 minutes) as evidence accumulates across multiple observation windows
+
+These are representative ranges from controlled evaluation scenarios, not guarantees. Actual TTD depends on the factors above and the threat's characteristics. The detection model is continuously evaluated against attack scenarios at varying subtlety levels to ensure these ranges hold as the model evolves.
+
+---
+
+## How detection improves over time
+
+Hilt's accuracy is not static. Three mechanisms drive continuous improvement:
+
+### Analyst feedback
+
+Every finding your team reviews directly influences future detection quality — but the mechanism differs for confirmed versus dismissed findings.
+
+**Dismissed findings** feed into a real-time suppression layer. When your team marks a finding as a false positive, Hilt builds a behavioral fingerprint of that pattern and uses it to suppress similar future findings. This suppression is immediate (active within minutes) and specific. It targets the pattern your analyst identified, not broad categories of behavior. Over time, this cleans up noise that is unique to your environment, letting real threats surface more clearly.
+
+**Confirmed findings** become test cases. When a new model version is evaluated, Hilt replays your confirmed threats against it and checks whether it would still catch them. This is how the "Real threats still caught" metric works. Your team's confirmations become a regression test suite that every future model must pass.
+
+This is why triaging findings matters: each review either removes a specific source of noise or adds a regression test for a real threat.
+
+### Model retraining
+
+Hilt does not retrain on a fixed schedule. Data-driven signals trigger retraining when the current model's fit to your environment degrades: feature drift, anomaly rate changes, or calibration degradation. A maximum interval acts as a backstop to ensure the model stays current even if no drift signal fires.
+
+Each candidate model goes through a multi-stage evaluation, including the benchmark replay and your team's feedback history, before it can replace the active model. If it regresses on any metric, Hilt holds it back automatically. The **Model Lifecycle** page shows the full training and evaluation history, including which models were promoted, which were held back, and why.
+
+### Baseline adaptation
+
+The statistical engine's baselines are rolling windows that evolve as your environment changes. It incorporates new software deployments, infrastructure changes, and workload shifts over time, so it stops flagging legitimate changes as anomalies. Anomalous epochs are excluded from these updates to prevent attacks from poisoning the normal profile. If the baseline has been frozen for too long, a safety valve forces an update to prevent a false-positive spiral from locking it indefinitely.
+
+---
+
+## Key terms
+
+| Term | Definition |
+| :-- | :-- |
+| **Epoch** | A five-minute window of host activity. The fundamental unit of behavioral observation and scoring. |
+| **Baseline** | A rolling statistical profile of normal behavior for a specific host. Starts building during cold-start and is refined continuously as new non-anomalous data arrives. |
+| **Cold-start** | The initial period (hours to days) where the system is learning baselines. Basic scoring starts within hours; full detection quality develops over 1–2 weeks as the baseline fills in. |
+| **Finding** | A behavioral anomaly flagged by the detection engines, or a match on a user-defined detection rule. Appears on the Anomalies page for review. |
+| **Benchmark suite** | A curated set of attack scenarios at varying subtlety levels, used to measure model recall. Controlled by Hilt and updated as new threat categories emerge. |
+| **Severity** | How statistically extreme the anomaly is (Critical, High, Medium, Low). |
+| **Confidence** | How many independent scoring channels agree the behavior is anomalous (High, Medium, Low). |
+| **TTD** | Time to detect — the number of epochs between the start of anomalous behavior and the first finding. |

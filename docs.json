@@ -75,6 +75,7 @@
               {
                 "group": "Security",
                 "pages": [
+                  "dashboard/detection-accuracy",
                   "dashboard/anomalies",
                   "dashboard/detection-rules",
                   "dashboard/fleet-behavior",
