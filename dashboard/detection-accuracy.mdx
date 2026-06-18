@@ -14,13 +14,13 @@ Hilt does not rely on signatures or known-bad lists. Instead, two complementary 
 
 A **statistical engine** builds a rolling behavioral baseline for each host, tracking process execution patterns, network destinations, file access, data movement, and dozens of derived behavioral signals. It scores each new observation against that baseline using statistical methods tuned for count data, temporal patterns, and correlated features. When behavior deviates from the baseline, the statistical engine quantifies how unusual it is.
 
-A **detection model** trained on your environment's behavioral data learns deeper temporal patterns that statistical baselines alone cannot capture: sequences of activity that look individually normal but are collectively anomalous, or subtle shifts that emerge over multiple observation windows. The model scores each epoch independently and combines its assessment with the statistical engine's output using a mathematically rigorous combination method that accounts for dependencies between signals.
+A **detection model** trained on your environment's behavioral data learns deeper temporal patterns that statistical baselines alone cannot capture: sequences of activity that look individually normal but are collectively anomalous, or subtle shifts that emerge over multiple observation windows. The model scores each epoch independently and combines its assessment with the statistical engine's output using a combination method that accounts for dependencies between signals.
 
 Together, these engines catch a wider range of threats than either could alone. The statistical engine is fast and interpretable; the detection model adds judgment about patterns that require learning from data. A **finding** appears on the [Anomalies](/dashboard/anomalies) page when both engines agree that something is unusual enough to warrant investigation.
 
 ### What gets observed
 
-Every five minutes, Hilt's collectors summarize host activity into a **behavioral snapshot** (an _epoch_). Each epoch captures dozens of features across several dimensions:
+Every five minutes, Hilt's collectors summarize host activity into a **behavioral snapshot** (an _epoch_). Each epoch captures dozens of features across these dimensions:
 
 - **Process activity**: execution counts, unique binaries, parent–child relationships, session behavior, fork patterns
 - **Network activity**: bytes transferred, unique destinations and ports, novel connections, cross-cluster communication
@@ -88,7 +88,7 @@ When analysts dismiss a finding, they're identifying a pattern that is normal fo
 
 `false alarms avoided = dismissed findings no longer raised / total dismissed findings`
 
-This is a **noise reduction rate** scoped specifically to patterns your team has already reviewed. It is related to, but distinct from, precision (the ratio of true positives to all alerts). Precision measures quality across all findings; this metric measures improvement on the subset your team has explicitly marked as false positives. A rising number means the model is absorbing your environment's feedback and producing less noise on the patterns your analysts have already told it about.
+This is a **noise reduction rate** scoped to patterns your team has already reviewed. It relates to precision (true positives / all alerts) but is narrower: precision measures quality across all findings, while this metric measures improvement on the subset your analysts have marked as false positives. A rising number means the model is absorbing your feedback and producing less noise on known false positives.
 
 Like Real threats still caught, this shows _"still maturing"_ until enough dismissed findings accumulate.
 
@@ -102,13 +102,13 @@ After evaluation against both the benchmark and your team's feedback, each model
 | **No change** | Performance is equivalent to the previous version. The new model is promoted. |
 | **Held back** | The new model regressed on one or more metrics. The previous model stays active and Hilt flags the issue for review. |
 
-A model must pass a multi-stage evaluation before it can replace the active model. This evaluation includes the benchmark replay and HITL (human-in-the-loop) replay described above, plus internal consistency checks on the model's scoring behavior. Models that fail any gate are held back automatically, with no manual intervention required.
+A model must pass a multi-stage evaluation before it can replace the active model. This evaluation includes the benchmark replay and HITL (human-in-the-loop) replay described above, plus internal consistency checks on the model's scoring behavior. Models that fail any gate are held back automatically.
 
 ---
 
 ## How fast does Hilt detect threats
 
-Time to detect (TTD) measures **how quickly Hilt flags a threat after the anomalous behavior begins**, expressed in epochs (five-minute windows). It is measured internally during model evaluation as the number of epochs between the start of an attack scenario and the first finding.
+Time to detect (TTD) measures **how quickly Hilt flags a threat after the anomalous behavior begins**, expressed in epochs (five-minute windows). Hilt measures TTD during model evaluation as the number of epochs between the start of an attack scenario and the first finding.
 
 ### What affects detection speed
 
@@ -127,7 +127,7 @@ For environments with established baselines, typical ranges observed in internal
 - **Moderate threats** (unusual network destinations, atypical process trees): detected within **2–5 epochs** (10–25 minutes)
 - **Subtle threats** (slow data exfiltration, gradual privilege escalation): detected within **5–15 epochs** (25–75 minutes) as evidence accumulates across multiple observation windows
 
-These are representative ranges from controlled evaluation scenarios, not guarantees. Actual TTD depends on the factors above and the specific characteristics of the threat. The detection model is continuously evaluated against attack scenarios at varying subtlety levels to ensure these ranges hold as the model evolves.
+These are representative ranges from controlled evaluation scenarios, not guarantees. Actual TTD depends on the factors above and the threat's characteristics. The detection model is continuously evaluated against attack scenarios at varying subtlety levels to ensure these ranges hold as the model evolves.
 
 ---
 
@@ -147,13 +147,13 @@ This is why triaging findings matters: each review either removes a specific sou
 
 ### Model retraining
 
-Hilt retrains the detection model when it detects signs that the current model's fit to your environment is degrading: feature drift, anomaly rate changes, or calibration degradation. Retraining is not on a fixed schedule; it is triggered by data-driven signals with a maximum interval as a backstop. This means the model updates when it needs to, not on an arbitrary calendar.
+Hilt does not retrain on a fixed schedule. Data-driven signals trigger retraining when the current model's fit to your environment degrades: feature drift, anomaly rate changes, or calibration degradation. A maximum interval acts as a backstop to ensure the model stays current even if no drift signal fires.
 
-Each retrained model goes through a multi-stage evaluation, including the benchmark replay and your team's feedback history, before it can replace the active model. If a candidate model regresses on any metric, it is held back automatically. You can see the full training and evaluation history on the **Model Lifecycle** page, including which models were promoted, which were held back, and why.
+Each candidate model goes through a multi-stage evaluation, including the benchmark replay and your team's feedback history, before it can replace the active model. If it regresses on any metric, Hilt holds it back automatically. The **Model Lifecycle** page shows the full training and evaluation history, including which models were promoted, which were held back, and why.
 
 ### Baseline adaptation
 
-The statistical engine's baselines are rolling windows that evolve as your environment changes. New software deployments, infrastructure changes, and workload shifts are incorporated into the baseline over time, so the system does not keep flagging legitimate changes as anomalies. Anomalous epochs are excluded from baseline updates to prevent attacks from poisoning the normal profile. If the baseline has been frozen for too long, a safety valve forces an update to prevent a false-positive spiral from locking the baseline indefinitely.
+The statistical engine's baselines are rolling windows that evolve as your environment changes. It incorporates new software deployments, infrastructure changes, and workload shifts over time, so it stops flagging legitimate changes as anomalies. Anomalous epochs are excluded from these updates to prevent attacks from poisoning the normal profile. If the baseline has been frozen for too long, a safety valve forces an update to prevent a false-positive spiral from locking it indefinitely.
 
 ---
 
