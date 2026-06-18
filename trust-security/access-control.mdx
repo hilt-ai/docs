@@ -1,0 +1,72 @@
+---
+title: "Access & identity"
+sidebarTitle: "Access & identity"
+description: "Dashboard authentication, role-based access, team scoping, audit logging, and the approval-gated Hilt engineer access model."
+---
+
+Access to a Hilt deployment is governed at two layers: your users authenticate to the dashboard and are constrained by roles and teams, and Hilt engineers reach your environment only through your approval workflow. Both layers are auditable.
+
+---
+
+## Dashboard authentication
+
+The dashboard authenticates against accounts stored in the deployment's dashboard database (PostgreSQL-backed authentication). There is no email invitation flow; an administrator creates each account directly with a username and a temporary password (minimum 8 characters), which the user replaces after first sign-in. Disabling an account blocks sign-in reversibly; deleting an account removes it and all its sessions.
+
+For identity provider integration options, contact your Hilt representative. See [User Management](/administration/user-management) for account lifecycle detail.
+
+---
+
+## Roles and permissions
+
+Each user holds one role. Roles map to fixed permission sets:
+
+| Role | What it can do |
+| :-- | :-- |
+| **Owner** | Same as admin; fixed on the seeded account and cannot be assigned, changed, or deleted |
+| **Admin** | Full access, including managing users, teams, and the audit log |
+| **Analyst** | Full data access and detection rule management, no admin pages |
+| **Responder** | Like analyst, but cannot create, edit, or delete detection rules |
+| **Viewer** | Read-only access plus the AI query page |
+
+Sensitive actions are gated by specific permissions, including *manage users*, *manage teams*, *manage alerts*, *manage rules*, and *quarantine hosts*. See [User Management](/administration/user-management) for the full role reference.
+
+---
+
+## Team scoping
+
+Teams constrain which hosts a user can see. A team owns a set of hosts, its members see those hosts, and a child team is limited to a subset of its parent's hosts.
+
+- A **global admin** (an admin or owner with no team) sees everything.
+- A **scoped admin** is an admin assigned to one or more teams and manages only that subtree.
+- Team membership, set on the user record, is what controls host visibility.
+
+Team-based scoping requires PostgreSQL-backed authentication. See [Teams](/administration/teams).
+
+---
+
+## Audit logging
+
+Security-relevant actions are recorded to the audit log, which administrators manage. Logged events include:
+
+- Quarantine and release actions, with the user who initiated them and the timestamp (see [Quarantine](/dashboard/quarantine))
+- Anonymized export events, with the export ID, row count, date range, and approval status (see [Anonymized data export](/on-prem/data-export-overview))
+- User account changes; after a user is deleted, audit history retains entries under the username
+
+Because the audit log lives in the dashboard database in your account, the record stays under your control.
+
+---
+
+## Hilt engineer access
+
+Hilt engineers do not hold standing access to your environment.
+
+- **Approval-gated.** Access is granted only through your approval workflow, established during provisioning.
+- **No standing admin.** There is no persistent Hilt administrator account in your deployment.
+- **Logged.** Access granted through your workflow is recorded by your cloud account's own logging.
+- **Scoped and time-bound.** Access is intended to be limited to the task and revoked afterward. The exact approval mechanism and time bounds are defined in your agreement and provisioning runbook.
+
+Because the deployment runs in your account, you can revoke Hilt access at any time using your cloud provider's IAM controls.
+
+<Note>
+For sensitive operations such as host quarantine, the action runs through your dashboard under a permissioned user and is recorded in the audit log. Quarantine requires the deployment to hold the IAM permissions to modify security groups in your account, granted during provisioning. See [Quarantine](/dashboard/quarantine).
+</Note>

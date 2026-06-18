@@ -1,0 +1,68 @@
+---
+title: "Security operations"
+sidebarTitle: "Operations"
+description: "Software supply chain, patching and updates, platform monitoring, backups, logging, and change management for Hilt."
+---
+
+Hilt operates the platform components in your account: it ships releases, applies updates, and monitors platform health. This page covers the supply chain behind those releases and the operational controls around them.
+
+---
+
+## Software supply chain
+
+Collector releases are distributed as versioned artifacts from Hilt-controlled storage:
+
+- **Release artifacts.** Each collector release ships as static Linux tarballs (one per architecture, `aarch64` and `x86_64`) plus a matching multi-arch container image, published under a versioned path in Hilt's release storage. See [Release artifacts](/linux-collector/release-artifacts).
+- **Static binaries.** The Linux collector is a single static binary with no runtime dependencies and no kernel modules, which reduces the dependency surface on your hosts.
+- **Airgapped bundle.** For airgapped environments, an offline bundle ships the full artifact set plus a `docker save`-ed image, so nothing is fetched at runtime. See [Networking and security](/linux-collector/networking-security).
+- **macOS packaging.** The macOS system extension is distributed as a signed `.pkg` installer approved through your MDM, and the managed Chrome extension is force-installed via enterprise policy. See [macOS Collector](/macos-collector).
+
+Release tags follow `vMAJOR.MINOR.PATCH`. For checksum or signature verification of downloaded artifacts, contact your Hilt representative.
+
+---
+
+## Updates and patching
+
+| Component | How it updates |
+| :-- | :-- |
+| **Platform components** | Hilt provisions and upgrades platform infrastructure; you approve maintenance windows |
+| **Collectors (Linux)** | You upgrade collectors, or enable the auto-update agent to roll them out |
+| **Collectors (macOS)** | Upgrades are pushed through your MDM |
+
+The optional auto-update agent runs as a Kubernetes CronJob in your cluster. It polls the Hilt release registry, mirrors new images into your own registries, rolls out the update, verifies health after rollout, and reports status to a webhook you configure. Its scope is governed by a version policy (`patch` by default, or `minor` / `any`); major version jumps require explicit operator action unless you opt into `any`. See [Auto-update agent](/on-prem/auto-update-overview).
+
+---
+
+## Monitoring
+
+Hilt monitors the health of platform components it operates (see the responsibility split in [Getting Started](/getting-started)). When the auto-update agent applies an update, it verifies platform health after each rollout and reports the result to your configured webhook, so update failures surface promptly.
+
+---
+
+## Backups and disaster recovery
+
+Platform state is held in managed cloud services (the dashboard database, the analytics database, and object storage), which provide native backup capabilities in your account. Recovery objectives (RPO and RTO) depend on your cloud configuration and agreement. Confirm the backup schedule and recovery targets for your deployment with your Hilt representative.
+
+---
+
+## Logging
+
+| Log source | Where it lives |
+| :-- | :-- |
+| Platform and infrastructure logs | Your cloud account's native logging |
+| Dashboard audit log | Dashboard database in your account (see [Access and identity](/trust-security/access-control)) |
+| Collector filter and event statistics | Reported by the collector (see [Agent filtering](/linux-collector/agent-filtering)) |
+
+Because logs live in your account, you set their retention and can route them into your existing SIEM or log pipeline.
+
+---
+
+## Change management
+
+Platform upgrades follow the versioned release process above and run during maintenance windows you approve. The auto-update agent's version policy gives you explicit control over which changes apply automatically and which require operator action, so no major change reaches the platform without a decision on your side. See [Auto-update workflow](/on-prem/auto-update-workflow).
+
+---
+
+## Secure development
+
+For details on Hilt's secure development lifecycle, dependency scanning, code review practices, and penetration testing cadence, contact your Hilt representative. Materials that can be shared are available under NDA (see [Compliance and legal](/trust-security/compliance)).

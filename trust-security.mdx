@@ -1,19 +1,77 @@
 ---
 title: "Trust & Security"
-sidebarTitle: "Trust & Security"
-description: "Hilt's security posture, data handling practices, and compliance information."
+sidebarTitle: "Overview"
+description: "Hilt's trust model: customer-owned single-tenant deployment, least-privilege access, transparent data handling, and defense in depth."
 ---
 
-This page will be expanded on June 16, 2026 with details on Hilt's security posture, data handling practices, and compliance information. Check back soon.
+Hilt is data detection and response that runs inside your own cloud account. Your telemetry, the analytics database, and the dashboard live in infrastructure Hilt provisions in your account, and Hilt operates the platform without standing access to it. This section documents how that model protects your data and gives security reviewers the detail needed to evaluate Hilt against a vendor questionnaire.
 
 ---
 
-## Security boundaries
+## Trust principles
 
-| Boundary | Implementation |
-| :-- | :-- |
-| **Network isolation** | All components in private subnets; ingest via private link only |
-| **Encryption in transit** | TLS 1.2+ on all connections |
-| **Encryption at rest** | Cloud-native encryption (KMS-managed keys) on all storage |
-| **Access control** | Hilt engineer access via your approval workflow only |
-| **No data egress** | Telemetry never leaves your cloud account (except opt-in anonymized exports) |
+- **Customer-owned infrastructure and data.** Every deployment is single-tenant, provisioned in your cloud account (AWS, GCP, Azure, or Ali Cloud). Telemetry, the analytics store, and the dashboard stay in your account.
+- **No covert egress.** Collector telemetry has one destination: the ingest endpoint in your account, reached over private networking. Nothing leaves your account except the opt-in, anonymized export that you control.
+- **Least privilege, approval-gated access.** Hilt engineers hold no standing access to your environment. Access happens only through your approval workflow and is logged.
+- **Transparency.** What the collector observes (and what it never observes) is documented and enforced in the collector itself, at the metadata level only.
+- **Defense in depth.** Controls layer across network (private subnets, private link), identity (role-based access, team scoping), encryption (TLS 1.2+, KMS at rest), and application (event filtering, audit logging).
+
+---
+
+## Architecture at a glance
+
+Collectors on your hosts stream metadata-level telemetry over private networking to an ingest endpoint in your account. Events are buffered, enriched, scored, and stored in an analytics database, then surfaced in a dashboard, all within your cloud boundary. The only path out of your account is the anonymized export pipeline, which is off by default.
+
+For the component map, per-cloud service list, and a data-flow diagram, see [Architecture and data flow](/trust-security/architecture).
+
+---
+
+## Control summary
+
+| Control area | Implementation | Responsibility |
+| :-- | :-- | :-- |
+| Deployment model | Single-tenant in your cloud account, provisioned with Terraform | Hilt provisions, you grant scoped access |
+| Network isolation | Private subnets, private link ingest, no public ingress | Shared |
+| Encryption in transit | TLS 1.2+ on all connections | Hilt |
+| Encryption at rest | Cloud-native KMS encryption on all storage | Hilt (keys held in your account) |
+| Data residency | Telemetry stays in your cloud account | Hilt design, you own the account |
+| Identity and access | Dashboard role-based access with team scoping | You |
+| Hilt engineer access | Approval-gated, time-bound, logged, no standing access | Shared |
+| Data collection | Metadata only, no file contents or payloads | Hilt design |
+| Data export | Opt-in, anonymized, reviewable before transfer | You (opt-in) |
+| Response controls | Quarantine and custom detection rules | You |
+
+---
+
+## Shared responsibility
+
+Hilt operates the platform; you own the cloud account it runs in. Responsibilities split as follows.
+
+| Area | Customer | Hilt |
+| :-- | :-- | :-- |
+| Cloud account security | Secure and monitor the account, IAM, and org guardrails | Operate only within the scope you grant |
+| Network configuration | Configure firewall and routing per the deployment guide | Provide requirements, provision the private ingest |
+| Collector deployment | Deploy and upgrade collectors (or enable auto-update) | Provide artifacts, guides, and the auto-update agent |
+| Platform infrastructure | Approve maintenance windows | Provision, patch, upgrade, and monitor platform components |
+| Dashboard user management | Create users, assign roles and teams | Provide the role-based access model |
+| Encryption keys | Own the cloud KMS in your account | Configure KMS encryption on all platform storage |
+| Data export opt-in | Opt in, review the manifest, approve or delete | Provide the pipeline and anonymization controls |
+| Incident response | Report incidents, act on findings, quarantine hosts | Investigate platform issues and notify you |
+
+---
+
+## In this section
+
+- [Architecture and data flow](/trust-security/architecture): single-tenant model, component map, per-cloud services, network boundaries, and a data-flow diagram.
+- [Data collection and handling](/trust-security/data-handling): what the collector captures, what it never captures, filtering, retention, and the export summary.
+- [Access and identity](/trust-security/access-control): dashboard authentication, role-based access, team scoping, audit logging, and the Hilt engineer access model.
+- [Encryption and key management](/trust-security/encryption): TLS in transit, KMS at rest, certificate handling, and key ownership.
+- [Security operations](/trust-security/operations): software supply chain, patching, monitoring, backups, and change management.
+- [Compliance and legal](/trust-security/compliance): frameworks, audit reports available under NDA, subprocessors, and data processing roles.
+- [Incident response and vulnerability disclosure](/trust-security/incident-response): how to report incidents and vulnerabilities, and what to expect in return.
+
+---
+
+## Reporting a security issue
+
+To report a suspected incident or a vulnerability in Hilt, contact your Hilt representative or account team. See [Incident response and vulnerability disclosure](/trust-security/incident-response) for the process and what information to include.
