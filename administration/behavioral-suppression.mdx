@@ -1,0 +1,54 @@
+---
+title: "Behavioral Anomaly Suppression"
+sidebarTitle: "Behavioral Suppression"
+description: "Configuring scheduled windows during which ML-based behavioral anomalies are hidden from the Anomalies page."
+---
+
+Behavioral Anomaly Suppression lets you configure recurring time windows during which ML-generated behavioral anomalies are hidden from the Anomalies page. This is useful for planned maintenance windows, batch job schedules, or other periods when known-noisy activity would generate a high volume of false positives. This page requires the **manage alerts** permission.
+
+---
+
+## How it works
+
+When suppression is active during a configured window:
+
+- **ML/behavioral anomalies** are hidden from the Anomalies triage queue.
+- **Detection-rule alerts** are unaffected — custom rules continue to fire and appear normally.
+- **Raw anomaly scores** are still computed and stored — suppression only hides the findings from the UI, not from the underlying data.
+
+---
+
+## Configuring suppression
+
+### Status toggle
+
+The main toggle has two states:
+
+| State | Behavior |
+| --- | --- |
+| **Always show anomalies** | Suppression is off — all behavioral anomalies appear in the Anomalies page at all times |
+| **Suppress on a schedule** | Suppression is on — behavioral anomalies are hidden during the configured time windows |
+
+### Schedule builder
+
+When suppression is enabled, the schedule builder lets you define one or more recurring weekly windows:
+
+- **Days**: select the days of the week the window applies to.
+- **Start / End time**: the time range within each selected day.
+- **Mode**: choose between "Suppress during" (hide anomalies during the window) or "Active only during" (show anomalies only during the window, hide at all other times).
+
+You can add multiple windows to cover different schedules (e.g., nightly batch jobs plus weekend maintenance).
+
+---
+
+## Saving changes
+
+Click **Save** to apply the configuration. The page shows who last changed the setting and when.
+
+---
+
+## Use cases
+
+- **Nightly batch jobs**: suppress anomalies from 1:00–4:00 AM when cron jobs run data pipelines.
+- **Deployment windows**: suppress during scheduled deployment hours when container restarts cause false positives.
+- **Weekend maintenance**: suppress on Saturdays when infrastructure teams perform routine maintenance.

@@ -1,0 +1,63 @@
+---
+title: "Storage"
+sidebarTitle: "Storage"
+description: "Monitoring telemetry storage usage across hot and cold tiers."
+---
+
+The Storage page shows how much telemetry data your deployment is storing, broken down by hot (fast-access) and cold (archival) tiers. This page requires the **view audit** permission.
+
+---
+
+## Summary
+
+The top of the page shows three key metrics:
+
+- **Total storage used** — combined hot and cold tier usage.
+- **Hot tier** — data stored in the fast-access layer (ClickHouse), used for real-time queries and dashboards.
+- **Cold tier** — data archived to object storage (S3) for long-term retention at lower cost.
+
+---
+
+## Time range
+
+A time range selector lets you view storage trends over different windows: **7d**, **30d**, **90d**, or **1y**.
+
+---
+
+## Tier explorer
+
+An interactive breakdown of storage by dataset (e.g., process events, network flows, file mutations). Each dataset shows its hot and cold tier usage, compression ratio, and retention policy. Click a dataset to view or edit its lifecycle policy.
+
+---
+
+## Hot / Cold comparison
+
+A chart comparing hot vs. cold storage usage over time. Helps you visualize how data flows from the hot tier to cold storage as it ages past the configured retention window.
+
+---
+
+## Cold storage policy
+
+Shows the current cold storage configuration:
+
+- **Retention period** — how long data is kept in cold storage before deletion.
+- **Compression** — the compression algorithm used for archived data.
+- **Storage class** — the S3 storage class (e.g., Standard, Glacier).
+
+---
+
+## Pricing estimate
+
+An estimated monthly storage cost based on current usage and configured storage classes. Provides a breakdown by tier so you can evaluate cost optimization opportunities.
+
+---
+
+## Insights
+
+Automated recommendations based on your storage patterns — for example, datasets with low query frequency that could benefit from shorter hot-tier retention, or unusually high growth rates worth investigating.
+
+---
+
+## Connectivity
+
+A live indicator shows whether the storage health endpoint is reachable. If the connection drops or data becomes stale, a banner appears with a retry option.

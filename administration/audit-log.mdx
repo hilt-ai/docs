@@ -1,0 +1,75 @@
+---
+title: "Audit Log"
+sidebarTitle: "Audit Log"
+description: "Reviewing authentication and administrative actions grouped by user session."
+---
+
+The Audit Log records every authentication event and administrative action performed in the dashboard. Entries are grouped into user sessions so you can see the full sequence of actions each user took during a sign-in. This page requires the **view audit** permission and is available in demo mode.
+
+---
+
+## Sessions
+
+Each session card shows:
+
+- **Username** and avatar initial.
+- **Status badge**: Active (currently signed in), Ended (logged out), or Admin actions (administrative actions without a corresponding login in the current window).
+- **Login time** as a relative timestamp.
+- **Event strip** (collapsed): a horizontal chain of colored dots and labels showing the actions in that session at a glance.
+
+Click a session card to expand its full timeline.
+
+### Expanded timeline
+
+The expanded view shows each action chronologically with:
+
+- A colored **dot** matching the action type.
+- An **action badge** (e.g., Login, Run Query, Create User).
+- A **timestamp** in local time.
+- **Detail text** when available (e.g., the query that was run, the user that was created).
+
+Date separators appear when a session spans multiple calendar days.
+
+---
+
+## Action types
+
+| Action | Category | Description |
+| --- | --- | --- |
+| **Login** | Auth | User signed in |
+| **Logout** | Auth | User signed out |
+| **Run query** | Analyst | Executed a query on the Query page |
+| **View report** | Analyst | Opened or generated a report |
+| **View investigation** | Analyst | Opened the Investigate page |
+| **Acknowledge alert** | Analyst | Triaged an anomaly finding |
+| **Export data** | Analyst | Exported data from the dashboard |
+| **Create user** | Admin | Created a new dashboard user |
+| **Update user** | Admin | Changed a user's role or team |
+| **Reset password** | Admin | Reset another user's password |
+| **Delete user** | Admin | Permanently removed a user account |
+| **Create team** | Admin | Created a new team |
+| **Update team** | Admin | Changed team settings |
+| **Delete team** | Admin | Removed a team |
+| **Set team nodes** | Admin | Changed which hosts a team can see |
+
+---
+
+## Filters
+
+### Time range
+
+A segmented toggle for the time window: **All time**, **5m**, **15m**, **1h**, **6h**, **24h**, or **7d**.
+
+### Username search
+
+A search box to filter sessions by username. Results update as you type (debounced).
+
+### Action filter
+
+A dropdown to show only sessions containing a specific action type (e.g., only sessions where a user ran a query).
+
+---
+
+## Session counts
+
+Below the filters, the page shows the number of matching sessions and total audit entries in the current view.

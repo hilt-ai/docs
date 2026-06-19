@@ -80,16 +80,23 @@
                   "dashboard/detection-rules",
                   "dashboard/fleet-behavior",
                   "dashboard/investigate",
-                  "dashboard/quarantine"
+                  "dashboard/quarantine",
+                  "dashboard/edr"
                 ]
               },
+              "dashboard/settings",
               {
                 "group": "Administration",
                 "pages": [
                   "administration/layout",
                   "administration/user-management",
                   "administration/teams",
-                  "administration/reports"
+                  "administration/reports",
+                  "administration/identity-mappings",
+                  "administration/behavioral-suppression",
+                  "administration/audit-log",
+                  "administration/storage",
+                  "administration/system-status"
                 ]
               }
             ]
@@ -138,7 +145,8 @@
                   "on-prem/data-export-schema",
                   "on-prem/data-export-implementation"
                 ]
-              }
+              },
+              "on-prem/model-lifecycle"
             ]
           },
           {

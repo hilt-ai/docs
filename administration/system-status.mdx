@@ -1,0 +1,39 @@
+---
+title: "System Status"
+sidebarTitle: "System Status"
+description: "Live health monitoring of the services behind your Hilt dashboard."
+---
+
+The System Status page provides a real-time view of the health of every backend service powering your Hilt deployment. This page requires the **manage users** permission.
+
+---
+
+## Overall status
+
+A banner at the top shows the aggregate health across all components:
+
+| Status | Meaning |
+| --- | --- |
+| **Operational** | All components are healthy |
+| **Degraded** | One or more components are experiencing issues but the system is functional |
+| **Outage** | A critical component is down |
+
+---
+
+## Component cards
+
+Each backend component has a status card showing:
+
+- **Component name** (e.g., API server, ingestion pipeline, scoring engine).
+- **Current status**: operational, degraded, or outage.
+- **Uptime history**: a 90-day visual history showing availability over time.
+
+### Infrastructure components
+
+Infrastructure-level components (ClickHouse, PostgreSQL) use an expandable card with a per-signal breakdown — individual health metrics like query latency, connection pool usage, and replication lag.
+
+---
+
+## Refreshing
+
+The page auto-refreshes status data periodically. You can also click the **Refresh** button to force an immediate check. The header shows when the status was last checked.
