@@ -84,7 +84,7 @@ This protects against regression: a model update that catches new attack types b
 
 _"Is the new model producing less noise than the old one?"_
 
-When analysts dismiss a finding, they're identifying a pattern that is normal for their environment. Hilt tracks whether a new model version would still surface those same dismissed findings — or whether it has learned to avoid them.
+When analysts dismiss a finding, they're identifying a pattern that is normal for their environment. Hilt tracks whether a new model version would still surface those same dismissed findings, or whether it has learned to avoid them.
 
 `false alarms avoided = dismissed findings no longer raised / total dismissed findings`
 
@@ -108,7 +108,11 @@ A model must pass a multi-stage evaluation before it can replace the active mode
 
 ## How fast does Hilt detect threats
 
-Time to detect (TTD) measures **how quickly Hilt flags a threat after the anomalous behavior begins**, expressed in epochs (five-minute windows). Hilt measures TTD during model evaluation as the number of epochs between the start of an attack scenario and the first finding.
+Time to detect (TTD) measures **how long after a threat's behavior first looks unusual that Hilt flags it.** Hilt shows this two ways: how fast it detects on **your real fleet**, and how fast it catches known attacks **on the testing corpus** (a curated benchmark of attack scenarios). Both are expressed in epochs, the five-minute windows Hilt scores in.
+
+**On your fleet** is the typical time from the first unusual signs on a real host to the finding. It reflects your environment, and it usually runs slower than the testing figure. Real threats are subtler than benchmark attacks, so Hilt waits until the evidence is convincing before it flags them.
+
+**On testing corpus** is how fast Hilt catches that fixed benchmark during model evaluation. Because the set never changes, it gives a consistent way to compare model versions, and it sits close to the model's best case on clear attacks.
 
 ### What affects detection speed
 
@@ -121,13 +125,13 @@ Time to detect (TTD) measures **how quickly Hilt flags a threat after the anomal
 
 ### What to expect
 
-For environments with established baselines, typical ranges observed in internal benchmarks:
+On the testing corpus, with established baselines, typical ranges are:
 
 - **Obvious threats** (large behavioral spikes, novel lateral movement): detected within **1–2 epochs** (5–10 minutes)
 - **Moderate threats** (unusual network destinations, atypical process trees): detected within **2–5 epochs** (10–25 minutes)
 - **Subtle threats** (slow data exfiltration, gradual privilege escalation): detected within **5–15 epochs** (25–75 minutes) as evidence accumulates across multiple observation windows
 
-These are representative ranges from controlled evaluation scenarios, not guarantees. Actual TTD depends on the factors above and the threat's characteristics. The detection model is continuously evaluated against attack scenarios at varying subtlety levels to ensure these ranges hold as the model evolves.
+These are representative ranges from controlled evaluation scenarios, not guarantees. On your real fleet the same threat types are typically detected somewhat slower, for the reasons in the table above. Actual TTD depends on those factors and the threat's characteristics. The detection model is continuously evaluated against attack scenarios at varying subtlety levels to ensure these ranges hold as the model evolves.
 
 ---
 
@@ -137,7 +141,7 @@ Hilt's accuracy is not static. Three mechanisms drive continuous improvement:
 
 ### Analyst feedback
 
-Every finding your team reviews directly influences future detection quality — but the mechanism differs for confirmed versus dismissed findings.
+Every finding your team reviews directly influences future detection quality, but the mechanism differs for confirmed versus dismissed findings.
 
 **Dismissed findings** feed into a real-time suppression layer. When your team marks a finding as a false positive, Hilt builds a behavioral fingerprint of that pattern and uses it to suppress similar future findings. This suppression is immediate (active within minutes) and specific. It targets the pattern your analyst identified, not broad categories of behavior. Over time, this cleans up noise that is unique to your environment, letting real threats surface more clearly.
 
@@ -168,4 +172,5 @@ The statistical engine's baselines are rolling windows that evolve as your envir
 | **Benchmark suite** | A curated set of attack scenarios at varying subtlety levels, used to measure model recall. Controlled by Hilt and updated as new threat categories emerge. |
 | **Severity** | How statistically extreme the anomaly is (Critical, High, Medium, Low). |
 | **Confidence** | How many independent scoring channels agree the behavior is anomalous (High, Medium, Low). |
-| **TTD** | Time to detect — the number of epochs between the start of anomalous behavior and the first finding. |
+| **TTD** | Time to detect: how long after a host's behavior first looks unusual that Hilt flags it. Shown two ways, on your real fleet (your environment's typical speed) and on the testing corpus (a fixed benchmark for comparing model versions). |
+| **First sign of unusual activity** | The earliest point the detection model saw a host's behavior begin to drift from its normal. TTD is measured from here to the finding. |
