@@ -30,7 +30,7 @@ A deployment is made up of these logical components, all inside your account:
 | **Enrichment and scoring** | Workloads that normalize, enrich, and score events, and evaluate model drift |
 | **Analytics database** | Column store that holds normalized telemetry and findings |
 | **Dashboard** | Web application for investigation, detection rules, and administration, reached over private networking |
-| **Export pipeline (optional)** | Off by default; produces the opt-in anonymized export you approve |
+| **Export pipeline** | Core component; produces anonymized exports on a daily schedule for your review and approval |
 
 ---
 
@@ -96,11 +96,11 @@ Events travel one direction, from your hosts into your analytics store and dashb
   │                          │   (ClickHouse)    │      │(private ALB¹) │  │
   │                          └─────────┬─────────┘      └──────────────┘  │
   │                                    ┊                                  │
-  │                                    ┊ opt-in, anonymized, approved     │
+  │                                    ┊ anonymized, approved             │
   │                                    ▼                                  │
   │                          ┌──────────────────┐                        │
-  │                          │  Export pipeline  │ ┄┄▶ to Hilt (opt-in)  │
-  │                          │   (off by default)│                       │
+  │                          │  Export pipeline  │ ┄┄▶ to Hilt (approved)│
+  │                          │  (daily schedule) │                       │
   │                          └──────────────────┘                        │
   │                                                                       │
   └─────────────────────────────────────────────────────────────────────┘
@@ -108,7 +108,7 @@ Events travel one direction, from your hosts into your analytics store and dashb
 
 ¹ "Private ALB" is AWS-specific; Azure and Ali Cloud use Kubernetes ingress load balancers.
 
-The dotted path is the only route by which any data leaves your account, and it runs only when you opt in and approve each transfer. See [Data collection and handling](/trust-security/data-handling) for what flows through this pipeline and [Anonymized data export](/on-prem/data-export-overview) for the export controls.
+The dotted path is the only route by which any data leaves your account, and nothing is transferred until you approve each export. See [Data collection and handling](/trust-security/data-handling) for what flows through this pipeline and [Anonymized data export](/on-prem/data-export-overview) for the export controls.
 
 <Note>
 Service names vary by cloud (for example, the streaming buffer is MSK on AWS and Pub/Sub on GCP), but the data flow and trust boundary are identical: telemetry stays in your account.
@@ -118,4 +118,4 @@ Service names vary by cloud (for example, the streaming buffer is MSK on AWS and
 
 ## Data residency
 
-Telemetry does not leave your cloud account. Hilt does not receive, mirror, or hold out-of-band access to your events. The single exception is the [anonymized data export](/on-prem/data-export-overview), which is off by default and, when enabled, transfers only anonymized statistical features after your review and approval.
+Telemetry does not leave your cloud account. Hilt does not receive, mirror, or hold out-of-band access to your events. The single exception is the [anonymized data export](/on-prem/data-export-overview), a core pipeline that transfers only anonymized statistical features after your review and approval.

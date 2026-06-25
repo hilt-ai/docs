@@ -41,14 +41,9 @@ Unix UID 会按每台主机重映射为顺序整数。UID 0（root）保留为 0
 
 ## 运行一次导出
 
-导出以一次性 Kubernetes Job 的形式在现有 EKS 集群上运行，使用与 enrichment 服务相同的 ClickHouse 凭证。
+导出管道作为每项部署的一部分进行预配，并按日计划运行。您也可以在现有 EKS 集群上触发一次性 Kubernetes Job，使用与 enrichment 服务相同的 ClickHouse 凭证。
 
 <Steps>
-  <Step title="启用导出能力">
-    ```bash
-    terraform -chdir=envs/app apply -var data_export_enabled=true
-    ```
-  </Step>
   <Step title="触发导出作业">
     ```bash
     kubectl create job --from=cronjob/dag-data-export dag-data-export-$(date +%s)
