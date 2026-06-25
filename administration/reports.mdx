@@ -4,17 +4,24 @@ sidebarTitle: "Reports"
 description: "Generating and exporting security reports from Hilt findings."
 ---
 
-Generates infrastructure and security reports from telemetry and findings, exportable to PDF. Two report types are available: an executive **Overview** and a deeper **Process Intel** breakdown.
+Generates infrastructure and security reports from telemetry and findings, exportable to PDF. Two report types are available: an **Executive Summary** and a deeper **Process Intel** breakdown.
+
+## Period selector
+
+A period selector at the top of the page lets you choose the reporting window: **24h**, **7d**, **30d**, **90d**, or **1y**.
 
 ---
 
-## Overview report
+## Executive Summary report
 
 A one-page executive summary covering the selected period:
 
 - **Risk identified**: a donut of detections by category, with the total anomaly count in the center.
-- **Detection funnel**: the stages from _anomalies flagged_ through _analyst reviewed_, _validated threats_, _hosts quarantined_, and _hosts restored_, with accuracy KPIs.
-- **ROI cards**: collector coverage (active/offline/users), intercepted outbound requests, and blocked sensitive-file activity.
+- **Detection funnel**: the stages from _anomalies flagged_ through _analyst reviewed_, _validated threats_, _hosts quarantined_, _hosts sanitized_, and _hosts restored_, with accuracy KPIs including **Detection accuracy** and **False positive rate**.
+- **ROI cards**:
+  - **Data Collectors Ensuring Complete System Coverage** — with Active, Offline, and Users sub-tiles.
+  - **Anomalous out requests intercepted** — with egress and file outbound sub-tiles.
+  - **Sensitive file opens blocked** — with deletions and permission changes sub-tiles.
 - **Charts**: transfer volume (bytes over time) and file activity over the period.
 
 If there were no detections in the period, the risk donut notes that.

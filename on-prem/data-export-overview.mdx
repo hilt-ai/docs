@@ -1,12 +1,38 @@
 ---
-title: "Anonymized data export"
+title: "Anonymized Data Export"
 sidebarTitle: "Overview"
-description: "How telemetry from on-prem deployments is anonymized for Hilt model improvement while preserving privacy."
+description: "How telemetry is anonymized for Hilt model improvement while preserving privacy."
 ---
 
 ## Purpose
 
 Hilt's detection models improve when trained on diverse, real-world behavioral patterns. For customers who opt in, a structured export pipeline produces anonymized statistical summaries that help calibrate detection thresholds across different infrastructure types.
+
+---
+
+## Dashboard view
+
+The Admin UI provides an export management panel:
+
+- **Export picker** — a dropdown to select an export by ID. Each export shows an icon indicating its status (approved or pending).
+- **Manifest panel** — once an export is selected, a detail panel displays:
+  - Date range
+  - Row count
+  - Host count
+  - Temporal jitter applied
+  - File size
+  - SHA-256 hash
+  - Column list
+  - Excluded columns note
+  - Zero-filled columns
+  - Status badges (anonymized, approved, transferred to Hilt)
+- **Approve export** — a button to approve the selected export, with a confirmation dialog.
+- **Delete (reject)** — a button to delete and reject the export, with a confirmation dialog.
+- **Sample table** — a preview showing the first 20 rows of the export data.
+
+When no exports exist, an empty state reads: _"Exports run on a daily schedule"_ with a note to contact your Hilt representative to enable exports.
+
+**Permissions**: viewing exports requires the **`view_audit`** permission; approving or deleting exports requires the **`manage_users`** permission.
 
 ---
 
@@ -73,6 +99,8 @@ Every export creates a logged event with the export ID, row count, date range, a
 
 ---
 
-## What Hilt receives
+## Operations reference
+
+### What Hilt receives
 
 Behavioral feature vectors and abstracted activity sequences only. No filenames, IP addresses, hostnames, usernames, cloud resource IDs, detection rule names, or match descriptions.

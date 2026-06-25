@@ -11,7 +11,7 @@ Lists every host running a Hilt collector, shows whether each one is reporting, 
 The page has two sections stacked vertically:
 
 1. **Fleet summary cards**: three filter cards at the top.
-2. **Host table**: searchable, sortable list of all matching hosts.
+2. **Host table**: filterable list of all matching hosts, with a search/filter bar for narrowing by hostname, IP, instance ID, or tag.
 
 Click any row to open that host's detail view.
 
@@ -61,16 +61,16 @@ The table lists every host matching the active filter from the summary cards abo
 | **Host** | Display name, plus an environment tag pill when `env` is set (prod, staging, dev) |
 | **Type** | Infrastructure type: VM, Kubernetes node, etc. |
 | **Last seen** | Relative time since the last event batch was received |
-| **Anomalies** | Count of open findings on this host, or "–" if none |
+| **Anomalies** | Anomaly count on this host, or "–" if none |
 | **Events** | Total events received |
 | **Users** | Distinct identities observed on this host |
-| **Actions** | Row menu: rename display name, deactivate/reactivate (where available) |
+| **Actions** | Row menu: rename display name, deactivate/reactivate |
 
 Click anywhere on a row (except the drag handle or actions menu) to open host detail.
 
 ### Table behavior
 
-- **Sorting**: default sort is by last seen (most recent first). Click column headers where supported.
+- **Sorting**: sort is fixed server-side by last seen (most recent first); only pin order overrides display position.
 - **Drag to reorder**: use the grip handle on the left to rearrange rows. Pin order to keep your arrangement.
 - **Pagination**: 50 hosts per page with previous/next controls.
 - **Auto-refresh**: the table reloads every 30 seconds.
@@ -113,7 +113,7 @@ Three clickable cards scoped to this host and the current dashboard time window:
 | Card | Value | Navigates to |
 | --- | --- | --- |
 | **Events (24h)** | Event count | Investigate, filtered to this host |
-| **Anomalies active** | Open finding count | Anomalies, filtered to this host |
+| **Anomalies (24h)** | Open finding count | Anomalies, filtered to this host |
 | **Users active** | Distinct identities | User Timeline, filtered to this host |
 
 ### Containment tree

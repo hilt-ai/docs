@@ -1,7 +1,7 @@
 ---
-title: "Auto-update agent"
+title: "Auto-Update Overview"
 sidebarTitle: "Overview"
-description: "Overview of the auto-update agent and its version policy for on-prem Hilt deployments."
+description: "Overview of the auto-update agent and its version policy."
 ---
 
 ## Overview
@@ -14,7 +14,28 @@ The auto-update agent is a lightweight container deployed as a Kubernetes CronJo
 4. Verifies health after rollout.
 5. Reports status to a configurable webhook (Slack, email, etc.).
 
-## Version policy
+---
+
+## Dashboard view
+
+The Admin UI provides a management panel for the auto-update agent:
+
+- **Current version** — the active release tag (e.g., `v1.04.28`).
+- **Previous tag** — the release tag that was active before the last update.
+- **Last updated** — the timestamp and actor (user or system) of the most recent update.
+- **Automatic updates toggle** — an on/off switch to enable or disable automatic updates.
+
+**Permissions**: viewing the dashboard panel requires the **`view_audit`** permission; toggling automatic updates on or off requires the **`manage_users`** permission.
+
+<Note>
+Disabling updates via the **dashboard toggle** keeps the CronJob scheduled but causes it to take no action on each run. This is different from disabling via Terraform (`auto_update_enabled = false`), which removes the CronJob entirely.
+</Note>
+
+---
+
+## Operations reference
+
+### Version policy
 
 Release tags follow the format `vMAJOR.MINOR.PATCH` (e.g. `v1.04.27`). The agent uses a **prefix-based minor update policy**:
 

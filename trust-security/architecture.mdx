@@ -40,13 +40,14 @@ The component roles above map to native managed services on each cloud. All vari
 
 | Role | AWS | GCP | Azure | Ali Cloud |
 | :-- | :-- | :-- | :-- | :-- |
-| Platform compute | EKS | GKE | AKS | ACK |
+| Platform compute (ingest, dashboard) | ECS Fargate | GKE | AKS | ACK |
+| Platform compute (enrichment, classification) | EKS | GKE | AKS | ACK |
 | Event streaming | MSK (Kafka) | Pub/Sub | Event Hubs | Message Queue for Apache Kafka |
 | Private ingest | PrivateLink | Private Service Connect | Private Link | PrivateLink |
-| Analytics database | ClickHouse | ClickHouse | ClickHouse | ClickHouse |
+| Analytics database | ClickHouse (EC2 instance) | ClickHouse | ClickHouse (Azure VM) | ClickHouse (ECS VM) |
 | Dashboard database | RDS (PostgreSQL) | Cloud SQL (PostgreSQL) | Azure Database for PostgreSQL | ApsaraDB RDS (PostgreSQL) |
 | Object storage | S3 | Cloud Storage | Blob Storage | OSS |
-| TLS and DNS | ACM, Route 53 | Certificate Manager | App Gateway / Front Door | PrivateLink, private DNS |
+| TLS and DNS | ACM, Route 53 | Certificate Manager | ingress-nginx + Kubernetes TLS | CAS, private DNS |
 | Service identity | IAM roles | Workload Identity | Managed Identity | RAM roles |
 
 ---
@@ -92,7 +93,7 @@ Events travel one direction, from your hosts into your analytics store and dashb
   │                                    ▼                                  │
   │                          ┌──────────────────┐      ┌──────────────┐  │
   │                          │ Analytics database│◀────▶│  Dashboard   │  │
-  │                          │   (ClickHouse)    │      │ (private ALB) │  │
+  │                          │   (ClickHouse)    │      │(private ALB¹) │  │
   │                          └─────────┬─────────┘      └──────────────┘  │
   │                                    ┊                                  │
   │                                    ┊ opt-in, anonymized, approved     │
@@ -104,6 +105,8 @@ Events travel one direction, from your hosts into your analytics store and dashb
   │                                                                       │
   └─────────────────────────────────────────────────────────────────────┘
 ```
+
+¹ "Private ALB" is AWS-specific; Azure and Ali Cloud use Kubernetes ingress load balancers.
 
 The dotted path is the only route by which any data leaves your account, and it runs only when you opt in and approve each transfer. See [Data collection and handling](/trust-security/data-handling) for what flows through this pipeline and [Anonymized data export](/on-prem/data-export-overview) for the export controls.
 

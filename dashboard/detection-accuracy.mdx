@@ -6,6 +6,10 @@ description: "How Hilt detects threats, what the accuracy metrics mean, and how 
 
 How Hilt finds threats, how it measures its own performance, and what you can do to make it sharper.
 
+<Note>
+This is a **concepts page** explaining how Hilt's detection engines work. The dashboard view of these metrics is on the **Model Lifecycle** page (under Admin).
+</Note>
+
 ---
 
 ## What Hilt watches and how it decides
@@ -16,7 +20,7 @@ A **statistical engine** builds a rolling behavioral baseline for each host, tra
 
 A **detection model** trained on your environment's behavioral data learns deeper temporal patterns that statistical baselines alone cannot capture: sequences of activity that look individually normal but are collectively anomalous, or subtle shifts that emerge over multiple observation windows. The model scores each epoch independently and combines its assessment with the statistical engine's output using a combination method that accounts for dependencies between signals.
 
-Together, these engines catch a wider range of threats than either could alone. The statistical engine is fast and interpretable; the detection model adds judgment about patterns that require learning from data. A **finding** appears on the [Anomalies](/dashboard/anomalies) page when both engines agree that something is unusual enough to warrant investigation.
+Together, these engines catch a wider range of threats than either could alone. The statistical engine is fast and interpretable; the detection model adds judgment about patterns that require learning from data. A **finding** appears on the [Anomalies](/dashboard/anomalies) page when the engines determine that something is unusual enough to warrant investigation. Findings come from **both ML engines and detection rules**.
 
 ### What gets observed
 
@@ -70,17 +74,17 @@ This metric is the model's **recall** against the benchmark: `threats caught = f
 
 A higher percentage means broader coverage. Because the benchmark is controlled and consistent across model versions, this metric lets you compare versions directly. If Threats caught goes up, the new model is catching attacks the old one missed. The benchmark itself is updated as new threat categories emerge, so coverage evolves alongside the threat landscape.
 
-### Real threats still caught
+### Real threats kept
 
 _"When the model updates, does it still catch the threats my team already confirmed?"_
 
 This metric comes from your team's **feedback**. When analysts confirm a finding as a real threat, that confirmation becomes a test case for future model versions. Hilt replays those confirmed incidents against the candidate model and checks whether it would still flag them.
 
-`real threats still caught = confirmed threats still flagged / total confirmed threats`
+`real threats kept = confirmed threats still flagged / total confirmed threats`
 
-This protects against regression: a model update that catches new attack types but silently drops threats you've already validated would show a decline here. Until your team has reviewed enough findings, this metric shows _"still maturing"_.
+This protects against regression: a model update that catches new attack types but silently drops threats you've already validated would show a decline here. When metrics are not yet available (insufficient feedback data), the UI shows "—" (em dash).
 
-### False alarms avoided
+### False alarms you won't see again
 
 _"Is the new model producing less noise than the old one?"_
 
@@ -90,7 +94,7 @@ When analysts dismiss a finding, they're identifying a pattern that is normal fo
 
 This is a **noise reduction rate** scoped to patterns your team has already reviewed. It relates to precision (true positives / all alerts) but is narrower: precision measures quality across all findings, while this metric measures improvement on the subset your analysts have marked as false positives. A rising number means the model is absorbing your feedback and producing less noise on known false positives.
 
-Like Real threats still caught, this shows _"still maturing"_ until enough dismissed findings accumulate.
+Like Real threats kept, this shows "—" (em dash) when not yet available.
 
 ### Model verdicts
 
@@ -98,9 +102,9 @@ After evaluation against both the benchmark and your team's feedback, each model
 
 | Verdict | Meaning |
 | :-- | :-- |
-| **Strengthened** | The new model improved on one or more metrics without regressing on others. It is promoted automatically. |
-| **No change** | Performance is equivalent to the previous version. The new model is promoted. |
-| **Held back** | The new model regressed on one or more metrics. The previous model stays active and Hilt flags the issue for review. |
+| **"Your protection strengthened…"** | The new model improved on one or more metrics without regressing on others. It is promoted automatically. |
+| **"No change needed"** | Performance is equivalent to the previous version. The new model is promoted. |
+| **"We held this update back…"** | The new model regressed on one or more metrics. The previous model stays active and Hilt flags the issue for review. |
 
 A model must pass a multi-stage evaluation before it can replace the active model. This evaluation includes the benchmark replay and HITL (human-in-the-loop) replay described above, plus internal consistency checks on the model's scoring behavior. Models that fail any gate are held back automatically.
 
@@ -145,7 +149,7 @@ Every finding your team reviews directly influences future detection quality, bu
 
 **Dismissed findings** feed into a real-time suppression layer. When your team marks a finding as a false positive, Hilt builds a behavioral fingerprint of that pattern and uses it to suppress similar future findings. This suppression is immediate (active within minutes) and specific. It targets the pattern your analyst identified, not broad categories of behavior. Over time, this cleans up noise that is unique to your environment, letting real threats surface more clearly.
 
-**Confirmed findings** become test cases. When a new model version is evaluated, Hilt replays your confirmed threats against it and checks whether it would still catch them. This is how the "Real threats still caught" metric works. Your team's confirmations become a regression test suite that every future model must pass.
+**Confirmed findings** become test cases. When a new model version is evaluated, Hilt replays your confirmed threats against it and checks whether it would still catch them. This is how the "Real threats kept" metric works. Your team's confirmations become a regression test suite that every future model must pass.
 
 This is why triaging findings matters: each review either removes a specific source of noise or adds a regression test for a real threat.
 

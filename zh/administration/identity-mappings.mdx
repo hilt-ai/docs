@@ -1,0 +1,74 @@
+---
+title: "身份映射"
+sidebarTitle: "身份映射"
+description: "将主机上观察到的机器身份关联到企业账户。"
+---
+
+身份映射页面将 Hilt 采集器观察到的机器级别身份（Linux 用户名、Teleport 会话、PPID 链）关联到你身份目录中的企业账户。这有助于你了解主机上活动背后的操作人员。本页面需要 **manage users** 权限。
+
+---
+
+## 工作原理
+
+Hilt 会观察你主机上的身份信号——Linux 登录用户名、Teleport 会话标识符、PPID 链模式——并建议与用户账户的映射关系。你负责审阅并确认这些建议的映射。
+
+---
+
+## Okta 同步
+
+页面顶部的状态栏显示：
+
+- **同步状态**：上次 Okta 目录同步是否成功。
+- **上次同步时间**：距上次刷新目录过去了多久。
+- **Okta 用户数**：从 Okta 导入的用户账户总数。
+
+使用 **Sync now** 按钮可立即触发目录刷新。如果同步失败，错误信息将内联显示。
+
+---
+
+## 统计信息
+
+映射表顶部的汇总行可一目了然地显示覆盖情况：
+
+> `{total} mappings · {confirmed} confirmed · {suggested} needs review · {type counts}`
+
+---
+
+## 映射表
+
+映射表中每一行显示：
+
+| 列 | 说明 |
+| --- | --- |
+| **Machine identity** | 在主机上观察到的身份（例如 Linux 用户名） |
+| **Source** | 身份的观察来源：Okta、Teleport Owner、SSH IP 或其他 |
+| **Okta user** | 该身份映射到的企业账户 |
+| **Match** | 映射的匹配方式：Email match、Login match、Manual 或 None |
+| **Status** | **Suggested**（待审阅）或 **Confirmed** |
+| **Type** | 身份分类：Verified、Machine、Shared、Service 或 Unknown |
+
+<Note>
+页面一次最多显示 **200 条映射**。在大规模部署中，可使用筛选器或搜索来定位特定映射。
+</Note>
+
+---
+
+## 筛选
+
+使用搜索栏按机器身份或 Okta 用户名进行筛选。**状态筛选器**可让你查看所有映射或仅查看特定状态（Suggested 或 Confirmed）的映射。**类型筛选器**下拉菜单可让你按身份分类（Verified、Machine、Shared、Service、Unknown）缩小结果范围。
+
+---
+
+## 审阅映射
+
+对于建议的映射：
+
+- **Confirm** — 接受映射，将机器身份关联到企业账户。
+
+你还可以更改映射的类型或将其完全删除。
+
+---
+
+## 创建手动映射
+
+点击 **Manual Mapping** 可手动将机器身份关联到 Okta 用户。这将打开 **Create Manual Mapping** 表单。手动映射适用于自动匹配无法解析身份的场景——例如，当 Linux 用户名与 Okta 邮箱前缀差异较大时。

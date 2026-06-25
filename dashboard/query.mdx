@@ -4,9 +4,35 @@ sidebarTitle: "Query"
 description: "Natural language and structured queries against your Hilt telemetry."
 ---
 
-Ask natural-language questions about telemetry, events, processes, file access, and network flows, and get answers back in a chat interface. Access requires the **run queries** permission.
+Ask natural-language questions about telemetry, events, processes, file access, and network flows, and get answers back in a chat interface.
+
+<Note>
+The **run_queries** permission controls whether the Query page appears in the sidebar navigation. Users without this permission can still reach the page via a direct URL — the permission gates visibility, not route access.
+</Note>
 
 The agent also answers questions about **how Hilt itself works** — deployment, collectors, configuration, permissions, data handling, on-prem operations, quarantine, and more — by searching the Hilt documentation that ships with your deployment. It decides per question whether to use live telemetry, the documentation, or both.
+
+---
+
+## Starter suggestion chips
+
+Before any conversation, the empty state shows four example questions as clickable chips to help you get started — for example:
+
+- _"Which hosts ran the most outbound connections this week?"_
+- _"Show me all file writes to /etc/shadow in the last 24 hours"_
+- _"What anomalies were detected on production hosts today?"_
+- _"How do I deploy the collector on Kubernetes?"_
+
+Clicking a chip fills it into the input and sends it immediately.
+
+---
+
+## Thinking indicator and timeout recovery
+
+When a query takes more than **3 seconds**, a thinking indicator with an elapsed timer appears so you know the query is still running.
+
+- After **45 seconds**, a reassurance message is shown to confirm the query is still in progress and has not stalled.
+- If a query **times out**, the UI suggests simplifying the question or narrowing the time window to reduce the amount of data scanned.
 
 ---
 

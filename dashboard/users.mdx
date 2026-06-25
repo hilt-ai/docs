@@ -1,6 +1,6 @@
 ---
-title: "Users"
-sidebarTitle: "Users"
+title: "User Timeline"
+sidebarTitle: "User Timeline"
 description: "Tracking user identity and activity across hosts."
 ---
 
@@ -24,6 +24,7 @@ Above the user list, three stat pills summarize the current scope:
 
 ### Filter and search
 
+- **Host filter**: a host selector in the page header scopes the user list to a specific host. When a host filter is active, an **Investigate events** button appears in the header and jumps to Investigate scoped to that host and user context.
 - **Segmented toggle**: **All** or **At risk** (users whose risk level is _unusual_ or _critical_).
 - **Search**: filter by identity, identity source, or Okta name/email.
 
@@ -83,7 +84,7 @@ Outline buttons to jump elsewhere with the user's scope carried over:
 | --- | --- |
 | **Investigate events** | Investigate, scoped to this user |
 | **Anomaly alerts** | Anomalies for the current time range |
-| **Process tree** | Processes (when the host is known) |
+| **Data Lineage** | Data Lineage (when the host is known; the `/processes` URL redirects to `/data-lineage`) |
 
 ---
 

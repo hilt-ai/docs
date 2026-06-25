@@ -8,6 +8,12 @@ description: "理解并分流由 Hilt 机器学习模型检测到的异常发现
 
 ---
 
+## 页面标头
+
+页面标头包含一个 **主机选择器**，用于将发现项范围限定到特定主机，以及 **时间预设**（5m、15m、1h、6h、24h、7d）来控制时间窗口。
+
+当没有深度链接到某个发现项时，页面会**自动选择 Review 标签页中的第一个发现项**。
+
 ## 过滤器
 
 过滤通过 **Filters** 弹出框进行结构化设置：
@@ -47,22 +53,22 @@ description: "理解并分流由 Hilt 机器学习模型检测到的异常发现
 - **User / Reviewer** 和 **Confidence**（High / Medium / Low）。
 - 当主机已被隔离时，显示 **Host quarantined · View** 链接。
 
-被选中的卡片以绿色强调色高亮。严重程度可用作过滤条件，但不会打印在卡片上。
+被选中的卡片以绿色强调色高亮。每张卡片上都会显示一个 **严重程度徽章**（Critical、High、Medium、Low）。当可用时，还会显示 **Time to Detect (TTD)**（例如 "detected ~30s after it began"）。
 
 ---
 
 ## 发现项详情
 
-选择某个发现项会在右侧面板中打开它的报告。（如果未选择任何项，面板会提示你 _“Select a finding from the queue to view details.”_）报告分为两部分。
+选择某个发现项会在右侧面板中打开它的报告。（如果未选择任何项，面板会提示你 _"Select a finding from the queue to view details."_）报告分为两部分。
 
 ### 叙述
 
 顶部条带解释该发现项：
 
 - **标题（Headline）**，附带 **主机** 和发现项的 **时间**。
-- 一个 **type** 徽章和一个 **confidence** 徽章（悬停可见 “Model Confidence”）。
+- 一个 **type** 徽章和一个 **confidence** 徽章（悬停可见 "Model Confidence"）。
 - 适用时显示 **Quarantined** 链接。
-- 叙述本身，即 _发生了什么_，以及一个 **Why unusual** 区块，外加上下文标签（chip）。
+- 叙述本身 — _发生了什么_ 以及 _为何异常_ — 外加上下文标签（chip）。
 - 涉及的作业、应用或工作负载的 **Identity** 徽章。
 
 可能会出现两条上下文横幅：一条 **workload phase change** 提示（说明仅基于流量的信号已被弱化处理），以及当该模式与某位审阅者先前驳回过的发现项相匹配时的 **feedback-suppression** 提示，其中包含模式相似度（精确匹配或一个百分比）。
@@ -73,10 +79,21 @@ description: "理解并分流由 Hilt 机器学习模型检测到的异常发现
 
 - **Confirm**：将其标记为真实异常（移至 **Accepted**）。
 - **Dismiss**：将其标记为良性或误报（移至 **Denied**）。
-- 一个备注字段（_“Add review notes...”_）可让你记录上下文。
+- 一个备注字段（_"Add review notes..."_）可让你记录上下文。
 
-### 事件时间线
+<Note>
+**只读用户**（Viewer 角色）不会看到 Confirm/Dismiss 按钮或备注字段。这些 HITL 控件仅对拥有审阅权限的用户可用。
+</Note>
 
-在叙述下方，一条 **泳道时间线（swimlane timeline）** 将证据绘制在一个五分钟窗口内的三条泳道中：**Process**、**Network** 和 **File**。节点按其贡献强度着色（图例涵盖 _key contributor_、_involved_、_background_ 和 _strongest link_），点击某个节点会固定一个工具提示，显示 PID、父进程、时间、相关性评分与排名，以及其关联事件。连接弧线标注为 _strong_、_moderate_ 或 _weak link_。
+### 操作按钮
+
+详情面板中的两个按钮提供快速后续操作：
+
+- **Explain**：启动该发现项的引导式讲解，逐步介绍叙述、证据和上下文，帮助你理解发生了什么。
+- **Investigate**：打开 [调查](/zh/dashboard/investigate) 页面上的限定范围事件时间线，预先过滤到该发现项的主机和时间窗口。
+
+### 因果图
+
+在叙述下方，**因果图（Causal Graph）** 将导致该异常的事件链条可视化呈现。它是一张垂直的因果故事图，带有可展开的进程步骤 — 每个节点展示某个进程做了什么及其下游分支效应。展开某个步骤会显示该链条节点上发生的具体操作（文件访问、网络连接、子进程）。
 
 ---

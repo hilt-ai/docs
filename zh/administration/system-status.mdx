@@ -1,0 +1,42 @@
+---
+title: "系统状态"
+sidebarTitle: "系统状态"
+description: "Hilt 仪表盘背后服务的实时健康监控。"
+---
+
+系统状态页面提供驱动你 Hilt 部署的每个后端服务的实时健康视图。本页面需要 **manage users** 权限。
+
+---
+
+## 总体状态
+
+页面顶部的横幅显示所有组件的聚合健康状态：
+
+| 状态 | 含义 |
+| --- | --- |
+| **All systems operational** | 所有受监控组件均正常运行 |
+| **N service(s) need(s) attention** | 一个或多个组件遇到问题，但系统仍可正常运行 |
+| **Some services disabled** | 一个或多个组件已被有意禁用 |
+| **No services monitored** | 没有后端组件在报告状态 |
+
+---
+
+## 组件卡片
+
+每个后端组件都有一张状态卡片，显示：
+
+- **组件名称**（例如 Anomaly Narratives、TRACE Anomaly Detection、Event Enrichment、Backend Process、ClickHouse、Postgres）。
+- **当前状态**：Operational、Degraded、Disabled 或 No data。
+- **运行时间历史**：一个 90 天的可视化历史，展示一段时间内的可用性。
+
+组件卡片还可以在服务不健康时显示**修复步骤**，以及带有额外详细信息（如响应时间、队列深度或资源使用情况）的**后端关键指标条**。
+
+### 基础设施组件
+
+基础设施级别的组件（ClickHouse、Postgres）使用可展开的卡片，按信号细分——包括查询延迟、连接池使用率和复制延迟等各项健康指标。
+
+---
+
+## 刷新
+
+页面会定期自动刷新状态数据。你也可以点击 **Refresh** 按钮强制执行即时检查。页面头部显示上次检查状态的时间。

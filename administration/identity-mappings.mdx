@@ -1,16 +1,16 @@
 ---
 title: "Identity Mapping"
 sidebarTitle: "Identity Mapping"
-description: "Linking machine identities observed on hosts to corporate Okta accounts."
+description: "Linking machine identities observed on hosts to corporate accounts."
 ---
 
-The Identity Mapping page connects the machine-level identities the Hilt collector observes (Linux usernames, Teleport sessions, PPID chains) to corporate accounts in your Okta directory. This helps you understand which person is behind activity on a host. This page requires the **manage users** permission.
+The Identity Mapping page connects the machine-level identities the Hilt collector observes (Linux usernames, Teleport sessions, PPID chains) to corporate accounts in your identity directory. This helps you understand which person is behind activity on a host. This page requires the **manage users** permission.
 
 ---
 
 ## How it works
 
-Hilt observes identity signals on your hosts — Linux login usernames, Teleport session identifiers, PPID chain patterns — and proposes mappings to Okta user accounts. You review, confirm, or reject these proposed mappings.
+Hilt observes identity signals on your hosts — Linux login usernames, Teleport session identifiers, PPID chain patterns — and suggests mappings to user accounts. You review and confirm these suggested mappings.
 
 ---
 
@@ -22,7 +22,15 @@ A status bar at the top shows:
 - **Last synced**: how long ago the directory was refreshed.
 - **Okta users**: the total number of user accounts imported from Okta.
 
-Use the **Sync now** button to trigger an immediate directory refresh.
+Use the **Sync now** button to trigger an immediate directory refresh. If the sync fails, the error message is displayed inline.
+
+---
+
+## Statistics
+
+A summary line at the top of the mapping table shows coverage at a glance:
+
+> `{total} mappings · {confirmed} confirmed · {suggested} needs review · {type counts}`
 
 ---
 
@@ -33,41 +41,34 @@ Each row in the mapping table shows:
 | Column | Description |
 | --- | --- |
 | **Machine identity** | The identity observed on the host (e.g., a Linux username) |
-| **Source** | Where the identity was observed (Linux username, Teleport session, PPID chain) |
+| **Source** | Where the identity was observed: Okta, Teleport Owner, SSH IP, or other |
 | **Okta user** | The corporate account the identity is mapped to |
-| **Status** | Proposed (awaiting review), Confirmed, or Rejected |
-| **Type** | Automatic (proposed by Hilt) or Manual (created by an admin) |
+| **Match** | How the mapping was matched: Email match, Login match, Manual, or None |
+| **Status** | **Suggested** (awaiting review) or **Confirmed** |
+| **Type** | The identity classification: Verified, Machine, Shared, Service, or Unknown |
 
----
-
-## Reviewing mappings
-
-For proposed mappings:
-
-- **Confirm** — accepts the mapping, linking the machine identity to the Okta account.
-- **Reject** — dismisses the mapping. Hilt will not propose the same pairing again.
-
-You can also change a mapping's type between automatic and manual, or delete it entirely.
-
----
-
-## Creating manual mappings
-
-Click **New mapping** to manually link a machine identity to an Okta user. This is useful when the automatic matching can't resolve an identity — for example, when a Linux username differs significantly from the Okta email prefix.
-
----
-
-## Statistics
-
-A summary card shows mapping coverage:
-
-- **Total identities** observed across your fleet.
-- **Mapped** — identities successfully linked to Okta accounts.
-- **Unmapped** — identities without a corporate account association.
-- **Pending** — proposed mappings awaiting review.
+<Note>
+The page shows up to **200 mappings** at a time. Use the filters or search to locate specific mappings in larger deployments.
+</Note>
 
 ---
 
 ## Filtering
 
-Use the search bar to filter by machine identity or Okta username. A status filter lets you view all mappings or only those in a specific state (proposed, confirmed, rejected).
+Use the search bar to filter by machine identity or Okta username. A **status filter** lets you view all mappings or only those in a specific state (Suggested or Confirmed). A **type filter** dropdown lets you narrow results by identity classification (Verified, Machine, Shared, Service, Unknown).
+
+---
+
+## Reviewing mappings
+
+For suggested mappings:
+
+- **Confirm** — accepts the mapping, linking the machine identity to the corporate account.
+
+You can also change a mapping's type or delete it entirely.
+
+---
+
+## Creating manual mappings
+
+Click **Manual Mapping** to manually link a machine identity to an Okta user. This opens the **Create Manual Mapping** form. Manual mapping is useful when the automatic matching can't resolve an identity — for example, when a Linux username differs significantly from the Okta email prefix.

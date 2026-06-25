@@ -4,35 +4,26 @@ sidebarTitle: "Layout"
 description: "How the Hilt dashboard is organized: navigation sections and what each page covers."
 ---
 
-The dashboard mirrors the sidebar in the Hilt web app. Pages are grouped into **Overview**, **Collectors**, **Data Flow**, **Security**, and **Endpoint**.
+The dashboard mirrors the sidebar in the Hilt web app. Pages are grouped into **Overview**, **Collectors**, **Cloud**, **Endpoint**, **Security**, and **Admin**, with a standalone **Settings** page.
 
 ## Overview
 
-- [Overview](/dashboard/overview): the unified landing for both Cloud (Linux) and Endpoint (macOS) — health signals, recent findings, and threat profile across the whole fleet
+- [Overview](/dashboard/overview): the unified landing for both Cloud (Linux) and Endpoint (macOS) — health signals, recent anomalies, and threat profile across the whole fleet
 
 ## Collectors
 
 - [Collectors](/dashboard/collectors): fleet list of deployed Hilt collectors and per-host detail
 
-## Data Flow
+## Cloud
 
 - [Data Lineage](/dashboard/data-lineage): process and data-flow visualization across hosts
 - [Networks](/dashboard/networks): TCP connections, destinations, and data transfer
 - [Files](/dashboard/files): file opens, writes, renames, and deletions
-- [Users](/dashboard/users): user identity and activity across the fleet
-- [Query](/dashboard/query): natural-language and structured telemetry queries
-
-## Security
-
-- [Anomalies](/dashboard/anomalies): ML and rule-based findings for triage
-- [Detection Rules](/dashboard/detection-rules): custom detection rule builder
-- [Fleet Behavior](/dashboard/fleet-behavior): behavioral clustering and host movement
-- [Investigate](/dashboard/investigate): deep-dive event timeline and filters
-- [Quarantine](/dashboard/quarantine): host isolation and blast-radius assessment
+- [User Timeline](/dashboard/users): user identity and activity across the fleet
 
 ## Endpoint
 
-The macOS half of the platform — every page built on Apple Endpoint Security kernel telemetry where each event carries code-signing trust and application attribution. See the [Foundation](/dashboard/endpoint/foundation) page for the shared model and layout.
+macOS endpoint detection built on Apple Endpoint Security kernel telemetry. See the [Foundation](/dashboard/endpoint/foundation) page for the shared model and layout.
 
 - [Foundation](/dashboard/endpoint/foundation): what every endpoint event carries, the shared layout, and how the section is organized
 - [Persistence](/dashboard/endpoint/persistence): launch agents, daemons, and login items that survive reboot
@@ -46,6 +37,28 @@ The macOS half of the platform — every page built on Apple Endpoint Security k
 - [Activity](/dashboard/endpoint/activity): the raw, live endpoint event stream
 - [Files](/dashboard/endpoint/files): macOS file explorer with provenance and signed-writer attribution
 
-## Account
+## Security
+
+- [Detection & Accuracy](/dashboard/detection-accuracy): how Hilt detects anomalies and measures model accuracy
+- [Anomalies](/dashboard/anomalies): ML and rule-based findings for triage
+- [Rules](/dashboard/detection-rules): custom detection rule builder
+- [Anomaly Windows](/administration/behavioral-suppression): scheduled suppression of ML anomalies during known-noisy periods
+- [Fleet behavior](/dashboard/fleet-behavior): behavioral clustering and host movement
+- [Investigate](/dashboard/investigate): deep-dive event timeline and filters
+- [Query](/dashboard/query): natural-language and structured telemetry queries
+- [Quarantine](/dashboard/quarantine): host isolation and blast-radius assessment
+- [Reports](/administration/reports): security report generation and PDF export
+
+## Settings
 
 - [Settings](/dashboard/settings): password, username, and session management
+
+## Admin
+
+- [Administration](/administration/layout): users, teams, identity mapping, and platform configuration
+- [Model Lifecycle](/on-prem/model-lifecycle): TRACE detection model status, promotion, and rollback
+- [Data Export](/on-prem/data-export-overview): anonymized data export review and approval
+- [Auto-Update](/on-prem/auto-update-overview): automatic platform update configuration
+- [Storage](/administration/storage): telemetry storage usage, tiering, and lifecycle policies
+- [Audit Log](/administration/audit-log): authentication and administrative action history
+- [MCP Server](/dashboard/mcp-server): Model Context Protocol server for AI assistant integration

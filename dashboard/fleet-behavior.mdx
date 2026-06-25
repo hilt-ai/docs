@@ -1,10 +1,10 @@
 ---
-title: "Fleet Behavior"
-sidebarTitle: "Fleet Behavior"
+title: "Fleet behavior"
+sidebarTitle: "Fleet behavior"
 description: "Cluster analysis and behavioral modeling across your host fleet."
 ---
 
-Groups your hosts by how they behave and shows how those groups shift over time. Hosts with similar activity form **clusters** (behavior groups); as behavior changes between periodic **refits**, hosts move between clusters. This page visualizes both the current grouping and the movement.
+Groups your hosts by how they behave and shows how those groups shift over time. Hosts with similar activity form **clusters** (behavior groups); as behavior changes between periodic **refits**, hosts move between clusters. This page visualizes both the current grouping and the movement. On cold load, the page auto-selects the most significant movement flow.
 
 - **Header**: title, the subtitle _"How hosts group and shift over time"_, and a `{N} clusters · {M} hosts` summary.
 - **Insight strip**: a card summarizing the most notable change (e.g. _"3 hosts moved into Network-heavy"_), with a top driver metric and an **Investigate Event** button when relevant.
@@ -17,7 +17,7 @@ Groups your hosts by how they behave and shows how those groups shift over time.
 
 The canvas plots the current snapshot:
 
-- **Cluster bubbles**: one per behavior group, sized by host count and colored per cluster, with the label and host count shown. Large bubbles may include a short narrative. Emptied-but-referenced clusters appear as dimmed "ghost" bubbles.
+- **Cluster bubbles**: one per behavior group, sized by host count and colored per cluster, with the label and host count shown. Large bubbles may include a short narrative. Ghost clusters (clusters emptied when all hosts moved away) appear as dimmed bubbles and are excluded from the header cluster count.
 - **Idle** and **Returned** pools: special groupings (bottom corners) for hosts with insufficient telemetry and hosts that have reappeared.
 - **Movement arrows**: curved flows between clusters, with width scaled to the number of hosts and labeled `{N} hosts`.
 - **Host dots**: individual hosts inside their bubble (when the Hosts layer is on).

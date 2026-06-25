@@ -8,6 +8,13 @@ description: "Browsing file activity across hosts: opens, writes, renames, and d
 
 Shows what's happening to files across the fleet: opens, deletes, permission changes, and renames, and lets you browse a host's filesystem the way the collector observed it.
 
+A **metric summary strip** sits below the header. The metrics depend on your scope:
+
+- **Fleet view**: Opens, Unlinks, Paths, Hosts
+- **Per-host view**: Events, Paths, Processes, Sessions
+
+When a host is selected, an **Investigate events** button appears in the page header and jumps to Investigate scoped to the current host and time window.
+
 ---
 
 ## Fleet overview
@@ -73,7 +80,7 @@ When you select a directory:
 
 - A **Current location** breadcrumb with back/forward arrows.
 - A **Folders & files** heading with folder and file-path counts.
-- **View options** toggles: **Show system paths** and **Show Hidden** (dotfiles).
+- **View options** toggles: **Show system paths** and **Show Hidden** (dotfiles are shown by default).
 - A **Folders** table (Path · Paths inside · Events) and a **File paths** table (Path · Class · Events · Procs · Del · Chmod · Top Process). Interesting files are highlighted.
 
 #### File list

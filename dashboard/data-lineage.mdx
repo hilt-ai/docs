@@ -17,7 +17,10 @@ The page header carries the controls and adapts to what you're looking at:
 - **View toggle**: appears once a host is selected: **Data Flow** / **Sessions**.
 - **Investigate events**: jumps to Investigate scoped to the current host and time window.
 
-A **metric summary strip** sits below the header with number of processes, network connections and file accesses along with identities and anomalies.
+A **metric summary strip** sits below the header. The metrics depend on your scope:
+
+- **Per-host**: Processes, Binaries, Relationships, Identities, Anomalies
+- **Fleet**: Processes, Binaries, Relationships, Anomalies
 
 The Processes, Relationships, and Anomalies cards are clickable and deep-link into Investigate or Anomalies for the same scope.
 
@@ -26,6 +29,18 @@ The Processes, Relationships, and Anomalies cards are clickable and deep-link in
 ## Fleet overview
 
 With no host selected, the page shows **Process Activity** across the fleet.
+
+A **Search hosts** filter in the table header lets you narrow the list by host name.
+
+### Columns
+
+| Column | What it shows |
+| --- | --- |
+| **Host** | Display name |
+| **Processes** | Process count |
+| **Binaries** | Distinct binary count |
+| **Relationships** | Parent–child relationship count |
+| **Anomalies** | Anomaly count |
 
 ### Behavior
 
@@ -76,6 +91,8 @@ The detail panel describes the selected **process node**, not graph edges.
 ## Sessions view
 
 Switch the per-host toggle to **Sessions** to inspect execution sessions, recurring shapes of process activity, with the ability to load any individual run.
+
+<Note>Session clustering is clamped to a **48-hour window**. When the global time range is wider than 48 hours, an amber banner appears explaining the clamp.</Note>
 
 ### Choosing a session
 

@@ -11,7 +11,7 @@ This page walks you through what happens between signing your contract and seein
 
 <Steps>
   <Step title="Infrastructure provisioning (Day 1)">
-    Hilt provisions a single-tenant deployment in your cloud account (AWS, GCP, Azure, or Ali Cloud). This includes the analytics database, dashboard, and ingest endpoint.
+    Hilt provisions a single-tenant deployment in your cloud account. This includes the analytics database, dashboard, and ingest endpoint. See the deployment guide for your cloud: [AWS](/deployment/aws), [GCP](/deployment/gcp), [Azure](/deployment/azure), or [Ali Cloud](/deployment/ali-cloud).
 
     **Who:** Hilt engineering, with your cloud admin granting access.
 
@@ -23,6 +23,7 @@ This page walks you through what happens between signing your contract and seein
     **Who:** Your infrastructure team, using provided guides:
     - [Deploy on Kubernetes](/linux-collector/deploy-kubernetes)
     - [Deploy on VMs](/linux-collector/deploy-vms)
+    - [macOS Collector](/macos-collector)
 
     **Typical scope:** Start with a representative subset (10–50 hosts) covering your main workload types. Expand once baseline is established.
   </Step>
@@ -62,8 +63,9 @@ This page walks you through what happens between signing your contract and seein
 
 - [ ] Dashboard accessible at your deployment URL
 - [ ] At least one collector reporting (check [Collectors](/dashboard/collectors) page)
-- [ ] Hosts appearing as "Alive" in the fleet view
+- [ ] Hosts appearing as "Active" in the fleet view
 - [ ] Events visible in [Investigate](/dashboard/investigate)
+- [ ] macOS endpoints reporting (if applicable — see [macOS Collector](/macos-collector))
 - [ ] Your team has dashboard accounts with appropriate roles
 
 ---

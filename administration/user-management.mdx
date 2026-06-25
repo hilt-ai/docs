@@ -8,6 +8,25 @@ Create and manage the accounts that can sign in to the dashboard, set each user'
 
 ---
 
+## Summary stats
+
+The top of the page displays headline counts:
+
+- **Total accounts** — the number of user accounts in the system.
+- **Admin count** — how many accounts hold the Admin (or Owner) role.
+- **Temporary-password count** — accounts still using the temporary password set at creation (i.e., the user has not yet changed it under Settings).
+
+## Filter bar
+
+A filter bar at the top of the user list lets you narrow results quickly:
+
+- **Search** — type a username, role, or team name to filter the list.
+- **Role filter** — a dropdown to show only users with a specific role (Admin, Analyst, Responder, Viewer).
+- **Team filter** — a dropdown to show only members of a specific team.
+- **Result count** — an indicator showing how many users match the current filters.
+
+---
+
 ## Roles and permissions
 
 Each user has one role. The role picker includes an info tooltip describing each:
@@ -50,6 +69,14 @@ The ⋯ actions menu offers (availability depends on whether the target is you, 
 | **Reset password** | Set a new temporary password |
 | **Disable / Enable account** | Block or restore sign-in (not for the owner) |
 | **Delete user** | Permanently remove the account (not for the owner) |
+
+<Note>
+**Self-service restriction**: when viewing your own account, only the **Rename user** action is available. You cannot edit your own role, reset your own password from admin, disable, or delete your own account.
+</Note>
+
+<Note>
+**Non-admin users** cannot rename other users. The rename action is only available to admins and the owner.
+</Note>
 
 ### Editing role and team
 

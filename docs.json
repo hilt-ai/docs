@@ -62,25 +62,12 @@
               "dashboard/overview",
               "dashboard/collectors",
               {
-                "group": "Data Flow",
+                "group": "Cloud",
                 "pages": [
                   "dashboard/data-lineage",
                   "dashboard/networks",
                   "dashboard/files",
-                  "dashboard/users",
-                  "dashboard/query",
-                  "dashboard/mcp-server"
-                ]
-              },
-              {
-                "group": "Security",
-                "pages": [
-                  "dashboard/detection-accuracy",
-                  "dashboard/anomalies",
-                  "dashboard/detection-rules",
-                  "dashboard/fleet-behavior",
-                  "dashboard/investigate",
-                  "dashboard/quarantine"
+                  "dashboard/users"
                 ]
               },
               {
@@ -99,19 +86,51 @@
                   "dashboard/endpoint/files"
                 ]
               },
+              {
+                "group": "Security",
+                "pages": [
+                  "dashboard/detection-accuracy",
+                  "dashboard/anomalies",
+                  "dashboard/detection-rules",
+                  "administration/behavioral-suppression",
+                  "dashboard/fleet-behavior",
+                  "dashboard/investigate",
+                  "dashboard/query",
+                  "dashboard/quarantine",
+                  "administration/reports"
+                ]
+              },
               "dashboard/settings",
               {
-                "group": "Administration",
+                "group": "Admin",
                 "pages": [
                   "administration/layout",
                   "administration/user-management",
-                  "administration/teams",
-                  "administration/reports",
                   "administration/identity-mappings",
-                  "administration/behavioral-suppression",
-                  "administration/audit-log",
+                  "administration/system-status",
+                  "administration/teams",
+                  "on-prem/model-lifecycle",
+                  {
+                    "group": "Data Export",
+                    "pages": [
+                      "on-prem/data-export-overview",
+                      "on-prem/data-catalog",
+                      "on-prem/data-export-schema",
+                      "on-prem/data-export-implementation"
+                    ]
+                  },
+                  {
+                    "group": "Auto-Update",
+                    "pages": [
+                      "on-prem/auto-update-overview",
+                      "on-prem/auto-update-prerequisites",
+                      "on-prem/auto-update-workflow",
+                      "on-prem/auto-update-operations"
+                    ]
+                  },
                   "administration/storage",
-                  "administration/system-status"
+                  "administration/audit-log",
+                  "dashboard/mcp-server"
                 ]
               }
             ]
@@ -134,7 +153,7 @@
             ]
           },
           {
-            "tab": "MacOS Collector",
+            "tab": "macOS Collector",
             "pages": [
               "macos-collector/layout",
               "macos-collector/system-requirements",
@@ -149,31 +168,6 @@
               "macos-collector/sizing-capacity",
               "macos-collector/data-flow",
               "macos-collector/troubleshooting"
-            ]
-          },
-          {
-            "tab": "On-Prem Operations",
-            "pages": [
-              "on-prem/layout",
-              {
-                "group": "Auto-update agent",
-                "pages": [
-                  "on-prem/auto-update-overview",
-                  "on-prem/auto-update-prerequisites",
-                  "on-prem/auto-update-workflow",
-                  "on-prem/auto-update-operations"
-                ]
-              },
-              {
-                "group": "Anonymized data export",
-                "pages": [
-                  "on-prem/data-export-overview",
-                  "on-prem/data-catalog",
-                  "on-prem/data-export-schema",
-                  "on-prem/data-export-implementation"
-                ]
-              },
-              "on-prem/model-lifecycle"
             ]
           },
           {
@@ -227,32 +221,65 @@
               "zh/dashboard/overview",
               "zh/dashboard/collectors",
               {
-                "group": "数据流",
+                "group": "云",
                 "pages": [
                   "zh/dashboard/data-lineage",
                   "zh/dashboard/networks",
                   "zh/dashboard/files",
-                  "zh/dashboard/users",
-                  "zh/dashboard/query"
+                  "zh/dashboard/users"
+                ]
+              },
+              {
+                "group": "端点",
+                "pages": [
+                  "zh/dashboard/edr"
                 ]
               },
               {
                 "group": "安全",
                 "pages": [
+                  "zh/dashboard/detection-accuracy",
                   "zh/dashboard/anomalies",
                   "zh/dashboard/detection-rules",
+                  "zh/administration/behavioral-suppression",
                   "zh/dashboard/fleet-behavior",
                   "zh/dashboard/investigate",
-                  "zh/dashboard/quarantine"
+                  "zh/dashboard/query",
+                  "zh/dashboard/quarantine",
+                  "zh/administration/reports"
                 ]
               },
+              "zh/dashboard/settings",
               {
-                "group": "系统管理",
+                "group": "管理",
                 "pages": [
                   "zh/administration/layout",
                   "zh/administration/user-management",
+                  "zh/administration/identity-mappings",
+                  "zh/administration/system-status",
                   "zh/administration/teams",
-                  "zh/administration/reports"
+                  "zh/on-prem/model-lifecycle",
+                  {
+                    "group": "数据导出",
+                    "pages": [
+                      "zh/on-prem/data-export-overview",
+                      "zh/on-prem/data-catalog",
+                      "zh/on-prem/data-export-schema",
+                      "zh/on-prem/data-export-implementation"
+                    ]
+                  },
+                  {
+                    "group": "自动更新",
+                    "pages": [
+                      "zh/on-prem/auto-update-overview",
+                      "zh/on-prem/auto-update-prerequisites",
+                      "zh/on-prem/auto-update-workflow",
+                      "zh/on-prem/auto-update-operations"
+                    ]
+                  },
+                  "zh/administration/storage",
+                  "zh/administration/audit-log",
+                  "zh/dashboard/mcp-server"
                 ]
               }
             ]
@@ -275,33 +302,9 @@
             ]
           },
           {
-            "tab": "MacOS 采集器",
+            "tab": "macOS 采集器",
             "pages": [
               "zh/macos-collector"
-            ]
-          },
-          {
-            "tab": "本地部署运维",
-            "pages": [
-              "zh/on-prem/layout",
-              {
-                "group": "自动更新代理",
-                "pages": [
-                  "zh/on-prem/auto-update-overview",
-                  "zh/on-prem/auto-update-prerequisites",
-                  "zh/on-prem/auto-update-workflow",
-                  "zh/on-prem/auto-update-operations"
-                ]
-              },
-              {
-                "group": "匿名化数据导出",
-                "pages": [
-                  "zh/on-prem/data-export-overview",
-                  "zh/on-prem/data-catalog",
-                  "zh/on-prem/data-export-schema",
-                  "zh/on-prem/data-export-implementation"
-                ]
-              }
             ]
           },
           {
@@ -351,7 +354,12 @@
     },
     {
       "source": "/on-prem/overview",
-      "destination": "/on-prem/layout",
+      "destination": "/administration/layout",
+      "permanent": true
+    },
+    {
+      "source": "/on-prem/layout",
+      "destination": "/administration/layout",
       "permanent": true
     },
     {
@@ -361,7 +369,12 @@
     },
     {
       "source": "/platform/overview",
-      "destination": "/platform/layout",
+      "destination": "/dashboard/layout",
+      "permanent": true
+    },
+    {
+      "source": "/platform/layout",
+      "destination": "/dashboard/layout",
       "permanent": true
     },
     {
@@ -376,12 +389,12 @@
     },
     {
       "source": "/auto-update-agent",
-      "destination": "/on-prem/layout",
+      "destination": "/on-prem/auto-update-overview",
       "permanent": true
     },
     {
       "source": "/untitled-page",
-      "destination": "/on-prem/layout",
+      "destination": "/on-prem/auto-update-overview",
       "permanent": true
     },
     {

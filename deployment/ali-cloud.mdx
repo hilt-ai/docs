@@ -4,7 +4,7 @@ sidebarTitle: "Ali Cloud"
 description: "Hilt's single-tenant deployment architecture and provisioning on Ali Cloud."
 ---
 
-Hilt runs as a single-tenant platform inside your own Ali Cloud account. A managed ACK cluster hosts the analytics engine (ClickHouse) and the dashboard, collectors on your hosts stream telemetry through a private PrivateLink ingest endpoint into Message Queue for Apache Kafka, and all traffic stays inside your account with no public internet exposure.
+Hilt runs as a single-tenant platform inside your own Ali Cloud account. A managed ACK cluster hosts the platform workloads, ClickHouse runs on a dedicated AliCloud ECS (VM), collectors on your hosts stream telemetry through a private PrivateLink ingest endpoint into Message Queue for Apache Kafka, and all traffic stays inside your account with no public internet exposure.
 
 ---
 
@@ -13,10 +13,12 @@ Hilt runs as a single-tenant platform inside your own Ali Cloud account. A manag
 | Service | Role |
 | :-- | :-- |
 | ACK | Managed Kubernetes for platform services |
+| AliCloud ECS (VM) | Dedicated VM for ClickHouse analytics database |
 | Message Queue for Apache Kafka | Event streaming |
 | PrivateLink | Private ingest endpoint |
-| OSS | Long-term storage and data exports |
+| OSS | Terraform remote state and VPC gateway |
 | ApsaraDB RDS (PostgreSQL) | Dashboard database |
+| CAS (Certificate Authority Service) | TLS certificates |
 
 ---
 
@@ -34,6 +36,6 @@ Hilt runs as a single-tenant platform inside your own Ali Cloud account. A manag
 Hilt provisions your Ali Cloud deployment using Terraform. The typical process:
 
 1. You provide a target Ali Cloud account with the agreed RAM permissions
-2. Hilt applies the Terraform configuration to create all infrastructure (ACK, Message Queue for Apache Kafka, ApsaraDB RDS, OSS, PrivateLink, and networking)
+2. Hilt applies the Terraform configuration to create all infrastructure (ACK, AliCloud ECS, Message Queue for Apache Kafka, ApsaraDB RDS, OSS, CAS, PrivateLink, and networking)
 3. PrivateLink connectivity is established between your workload VPCs and the platform VPC
 4. Collectors are deployed to your hosts using the guides in this documentation
