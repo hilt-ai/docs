@@ -108,6 +108,7 @@
                   "administration/user-management",
                   "administration/identity-mappings",
                   "administration/system-status",
+                  "administration/prometheus",
                   "administration/teams",
                   "on-prem/model-lifecycle",
                   {
@@ -257,6 +258,7 @@
                   "zh/administration/user-management",
                   "zh/administration/identity-mappings",
                   "zh/administration/system-status",
+                  "zh/administration/prometheus",
                   "zh/administration/teams",
                   "zh/on-prem/model-lifecycle",
                   {
