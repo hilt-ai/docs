@@ -1,0 +1,241 @@
+---
+title: "Event data model"
+sidebarTitle: "Event data model"
+description: "The endpoint_events schema: what the macOS collector captures, the code-signing trust and application attribution stamped on every row, and explicitly what it does not capture."
+---
+
+The macOS collector (the **Hilt EDR** app and its **ESensor** Endpoint Security extension) emits one event per security-relevant kernel action. Those events are shipped over HTTPS to the Hilt `edr-collector`, routed through MSK Kafka and the enrichment service (`ENRICH_PLATFORM=macos`), and land in a single, purpose-built ClickHouse table: **`endpoint_events`**.
+
+`endpoint_events` is a wide, macOS-native table typed by `event_class` and `event_type`. Per-class columns are populated only for the events that use them; everything else is left empty. There is no Linux cgroup, container, pod, or Kubernetes clutter in this schema — those concepts do not apply to an endpoint.
+
+The defining property of this table — the macOS differentiator — is that **every single row carries code-signing trust and application attribution as first-class columns.** A file read, a network flow, and a process exec all arrive already stamped with "what signed this binary, do we trust that signature, and which user-facing application is responsible." On Linux, none of that exists at the kernel-event level. On macOS it rides on every row, which turns questions like *"which unsigned application read `~/.ssh`?"* into a single `WHERE` clause.
+
+---
+
+## Schema overview
+
+Each row is one observed kernel event with four layers of columns:
+
+| Layer | Columns | Present on |
+| :-- | :-- | :-- |
+| **Common header** | `host_id`, `boot_id`, `device_name`, `event_class`, `event_type`, `wall_time_ns`, `event_time`, `pid`, `ppid`, `tgid`, `uid`, `euid`, `username`, `comm` | Every row |
+| **Code-signing identity** | `signing_id`, `team_id`, `cdhash`, `code_signature`, `is_platform_binary` | Every row (macOS differentiator) |
+| **Application attribution** | `application_id`, `application_display_name`, `responsible_pid`, `session_id` | Every row (macOS differentiator) |
+| **Per-event payload** | `argv`, `filename`, `flags`, `mode`, `dest_path`, `dst_addr`, `dst_port`, `bytes_sent`, `bytes_recv`, `bundle_id`, `item_type`, `item_path`, `xattr_name`, `target_pid`, `signum`, … plus an `attrs` map for the long tail | Class-specific |
+
+This document walks each layer in turn, then lists the `event_type` values.
+
+---
+
+## Common header (every event)
+
+The header identifies *when*, *where*, and *who* — the same actor metadata on every row regardless of event class.
+
+| Column | Type | Meaning |
+| :-- | :-- | :-- |
+| `host_id` | String | Stable machine identifier for the Mac. Joins the host into the [Collectors](/dashboard/collectors) fleet. |
+| `boot_id` | String | Identifier for the current boot, for ordering across reboots. |
+| `device_name` | String | The human Mac name, e.g. `Zin's MacBook Pro`. Populated on 100% of rows — no host-inventory join required. |
+| `event_class` | LowCardinality(String) | The broad family: `process`, `file`, `network`, `persistence`, `device`. |
+| `event_type` | LowCardinality(String) | The specific event, e.g. `exec`, `file_open`, `net_flow`, `btm_add`. |
+| `wall_time_ns` | UInt64 | Wall-clock timestamp (nanoseconds) of the event. |
+| `event_time` | DateTime64 | Derived timestamp for time-range queries and partitioning. |
+| `pid` | UInt32 | Process ID of the acting process. |
+| `ppid` | UInt32 | Parent process ID. |
+| `tgid` | UInt32 | Thread group ID. |
+| `uid` / `euid` | UInt32 | Real / effective user ID (`0` = root, which is valid and common). |
+| `username` | String | Resolved login name of `uid`. |
+| `comm` | String | Short process name of the acting binary. |
+
+<Note>
+`wall_time_ns` is the authoritative event timestamp from the Endpoint Security message. `event_time` is the derived `DateTime64` column you filter and partition on in ClickHouse.
+</Note>
+
+---
+
+## Code-signing identity (every event) — the macOS differentiator
+
+On macOS, the kernel knows the **signing identity** of every running binary, and Apple's Endpoint Security framework hands it to ESensor on each message. The collector promotes that identity to dedicated columns, so trust is queryable on *every* event — not just on exec.
+
+| Column | Type | Meaning |
+| :-- | :-- | :-- |
+| `signing_id` | String | The code-signing identifier (bundle id) of the acting binary, e.g. `com.google.Chrome` or `com.apple.bash`. Filled on ~98% of rows. |
+| `team_id` | String | The Apple Developer **Team ID** that signed the binary (e.g. `MVMB6LCP2A` for Cybe Corporation). Empty for Apple **platform binaries** — which is correct, not a gap — so it fills on a minority of rows (~13%, all third-party). |
+| `cdhash` | String | The **code directory hash**: a cryptographic integrity hash of the binary, captured on `exec` and propagated down the process tree. This is the per-binary fingerprint. |
+| `code_signature` | LowCardinality(String) | The **trust verdict** (see below). Filled on ~98% of rows. |
+| `is_platform_binary` | UInt8 | `1` if the binary is an Apple-shipped OS component, `0` if third-party. |
+
+### The `code_signature` verdict
+
+`code_signature` collapses Apple's signature evaluation into one of four trust tiers:
+
+| Verdict | Meaning | Example |
+| :-- | :-- | :-- |
+| `platform` | Signed by Apple as part of the OS. | `/bin/zsh`, `/usr/sbin/cfprefsd` |
+| `developer_id` | Signed with a Developer ID certificate and notarized — a known third-party vendor. | Google Chrome, Slack, the Hilt EDR app itself |
+| `adhoc` | Ad-hoc signed: a valid signature with **no identity** behind it. Common for locally built tools and a frequent malware tell. | a freshly compiled binary |
+| `unsigned_or_invalid` | No signature, or a signature that failed validation. | dropped payloads, tampered binaries |
+
+This is the column that makes macOS telemetry distinctive. Because the verdict is on **every** row — file, network, and process alike — you can ask trust questions about any action:
+
+```sql
+-- Every file an UNSIGNED or AD-HOC binary opened under a user's SSH directory
+SELECT event_time, device_name, comm, signing_id, code_signature, filename
+FROM endpoint_events
+WHERE event_class = 'file'
+  AND code_signature IN ('unsigned_or_invalid', 'adhoc')
+  AND filename LIKE '%/.ssh/%'
+ORDER BY event_time DESC;
+```
+
+On the Linux collector this query cannot be expressed: there is no per-event notion of signing trust.
+
+---
+
+## Application attribution (every event) — the macOS differentiator
+
+A modern macOS app is not one process. Google Chrome alone spawns dozens of `Google Chrome Helper`, `Google Chrome Helper (GPU)`, and `Google Chrome Helper (Renderer)` processes. Looking at raw `comm` values, the signal is scattered across helper processes that mean nothing to an analyst.
+
+The macOS collector folds every event back to the **owning application** using Apple's Endpoint Security "responsible process" concept, so activity is grouped the way a human thinks about it.
+
+| Column | Type | Meaning |
+| :-- | :-- | :-- |
+| `application_id` | String | Bundle id of the **owning application**. Helper processes fold to their parent app — `Google Chrome Helper` → `com.google.Chrome`. Filled on ~98% of rows. |
+| `application_display_name` | String | Human-readable app name, e.g. `Google Chrome`. Filled on ~98% of rows. |
+| `responsible_pid` | UInt32 | Apple ES **responsible process** PID — the process the OS holds accountable for this action (the app, not the transient helper). Filled on ~100% of rows on the current agent build. |
+| `session_id` | String | A per-app-instance session identifier. Groups all events from one launch of an application into a single session. Filled on 100% of rows. |
+
+This means a single `WHERE application_id = 'com.google.Chrome'` returns the entire footprint of Chrome — every helper exec, every file it touched, every flow it opened — without enumerating helper names. `session_id` further narrows that to one specific launch of the app, and `responsible_pid` lets you pivot from any event to the accountable process.
+
+<Note>
+`responsible_pid` and `application_id` are how the dashboard's Investigate, Files, Networks, and Users views attribute scattered helper-process activity to the application a user actually ran. The folding happens at enrichment time so it is consistent across every query.
+</Note>
+
+---
+
+## Per-event payloads
+
+Beyond the common header and the two always-present identity layers, each event class carries its own payload columns. The long tail of less-common attributes lands in an `attrs` map.
+
+### Process payload — `exec`, `fork`, `signal`
+
+| Column | Events | Meaning |
+| :-- | :-- | :-- |
+| `argv` | `exec` | The full command line of the executed program, including arguments. Set on `exec` rows. |
+| `comm` / `signing_id` / `cdhash` | `exec`, `fork` | The acting binary's name, bundle id, and integrity hash (header/identity columns above). |
+| `parent_comm`, `ppid` | `exec`, `fork` | Parent process context; propagated down the tree. |
+| `target_pid` | `signal` | The PID the signal was **sent to** (the would-be victim of a kill attempt). |
+| `signum` | `signal` | The signal number sent (e.g. `9` = SIGKILL). |
+
+`exec` is the spine of the process model: it carries the argv, the signing identity, the team id, and the cdhash all on one row. `signal` events record kill attempts — `target_pid` and `signum` reveal who tried to terminate whom, which surfaces both attacker kill-chains and attempts to tamper with the collector itself.
+
+### File payload — `file_open`, `file_unlink`, `file_rename`, `file_chmod`, `xattr_set`, `xattr_delete`
+
+| Column | Events | Meaning |
+| :-- | :-- | :-- |
+| `filename` | all file events | The path acted on. The primary subject of a file event. |
+| `flags` | `file_open` | Open flags (read/write/create intent). |
+| `mode` | `file_chmod` | The new permission bits. |
+| `dest_path` | `file_rename` | The destination path of a rename (`filename` → `dest_path`). |
+| `xattr_name` | `xattr_set`, `xattr_delete` | The extended-attribute name set or removed. |
+
+`file_open` dominates event volume (~95%+), which is why ESensor applies aggressive userspace filtering before anything leaves the host — see [Agent filtering](/macos-collector/event-coverage).
+
+The `xattr_*` events are macOS-specific and high-signal: they capture changes to **`com.apple.quarantine`**, the extended attribute Gatekeeper uses to mark downloaded files. An `xattr_delete` on a quarantine attribute is a classic **Gatekeeper bypass** — stripping the "downloaded from the internet" flag so the OS will run a file without prompting.
+
+### Network payload — `net_flow`
+
+| Column | Meaning |
+| :-- | :-- |
+| `dst_addr` | Destination IP address of the outbound flow. |
+| `dst_port` | Destination port. |
+| `direction` | Flow direction (outbound). |
+| `bytes_sent` / `bytes_recv` | Bytes transferred in each direction over the flow. |
+| `bundle_id` | The **responsible application** bundle id for the flow — the app that owns the socket, e.g. `com.google.Chrome`. |
+
+Network flows come from a combination of an `lsof`/socket poller and the **NetFilter** NetworkExtension content-filter system extension, which resolves each flow's audit token back to the responsible app. Because of NetFilter, a `net_flow` row already knows *which application* opened the connection — `bundle_id` answers "what made this connection" without a separate process-to-socket correlation step.
+
+<Note>
+`net_flow` records connection metadata only — destination, ports, byte counts, and the responsible app. It does not capture packet payloads, and by default it does not resolve DNS names.
+</Note>
+
+### Persistence payload — `btm_add`
+
+| Column | Meaning |
+| :-- | :-- |
+| `item_type` | What kind of persistence was registered: `launch_agent`, `launch_daemon`, or `login_item`. |
+| `item_path` | The path of the installed launch item / login item. |
+| `managed` | Whether the item was installed by MDM (managed) vs. by a user/process. |
+
+`btm_add` events come from macOS 13+ **Background Task Management (BTM)** and fire whenever a launch agent, launch daemon, or login item is registered — i.e. when something installs itself to **persist across reboots**. This is the single highest-signal persistence event on macOS: it is how the vast majority of macOS malware (and legitimate auto-start software) survives a restart.
+
+### Device payload — `mount`
+
+| Column | Meaning |
+| :-- | :-- |
+| `path` (via `attrs`) | The mount point of the filesystem. |
+| `removable` (via `attrs`) | Whether the mounted volume is removable media. |
+
+`mount` events fire when a filesystem is mounted — most interestingly removable media (USB drives) and disk images (DMGs), both common vectors for data exfiltration and software delivery.
+
+---
+
+## Event types
+
+The collector subscribes to **12 Apple Endpoint Security events** plus a network source, and emits the following `event_type` values into `endpoint_events`:
+
+| `event_type` | `event_class` | What it records | Payload columns |
+| :-- | :-- | :-- | :-- |
+| `exec` | process | Process spawn, with full command line and signing identity | `argv`, `signing_id`, `team_id`, `cdhash`, `code_signature` |
+| `fork` | process | Process fork (parent → child) | parent context |
+| `signal` | process | A signal sent to a process (kill attempts; also drives collector self-protection) | `target_pid`, `signum` |
+| `file_open` | file | File open / create — dominates volume (~95%+) | `filename`, `flags` |
+| `file_unlink` | file | File delete | `filename` |
+| `file_rename` | file | File rename / move | `filename` → `dest_path` |
+| `file_chmod` | file | Permission change | `filename`, `mode` |
+| `xattr_set` | file | Extended-attribute set — Gatekeeper quarantine tamper | `xattr_name` |
+| `xattr_delete` | file | Extended-attribute delete — quarantine removal (rare) | `xattr_name` |
+| `mount` | device | Filesystem mount — removable media / DMG (rare) | `path`, `removable` |
+| `btm_add` | persistence | Launch agent / daemon / login item registered — persistence installed (macOS 13+) | `item_type`, `item_path`, `managed` |
+| `net_flow` | network | Outbound TCP flow with destination, ports, bytes, and responsible app | `dst_addr`, `dst_port`, `direction`, `bytes_sent`, `bytes_recv`, `bundle_id` |
+
+<Note>
+`xattr_delete` and `mount` are rare by nature (quarantine removal and USB/DMG mounts) — they are subscribed and emitted, but a quiet host may show none over a short window. `signal`, `file_unlink`, and `file_rename` are subscribed as **AUTH** events so ESensor can also *deny* tampering with itself, but they still emit equivalent telemetry rows.
+</Note>
+
+---
+
+## How identity and attribution are filled
+
+The identity and attribution layers are not best-effort metadata — they are populated at high fill rates and are the columns most queries pivot on. Verified fill rates from live data:
+
+| Column | Fill | Note |
+| :-- | :-- | :-- |
+| `signing_id` | ~98% | bundle id of the acting binary |
+| `code_signature` | ~98% | trust verdict: `platform` / `developer_id` / `adhoc` / `unsigned_or_invalid` |
+| `team_id` | ~13% | empty for Apple platform binaries (correct) |
+| `cdhash` | exec rows | code-directory hash; set on `exec`, propagated down the tree |
+| `argv` | exec rows | full command line; set on `exec` |
+| `application_id` | ~98% | owning app — helpers fold to parent |
+| `application_display_name` | ~98% | owning app name |
+| `responsible_pid` | ~100% | Apple ES responsible process (current agent build) |
+| `session_id` | 100% | per app-instance session |
+| `device_name` | 100% | human Mac name; no host-inventory join needed |
+
+For more on how telemetry travels from ESensor to ClickHouse, see [End-to-end data flow](/macos-collector/data-flow). For how raw event volume is reduced before it leaves the host, see [Agent filtering](/macos-collector/event-coverage).
+
+---
+
+## What the collector does not capture
+
+Consistent with the Linux collector's design philosophy, the macOS collector observes activity at the **metadata level only**. It is not a content-inspection tool. It does **not** capture:
+
+- **File contents** — only the path, operation type, flags, and (for renames) the destination
+- **Packet payloads** — only the flow's destination, ports, byte counts, and responsible app
+- **DNS query contents** — `net_flow` does not resolve domain names by default
+- **Keystrokes or screen content**
+- **Memory regions or process memory**
+- **Environment variables**
+- **Credentials or any user data** beyond what standard tools like `ps`, `lsof`, or `codesign` would expose
+
+In other words, ESensor reports *that* a binary opened a file, signed by whom, on behalf of which app — never *what was in* the file. All event shipping is over **outbound HTTPS only** to the configured ingest endpoint; the collector opens no inbound sockets and makes no phone-home connections.

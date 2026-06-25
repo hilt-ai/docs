@@ -1,0 +1,131 @@
+---
+title: "System requirements"
+sidebarTitle: "System requirements"
+description: "macOS version, architecture, System Integrity Protection, Full Disk Access, MDM, and network requirements for the Hilt macOS Collector."
+---
+
+<Note>
+The macOS Collector is in **early access**. The notarized `.pkg` with **SIP enabled** install described here is the target shipping model. Contact your account team to enable it for your deployment.
+</Note>
+
+The Hilt macOS Collector is a notarized macOS app — **Hilt EDR** (bundle `EDRApp.app`, Team `MVMB6LCP2A` / Cybe Corporation) — that embeds two Apple System Extensions:
+
+- **ESensor** — an [Endpoint Security](https://developer.apple.com/documentation/endpointsecurity) (ES) system extension (`Hilt.EDRApp.ESensor`). This is the telemetry sensor: process, file, persistence, and device events.
+- **NetFilter** — a [NetworkExtension](https://developer.apple.com/documentation/networkextension) content-filter system extension (`Hilt.EDRApp.NetFilter`) for per-flow network attribution.
+
+There is **no kernel extension (kext)**. Both extensions run in user space on Apple's modern frameworks. Unlike the [Linux Collector](/linux-collector/system-requirements), which loads an eBPF program into the kernel, the macOS Collector relies entirely on Apple-sanctioned System Extensions — which is what makes a **SIP-enabled** install possible.
+
+## Summary
+
+| Requirement | Value |
+| :-- | :-- |
+| **macOS version** | 13.0 (Ventura) or later |
+| **Architecture** | Universal — Apple Silicon (`arm64`) and Intel (`x86_64`) |
+| **System Integrity Protection (SIP)** | **Enabled** (supported — and required; no `csrutil disable`) |
+| **Full Disk Access** | **Required** for ESensor (any ES client needs it) |
+| **MDM** | Optional — only for zero-click (silent) install |
+| **Outbound network** | HTTPS to your Hilt ingest endpoint |
+| **Inbound network** | None |
+
+## macOS version
+
+**macOS 13.0 (Ventura) or later.** The floor is 13.0 because the Collector reports persistence events through **Background Task Management (BTM)** — the `btm_add` Endpoint Security event that fires when a launch agent, launch daemon, or login item is installed. BTM is a macOS 13 framework; on earlier releases that signal does not exist, so a key part of the collector's persistence coverage would be silently missing.
+
+<Note>
+Full Disk Access grants can occasionally reset across a **macOS major upgrade** (a known TCC behavior). On MDM-managed hosts a PPPC profile re-applies it automatically; direct-download users may need to re-toggle Full Disk Access once after a major OS upgrade. See [Install](/macos-collector/install-flow).
+</Note>
+
+## Architecture
+
+**Universal.** The app and both System Extensions ship as a single universal binary covering:
+
+- **Apple Silicon** (`arm64`) — M-series Macs
+- **Intel** (`x86_64`)
+
+A single notarized `.pkg` installs on either architecture; there is no per-architecture artifact to choose. This differs from the [Linux Collector](/linux-collector/release-artifacts), which ships a separate tarball per architecture.
+
+## System Integrity Protection (SIP)
+
+**SIP stays enabled.** This is the headline of the macOS Collector: it runs on a normal, hardened Mac with **no `csrutil disable`, no developer mode, and no kext**. SIP-on operation is the whole point of the migration to a System Extension.
+
+This works because the restricted Endpoint Security entitlement (`com.apple.developer.endpoint-security.client`) is **authorized**, not merely requested:
+
+| Element | Detail |
+| :-- | :-- |
+| **Entitlement** | `com.apple.developer.endpoint-security.client`, granted to Team `MVMB6LCP2A` by Apple |
+| **Signing** | Developer ID Application certificate |
+| **Provisioning profile** | Embedded in the bundle, authorizing the ES entitlement |
+| **Hardened Runtime** | Enabled |
+| **Notarization** | Notarized and stapled by Apple |
+| **App Sandbox** | **Not** used on the ES extension — sandboxing makes `es_new_client` fail with `ERR_NOT_PERMITTED` |
+
+With SIP on, the kernel's trusted-execution (AMFI) layer only honors the ES entitlement when an Apple-issued provisioning profile that allowlists it is embedded in a properly signed, notarized bundle. The Collector satisfies all of those conditions, so it is a fully trusted Endpoint Security client on a stock, locked-down Mac. For the full entitlement and signing story, see [Architecture](/macos-collector/networking-security).
+
+<Note>
+Notarization satisfies Gatekeeper's signature and malware check — it does **not** activate the extension. The user (or MDM) still has to approve the System Extension and grant Full Disk Access. See [Install](/macos-collector/install-flow).
+</Note>
+
+## Full Disk Access
+
+**Full Disk Access is required.** Every Apple Endpoint Security client must have Full Disk Access (TCC `SystemPolicyAllFiles`); without it, `es_new_client()` fails with `ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED` even when the entitlement is correctly authorized. Entitlement authorization and Full Disk Access are **two independent runtime gates** — both must pass.
+
+The grant applies to the **ESensor** extension, not the parent app:
+
+- In **System Settings → Privacy & Security → Full Disk Access**, the entry appears as **ESensor** / *"Hilt EDR Sensor"* — **not** "EDRApp".
+- The entry appears automatically once the System Extension is approved.
+
+This is the same consent that CrowdStrike, SentinelOne, and every other third-party Endpoint Security product require; it is an Apple security requirement, not a Hilt-specific one. It cannot be click-suppressed without MDM. See [Install](/macos-collector/install-flow) for the end-user steps.
+
+## MDM
+
+**MDM is optional.** The Collector installs and runs fully without any MDM. MDM is only needed to make the install **zero-click (silent)** across a fleet by pre-approving the two consents the user would otherwise grant by hand.
+
+| Install path | What the user does | MDM needed |
+| :-- | :-- | :-- |
+| **Standalone** (direct download) | Approve the extension once, toggle Full Disk Access once (~2 actions + 1 password) | No |
+| **MDM-managed** (zero-click) | Nothing | Yes |
+
+For the silent path, push two configuration-profile payloads keyed to Team `MVMB6LCP2A`:
+
+| Payload | Effect | Requires |
+| :-- | :-- | :-- |
+| **System Extensions** (`com.apple.system-extension-policy`, `AllowedTeamIdentifiers = MVMB6LCP2A`) | Auto-approves the extension — suppresses the approval prompt | MDM-enrolled (UAMDM); supervision **not** required |
+| **PPPC** (`com.apple.TCC.configuration-profile-policy`, `SystemPolicyAllFiles = Allow`) | Pre-grants Full Disk Access | **Supervision required** (ADE / supervised enrollment) |
+
+Deliver the System Extensions payload *before* the app first launches. The Collector only needs Full Disk Access — never Camera, Microphone, or Screen Recording, which PPPC cannot pre-grant — so MDM install is fully silent. See [Install](/macos-collector/install-flow) for both paths in detail.
+
+## Network
+
+**Outbound HTTPS only.** ESensor emits events as JSON lines; a local forwarder LaunchDaemon ships them over **outbound HTTPS** to the Hilt `edr-collector`, which routes them to MSK Kafka topics for enrichment.
+
+| Direction | Detail |
+| :-- | :-- |
+| **Outbound** | HTTPS to the configured Hilt ingest endpoint |
+| **Inbound** | None — no listening sockets |
+| **Phone-home** | None — nothing beyond the configured ingest endpoint |
+
+**Firewall rule:** allow the host to reach your configured Hilt ingest endpoint over HTTPS. There are no inbound rules to open. For the full path from sensor to ClickHouse, see [Data flow](/macos-collector/data-flow).
+
+## What it does not require
+
+In contrast to the Linux Collector's kernel and privilege requirements, the macOS Collector does **not** need any of the following:
+
+- **No `csrutil disable`** — SIP stays enabled.
+- **No `systemextensionsctl developer on`** — developer mode is a dev-only workaround, never used on a real install.
+- **No kernel extension (kext)** — pure user-space System Extensions.
+- **No App Sandbox on the ES extension** — sandboxing breaks `es_new_client`.
+- **No MDM** for the standalone install — MDM is only for zero-click fleet deployment.
+- **No inbound network access** — outbound HTTPS only.
+
+## What it does not do
+
+Consistent with the [Linux Collector](/linux-collector/event-data-model), the macOS Collector observes at the metadata level only:
+
+- **Does not read file contents** — only path, operation type, and metadata.
+- **Does not capture packet payloads** — only flow metadata (destination, ports, bytes, owning bundle id).
+- **Does not capture keystrokes or screen content** — it does not request Screen Recording.
+- **Does not block or modify activity** — it is strictly observational. On-device quarantine response is not yet available on macOS.
+
+## Status
+
+The macOS Collector is in **early access**. The notarized `.pkg` with SIP enabled described on this page is the target shipping model. Auto-update and on-device quarantine response are **not yet available** on macOS; upgrades are delivered by re-installing the signed `.pkg` (direct download) or by package push (MDM).
