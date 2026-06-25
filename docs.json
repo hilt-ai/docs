@@ -80,8 +80,23 @@
                   "dashboard/detection-rules",
                   "dashboard/fleet-behavior",
                   "dashboard/investigate",
-                  "dashboard/quarantine",
-                  "dashboard/edr"
+                  "dashboard/quarantine"
+                ]
+              },
+              {
+                "group": "Endpoint",
+                "pages": [
+                  "dashboard/endpoint/foundation",
+                  "dashboard/endpoint/persistence",
+                  "dashboard/endpoint/tamper",
+                  "dashboard/endpoint/credential-privacy",
+                  "dashboard/endpoint/removable-media",
+                  "dashboard/endpoint/network-egress",
+                  "dashboard/endpoint/attack-matrix",
+                  "dashboard/endpoint/process-lineage",
+                  "dashboard/endpoint/credential-access",
+                  "dashboard/endpoint/activity",
+                  "dashboard/endpoint/files"
                 ]
               },
               "dashboard/settings",
@@ -352,6 +367,11 @@
     {
       "source": "/dashboard/reports",
       "destination": "/administration/reports",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/edr",
+      "destination": "/dashboard/endpoint/foundation",
       "permanent": true
     },
     {

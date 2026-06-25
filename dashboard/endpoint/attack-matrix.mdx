@@ -1,0 +1,136 @@
+---
+title: "ATT&CK Matrix"
+sidebarTitle: "ATT&CK Matrix"
+description: "A Navigator-style view of the MITRE ATT&CK techniques the macOS endpoint sensor covers — tactics in kill-chain order, techniques as cells colored by detection, so coverage reads as coverage, not just a list of alerts."
+---
+
+The **ATT&CK Matrix** is the one Endpoint page that does not resolve to a single Mac. It is a fleet-wide map of *what the sensor can see, framed the way an adversary thinks*: MITRE ATT&CK tactics laid out as columns in kill-chain order, the techniques under each tactic rendered as cells. It answers the question every other page raises and none of them answers on its own — **how much of the attack surface do we actually cover?**
+
+Where the detection pages — [Persistence](/dashboard/endpoint/persistence), [Tamper Detection](/dashboard/endpoint/tamper), [Credential & Privacy](/dashboard/endpoint/credential-privacy), [Removable Media](/dashboard/endpoint/removable-media) — each show *findings* in their own domain, the Matrix is the union of all of them, projected onto MITRE's shared vocabulary. Read [the foundation](/dashboard/endpoint/foundation) first: the Matrix inherits the same trust-and-attribution telemetry, it just rolls it up to the technique level.
+
+<Note>
+This page opens fleet-wide. Tactics are columns, techniques are cells, severity is color, and a clear cell still means something — see [Coverage, not alert count](#coverage-not-alert-count).
+</Note>
+
+---
+
+## Page layout
+
+The route is `/edr/attack`. The header carries three counters that summarize the whole matrix at a glance:
+
+| Counter | Meaning |
+| :-- | :-- |
+| **Detected techniques** | Techniques with at least one hit across the fleet in range — the cells that are lit |
+| **Monitored techniques** | Techniques with a live detection rule but no hits yet — the cells that read "clear" |
+| **Tactics covered** | The number of ATT&CK tactic columns that contain at least one monitored or detected technique |
+
+On current fleet data that reads **7 detected · 19 monitored · 7 tactics**. The body below the counters is the matrix grid itself.
+
+### The grid
+
+Columns are ATT&CK **tactics**, ordered left-to-right along the kill chain. Each column stacks the **techniques** the sensor monitors under that tactic as cells.
+
+| Cell state | Renders as | What it means |
+| :-- | :-- | :-- |
+| **Detected** | Colored by worst severity, with a hit count badge | A monitored rule fired at least once in range |
+| **Monitored (clear)** | Muted "clear" tile, no count | A rule exists and is watching; nothing has tripped it |
+| **Not monitored** | Absent from the grid | No rule maps to this technique — a visible coverage gap |
+
+The color of a detected cell is driven by the **worst severity** among its contributing findings, on the same scale every Endpoint page uses (`critical` → `high` → `medium` → `low` → `info`). A technique that fired one `info` finding and one `high` finding is a `high` cell — the matrix always shows the worst case so triage starts at the right place.
+
+---
+
+## Coverage, not alert count
+
+The design decision that makes this page useful is that **monitored-but-clear techniques are drawn, not hidden**. A Navigator export that only shows techniques with hits is an alert list wearing a matrix's clothes — it tells you what fired, never what is watched. Here, a clear cell is a positive statement: *a rule is live for this technique and the fleet is currently clean of it.*
+
+That inversion is what turns the grid into a coverage map. The 19 monitored techniques are the catalog of everything the sensor knows how to catch; the 7 detected ones are simply the subset that has tripped. The empty space — tactics and techniques with no cell at all — is the honest part of the picture: it is exactly where the sensor has no coverage today, and the matrix makes that absence as legible as a hit.
+
+<Warning>
+A clear cell means "monitored and quiet," not "impossible." Absence of a cell means "not monitored" — that is the gap to close, not a guarantee of safety.
+</Warning>
+
+---
+
+## Technique detail
+
+Clicking any cell — detected or clear — slides in a detail panel for that technique:
+
+| Field | Contents |
+| :-- | :-- |
+| **Technique** | ATT&CK ID and name, e.g. `T1543.001 — Launch Agent` |
+| **Tactic** | The owning tactic column, e.g. `Persistence` |
+| **Hit count** | Total contributing findings across the fleet in range (`0` for a clear cell) |
+| **Worst severity** | The highest severity among the contributing findings |
+| **Detection rules** | The specific rules that map to this technique — the same rules that raise findings on the source detection page |
+| **Last seen** | The most recent contributing finding's time (blank when clear) |
+
+The **Detection rules** list is the bridge back to the rest of the section: every rule named here lives on one of the detection pages, and following it lands you in that page's findings table with the matching findings in view. The Matrix is the index; the detection pages are the entries.
+
+---
+
+## What's detected today
+
+Seven techniques have fired across the fleet, spread over six tactics. Persistence dominates the volume by a wide margin.
+
+| Technique | Tactic | Hits | Worst severity | Fed by |
+| :-- | :-- | :-- | :-- | :-- |
+| `T1543.001` Launch Agent | Persistence | ~1,389 | high | [Persistence](/dashboard/endpoint/persistence) |
+| `T1553.001` Gatekeeper Bypass | Defense Evasion | — | — | [Tamper Detection](/dashboard/endpoint/tamper) |
+| `T1562.001` Disable or Modify Tools | Defense Evasion | — | — | [Tamper Detection](/dashboard/endpoint/tamper) |
+| `T1123` Audio Capture | Collection | — | — | [Credential & Privacy](/dashboard/endpoint/credential-privacy) |
+| `T1052.001` Exfiltration over USB | Exfiltration | — | — | [Removable Media](/dashboard/endpoint/removable-media) |
+| `T1200` Hardware Additions | Initial Access | — | — | [Removable Media](/dashboard/endpoint/removable-media) |
+
+The seventh tactic with coverage, **Impact**, is monitored and currently clear — its techniques render as "clear" cells rather than detections. The full set of tactics with monitored coverage is **Initial Access, Persistence, Defense Evasion, Credential Access, Collection, Exfiltration, and Impact**.
+
+<Note>
+`T1543.001 — Launch Agent` carrying ~1,389 high-severity hits is the macOS story in one cell: Background Task Management (`btm_add`) fires on every launch-agent registration, and the trust verdict on each row decides severity. A launch agent registered by an `unsigned_or_invalid` binary is `high`; the same registration from a `developer_id` updater is `info`. See [Event data model → Persistence payload](/macos-collector/event-data-model#persistence-payload-btm_add).
+</Note>
+
+---
+
+## How detections feed the matrix
+
+Every cell traces back to a detection page, and through it to a typed event in `endpoint_events`. The Matrix performs no detection of its own — it aggregates findings the source pages already produce and maps each finding's rule to its ATT&CK technique.
+
+| Source page | Built on | Techniques it contributes |
+| :-- | :-- | :-- |
+| [Persistence](/dashboard/endpoint/persistence) | `btm_add` | `T1543.001` Launch Agent |
+| [Tamper Detection](/dashboard/endpoint/tamper) | `xattr_set`, `xattr_delete`, `signal` | `T1553.001` Gatekeeper Bypass, `T1562.001` Disable or Modify Tools |
+| [Credential & Privacy](/dashboard/endpoint/credential-privacy) | `file_open`, TCC/privacy | `T1123` Audio Capture, `T1555` Credentials from Password Stores |
+| [Removable Media](/dashboard/endpoint/removable-media) | `mount`, `file_*` on `/Volumes` | `T1052.001` Exfil over USB, `T1200` Hardware Additions |
+
+The mapping is deliberate and direct: a Gatekeeper-quarantine `xattr_delete` on the Tamper page *is* `T1553.001`; a kill signal aimed at a security tool *is* `T1562.001`; a `mount` of removable media *is* `T1200`, and writes to that volume *are* `T1052.001`. Because the underlying events already carry code-signing trust and the owning application, the technique cell inherits that context for free — you can pivot from "this technique fired" to "which unsigned app, on which Mac" without leaving the lineage the foundation describes.
+
+### The query behind a cell
+
+A detected cell is, at its core, a grouped count over the contributing rules' events. The Launch Agent cell, for instance, rolls up `btm_add` persistence events weighted by trust:
+
+```sql
+-- T1543.001 (Launch Agent): fleet-wide hits, worst severity by trust tier
+SELECT
+    count()                                              AS hits,
+    countIf(code_signature IN ('unsigned_or_invalid'))  AS untrusted_hits,
+    max(event_time)                                      AS last_seen,
+    uniq(device_name)                                    AS hosts
+FROM endpoint_events
+WHERE event_type = 'btm_add'
+  AND item_type  = 'launch_agent'
+  AND event_time >= now() - INTERVAL 30 DAY;
+```
+
+The same shape — filter to the technique's event signature, count, take the worst trust tier as severity, take `max(event_time)` as last-seen — produces every other cell in the grid. Swap the `WHERE` for an `xattr_delete` on a quarantine attribute and you have `T1553.001`; swap it for a removable `mount` and you have `T1200`.
+
+---
+
+## Reading the matrix
+
+A practical pass over the grid:
+
+1. **Scan the counters.** `7 detected · 19 monitored` tells you how much has fired versus how much is watched before you read a single cell.
+2. **Find the hot columns.** Defense Evasion and Persistence carry the most lit cells today — start there.
+3. **Open the worst cell.** Click the highest-severity detection (the `T1543.001` high cell), read its contributing rules, and follow one to its detection page.
+4. **Mind the clear cells.** A clear cell in a tactic you care about is reassurance; *no* cell in that tactic is a gap to plan for.
+
+The Matrix is the section's table of contents written in MITRE's language. Once a technique lights up, every path from it — rule → detection page → finding → process responsible → code signature → owning application — runs back through the [kernel foundation](/dashboard/endpoint/foundation) that every Endpoint page is built on.

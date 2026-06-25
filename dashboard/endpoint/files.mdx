@@ -1,0 +1,209 @@
+---
+title: "Files"
+sidebarTitle: "Files"
+description: "The macOS file explorer: a fleet roster of Macs reporting file telemetry, a per-host tree Explorer over the macOS path taxonomy, and a per-file Detail with code-signed provenance — where each file came from, who wrote it, and whether its quarantine flag was stripped."
+---
+
+The **Files** page is the macOS file explorer. It answers two questions — *which Mac is touching files, and how much?* across the fleet, and *what is the file activity on this Mac, and where did each file come from?* on a single host. It is the Endpoint counterpart to the Cloud [Files](/dashboard/files) page, rebuilt around the macOS filesystem shape and around the one thing the macOS kernel gives you that Linux cannot: **trust and owning-app identity on every file event.**
+
+It is an exploration page — it reads the raw [`endpoint_events`](/macos-collector/event-data-model) stream directly rather than the finding catalog — built on the file events `file_open`, `file_unlink`, `file_rename`, `file_chmod`, plus the `xattr_*` events that carry quarantine and provenance. See [the foundation](/dashboard/endpoint/foundation) for the layout and identity model every Endpoint page shares.
+
+<Note>
+Because the [code-signing verdict](/macos-collector/event-data-model#the-code_signature-verdict) and the [owning application](/macos-collector/event-data-model#application-attribution-every-event-the-macos-differentiator) ride on every file row, this page can answer *"which `unsigned_or_invalid` app wrote this file"* as a single column filter — not a forensic reconstruction. That is the thesis of the whole section, applied to files.
+</Note>
+
+---
+
+## Fleet view
+
+With no host selected, the page opens on a **roster of every Mac reporting file telemetry**, so you can see the shape of file activity across the fleet before drilling into one machine. Each row aggregates that host's file stream over the selected time range.
+
+### Search and columns
+
+- **Search** filters Macs by `device_name`.
+- **Row click** drills into a single host's Explorer; the choice is remembered across Endpoint pages (see [Selecting an endpoint](/dashboard/endpoint/foundation#selecting-an-endpoint)).
+
+| Column | What it counts | Built on |
+| :-- | :-- | :-- |
+| **Mac** | `device_name` (e.g. `Zin's MacBook Pro`) | header |
+| **Opens** | `file_open` events | `file_open` |
+| **Deletes** | `file_unlink` events | `file_unlink` |
+| **Chmods** | `file_chmod` permission changes | `file_chmod` |
+| **Renames** | `file_rename` / move events | `file_rename` |
+| **Unique Paths** | distinct `filename` values touched | all file events |
+| **Sensitive** | events on [sensitive-classified paths](#sensitive-path-classification) | path classifier |
+
+Default sort is **Opens**, highest first. The fleet aggregates are computed per host; selecting one drops you into a per-host view that scans that host's raw stream.
+
+<Note>
+On the reference Mac, the fleet roster summarizes roughly **64.8M file events** — about **63.9M opens** — across **~961k unique paths**. `file_open` dominates by design; ESensor's [userspace filtering](/macos-collector/event-coverage#what-gets-filtered) has already stripped framework loads, font and cache churn, and platform-binary noise, so what lands here is the security-relevant remainder.
+</Note>
+
+---
+
+## Per-host view
+
+Selecting a Mac opens a three-part workspace, the same shape as the Cloud page but navigating the macOS tree: a **tree Explorer** on the left, a **main pane** in the center, and a resizable **mini-terminal** along the bottom.
+
+### Path Search
+
+A search bar at the top of the host view does full-text matching over captured `filename` paths. It debounces as you type and shows matching paths with a path-taxonomy badge, a file-class badge, and an event count. Selecting a result navigates the Explorer to the file's parent directory and opens its [Detail modal](#file-detail).
+
+### Tree Explorer
+
+The left sidebar is a lazily-expanded folder tree, but it is shaped by the **macOS path taxonomy** rather than a flat Linux `/`. The captured stream resolves into the directories a Mac actually has:
+
+| Taxonomy bucket | What lives there | Why it matters |
+| :-- | :-- | :-- |
+| `/Applications` | Installed app bundles | New or modified apps; unsigned writers into a bundle |
+| **`.app` bundles** | The internals of an application package (`Contents/MacOS`, `Resources`, `Info.plist`) | Bundle tampering — a non-`developer_id` writer modifying a signed app |
+| `/System`, `/usr` | OS-shipped, SIP-protected paths | Writes here are anomalous by definition |
+| `/Library` | System-wide support, `LaunchAgents`, `LaunchDaemons` | Pairs with [Persistence](/dashboard/endpoint/persistence) |
+| `/Users/<name>` | Per-user home directories | Where work, downloads, and secrets live |
+| `~/Library` | Per-user app support, Keychains, containers, `CloudStorage` | Credential and cloud-sync activity |
+| `/private/tmp`, `/private/var` | Scratch and staging space | A classic drop-and-exec staging ground |
+| `/Volumes` | Mounted disks — USB, DMGs, network shares | Joins [Removable Media](/dashboard/endpoint/removable-media); writes here are egress |
+
+- **Folder rows** show the name plus `N paths · N evts`.
+- **File rows** show the basename and event count, with an `unsigned` / `adhoc` chip when the last writer was untrusted.
+- The tree respects **Show system paths** (`/System`, `/usr`, platform-binary churn) and **Show Hidden** (dotfiles like `~/.ssh`, `~/.aws`) toggles set in the Browse pane.
+
+### Main pane
+
+The center pane shows one of three states.
+
+#### Landing
+
+Shown before you drill into a directory — a per-host summary of the file stream:
+
+| Section | Contents |
+| :-- | :-- |
+| **Stats cards** | Total file events · Unique Paths · Responsible apps (`application_id`) |
+| **Path Buckets** | Horizontal bars grouping paths by the macOS taxonomy above |
+| **File Classes** | Class (document, archive, executable, plist, keychain, key/cert, dotfile) · activity · distinct files |
+| **Top Directories** | Directory · paths · events — click to browse |
+| **Top Files** | Path · responsible apps · events — click to open the Detail modal |
+| **Interesting Files** | Path · class badge · reason · top app · delete / chmod / rename / quarantine-strip counts |
+
+The **Interesting Files** list is where trust earns its keep: a row is interesting not because the path is special but because *who touched it* is — an `unsigned_or_invalid` writer into a `.app` bundle, an `xattr_delete` on `com.apple.quarantine`, a chmod to `+x` in `/private/tmp`.
+
+#### Browse
+
+When you select a directory:
+
+- A **Current location** breadcrumb with back/forward arrows.
+- A **Folders & files** heading with folder and file-path counts.
+- **View options**: **Show system paths** and **Show Hidden**.
+- A **Folders** table (Path · Paths inside · Events) and a **File paths** table (Path · Class · Events · Apps · Del · Chmod · **Writer trust** · Top App). The **Writer trust** column renders the `code_signature` of the last app to write each path, so an `unsigned_or_invalid` file in a folder of `developer_id` files is visible at a glance. Interesting files are highlighted.
+
+#### File list
+
+When a Path Search is active, the pane shows **File paths**, one row per distinct path, using the same columns as the Browse file table, sorted by total events highest-first.
+
+### Mini-terminal
+
+A resizable panel at the bottom mirrors the Explorer location and navigates the *captured* tree — it is a read-only view over telemetry, not a shell on the Mac. It accepts a small command set: `cd`, `ls`, `tree`, `pwd`, `cat <file>`, and `clear`. `cd ..` follows the Browse back stack.
+
+<Warning>
+`cat <file>` prints the file's **telemetry record** — its taxonomy bucket, class, writer trust, provenance, and event counts — never its contents. The collector captures metadata only; see [what the collector does not capture](/macos-collector/event-data-model#what-the-collector-does-not-capture).
+</Warning>
+
+---
+
+## File Detail
+
+Clicking a file opens the Detail modal. The header shows the basename, full path, the taxonomy bucket, and a **Deleted** badge (from `file_unlink`) when applicable. This is where macOS telemetry pulls decisively ahead of the Linux page — every section below rides on identity and provenance that exist on the raw rows.
+
+| Section | Contents | Built on |
+| :-- | :-- | :-- |
+| **Identity** | Directory, extension, file class, UTI / semantic type, taxonomy bucket, first seen, last seen | `filename`, classifier |
+| **Provenance** | Where the file came from — downloaded-by app and source URL, plus a quarantine-strip flag | `xattr_*`, `quarantine` |
+| **Signed writer** | The `code_signature` and `team_id` of the app that wrote each version | identity columns |
+| **Overview** | Opens, Deletes, Chmods, Renames; distinct apps and top app; a per-app breakdown (App · Opn · Del · Mod · Ren · Σ) | all file events |
+| **Who touched this** | Responsible app, signing identity, trust verdict, user (`username`/`uid`), and event types | identity + attribution |
+| **Renames & permission changes** | Type · time · app · `uid` · details (old→new path, or octal `mode`) | `file_rename`, `file_chmod` |
+| **Activity timeline** | A stacked bar chart of opens over time, split Read / Write | `file_open` `flags` |
+
+### Provenance card
+
+This is the centerpiece, and it has no equivalent on the Linux page. macOS records a file's origin in extended attributes, and ESensor captures the events that set and strip them:
+
+- **Downloaded by + source URL** — when an app saves a downloaded file, macOS writes `com.apple.quarantine` (and `kMDItemWhereFroms`), recording the *agent that downloaded it* and the *source URL*. The card surfaces both: "Downloaded by `Google Chrome` from `https://…`". The setting of that attribute is an `xattr_set` event the collector keeps unconditionally.
+- **Quarantine-strip flag** — an `xattr_delete` on `com.apple.quarantine` removes the "downloaded from the internet" mark so Gatekeeper will run the file without prompting. This is a classic [Gatekeeper bypass](/macos-collector/event-data-model#file-payload), and the card flags it loudly with the app and time of the strip.
+
+<Warning>
+A file whose Provenance shows it was **downloaded by a browser** and then had its **quarantine attribute deleted by an unsigned binary** is one of the highest-signal sequences on macOS. The Detail surfaces both halves on one card so the bypass reads as a single story.
+</Warning>
+
+### Signed writer and write completion
+
+Every file event carries the `code_signature` and `team_id` of the *acting binary*, folded to its [owning application](/macos-collector/event-data-model#application-attribution-every-event-the-macos-differentiator). The **Signed writer** section attributes each modification to a trust verdict, so you can see that a config file was last written by a `developer_id` app (`team_id` shown) versus an `adhoc` or `unsigned_or_invalid` one. Write completion is read from the `file_open` write `flags` — a write-intent open followed by activity marks a real modification, not a probe.
+
+### Cloud-sync attribution
+
+When a file lives under `~/Library/CloudStorage`, the writer is typically a sync daemon — `fileproviderd` or `bird` (iCloud), or a vendor provider — rather than the app you edited it in. The Detail labels these writes as **cloud-sync** by their `signing_id`, so a document syncing to iCloud is not mistaken for a suspicious background writer, while a *non-provider* binary writing into a CloudStorage folder still stands out.
+
+---
+
+## Sensitive-path classification
+
+A path classifier marks security-relevant files so they surface in the **Sensitive** fleet column and the **Interesting Files** list, and so opens of them survive [filtering](/macos-collector/event-coverage#what-is-never-filtered) even when the surrounding directory is noisy:
+
+| Class | Example paths |
+| :-- | :-- |
+| **SSH keys** | `~/.ssh/id_*`, `~/.ssh/config`, `known_hosts` |
+| **Cloud credentials** | `~/.aws/credentials`, `~/.config/gcloud`, `~/.kube/config` |
+| **Keychains** | `~/Library/Keychains/login.keychain-db`, `/Library/Keychains` |
+| **Tokens & dotenv** | `.npmrc`, `.netrc`, `.env`, `*.pem`, `*.p12` |
+| **Browser secrets** | `Login Data`, `Cookies`, Safari keychain items |
+
+Sensitive reads are the bridge to [Credential Access](/dashboard/endpoint/credential-access), which builds the process-to-secret view on the same `file_open` rows.
+
+---
+
+## Querying the same data
+
+Everything on the page is a view over `endpoint_events`. Two queries that back it:
+
+```sql
+-- Most-touched paths on one Mac, with the app and trust of the last writer
+SELECT filename,
+       count() AS events,
+       countIf(event_type = 'file_open')   AS opens,
+       countIf(event_type = 'file_unlink') AS deletes,
+       argMax(application_display_name, event_time) AS last_writer_app,
+       argMax(code_signature, event_time)           AS last_writer_trust
+FROM endpoint_events
+WHERE event_class = 'file'
+  AND device_name = 'Zin''s MacBook Pro'
+GROUP BY filename
+ORDER BY events DESC
+LIMIT 50;
+```
+
+The reference Mac shows `/Users/zinbitar` as one of the heaviest subtrees, on the order of **7.9M events**. The differentiator query — *which files did an untrusted app write?* — is the one that does not exist on Linux:
+
+```sql
+-- Files written, renamed, or chmod'd by an unsigned or ad-hoc binary
+SELECT event_time, device_name, application_display_name,
+       signing_id, team_id, code_signature, event_type, filename, dest_path
+FROM endpoint_events
+WHERE event_class = 'file'
+  AND event_type IN ('file_open', 'file_rename', 'file_chmod', 'file_unlink')
+  AND code_signature IN ('unsigned_or_invalid', 'adhoc')
+ORDER BY event_time DESC;
+```
+
+---
+
+## Related pages
+
+| Page | Relationship |
+| :-- | :-- |
+| [Foundation](/dashboard/endpoint/foundation) | The shared layout, trust model, and endpoint picker |
+| [Activity](/dashboard/endpoint/activity) | The live, all-event-type feed for one Mac |
+| [Credential Access](/dashboard/endpoint/credential-access) | The process-to-secret view over sensitive `file_open` rows |
+| [Removable Media](/dashboard/endpoint/removable-media) | File writes onto `/Volumes` — USB and DMG egress |
+| [Cloud Files](/dashboard/files) | The Linux counterpart, over the cloud workload fleet |
+| [Event data model](/macos-collector/event-data-model) | The `endpoint_events` schema and file payload columns |
+| [Event coverage](/macos-collector/event-coverage) | Why `file_open` is filtered and what is never dropped |
