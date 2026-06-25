@@ -1,0 +1,178 @@
+---
+title: "Prometheus metrics"
+sidebarTitle: "Prometheus"
+description: "Scrape process and runtime telemetry from Hilt platform services with Prometheus or any compatible agent."
+---
+
+Every Hilt backend service exposes a `/metrics` endpoint in the standard Prometheus text exposition format (`text/plain; version=0.0.4`). You can scrape these into your own observability stack — Prometheus, Grafana Agent / Alloy, VictoriaMetrics, the OpenTelemetry Collector, Datadog, or any tool that speaks OpenMetrics.
+
+The exporter covers **process and runtime telemetry** (CPU, memory, GC, file descriptors). Application-level metrics such as request latency or queue depth are not currently exported.
+
+---
+
+## Services with `/metrics`
+
+| Service | Runtime | Default port | Endpoint |
+| :-- | :-- | :-- | :-- |
+| Collector (`dag-collector`) | Go | 80 | `/metrics` |
+| Backend (`dag-backend`) | Go | 80 | `/metrics` |
+| Enrichment (`dag-enrichment`) | Go | 8080 | `/metrics` |
+| Detection ML (`dag-detectionML`) | Python | 8080 | `/metrics` |
+
+The endpoint shares each service's existing HTTP port — no additional container port or security-group rule is required. On the backend, the endpoint is mounted ahead of the authentication middleware, so scrapes do not require a session or cookie.
+
+---
+
+## Labels
+
+Every metric series carries three labels:
+
+| Label | Source | Example |
+| :-- | :-- | :-- |
+| `service` | `SERVICE_NAME` env | `dag-backend` |
+| `instance` | `INSTANCE_ID` / `POD_NAME` / `HOSTNAME` | `enrichment-6f8b4-xz9kp` |
+| `environment` | `ENVIRONMENT` / `ENV` | `prod` |
+
+These are stamped by the exporter at emission time. If your scrape config also adds an `environment` label, set `honor_labels: true` to preserve the exporter's value.
+
+---
+
+## Configuration
+
+All services share the same environment-variable contract:
+
+| Variable | Default | Purpose |
+| :-- | :-- | :-- |
+| `METRICS_ENABLED` | `true` | Set to `false` to disable the endpoint entirely |
+| `METRICS_PATH` | `/metrics` | Override the endpoint path |
+| `SERVICE_NAME` | *(per service)* | Value for the `service` label |
+| `ENVIRONMENT` / `ENV` | `unknown` | Value for the `environment` label |
+| `INSTANCE_ID` / `POD_NAME` / `HOSTNAME` | OS hostname | Value for the `instance` label |
+
+<Note>
+  The endpoint is **enabled by default**. Set `METRICS_ENABLED=false` on any service where you do not want to expose it.
+</Note>
+
+---
+
+## Metric families
+
+### CPU
+
+- `process_cpu_seconds_total` — cumulative CPU time
+- `process_cpu_utilization_ratio` — instantaneous CPU usage (0–1)
+- `process_cpu_throttled_seconds_total` — cgroup throttle time
+- `process_cpu_throttled_periods_total` — cgroup throttle period count
+- `process_cpu_core_usage_ratio{core}` — per-core usage (Linux only)
+
+### Memory
+
+- `process_resident_memory_bytes` — RSS
+- `process_virtual_memory_bytes` — virtual memory
+- `process_heap_bytes` / `process_heap_sys_bytes` — Go heap (Go services only)
+- `system_memory_total_bytes` / `system_memory_available_bytes` — host memory
+- `process_memory_usage_ratio` — RSS vs cgroup limit
+
+### Runtime
+
+- `process_uptime_seconds` — seconds since start
+- `process_open_fds` / `process_max_fds` — file descriptors
+- `go_goroutines`, `go_threads`, `go_gc_duration_seconds` — Go runtime (Go services)
+- `python_gc_collections_total`, `python_info` — Python runtime (Detection ML)
+
+<Note>
+  cgroup and `/proc`-derived metrics (throttling, per-core, system memory) are emitted only on Linux. On other platforms they are silently omitted.
+</Note>
+
+---
+
+## Scrape configuration
+
+### Prometheus / VictoriaMetrics
+
+A minimal static-target config:
+
+```yaml
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: "dag-backend"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["dag-backend:80"]
+
+  - job_name: "dag-collector"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["dag-collector:80"]
+
+  - job_name: "dag-enrichment"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["dag-enrichment:8080"]
+
+  - job_name: "dag-detectionml"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["dag-detectionml:8080"]
+```
+
+Replace the static targets with your service discovery mechanism (Kubernetes pod annotations, ECS Cloud Map, Consul, etc.).
+
+### Kubernetes pod annotations
+
+For in-cluster Prometheus with pod-based service discovery, annotate your pods:
+
+```yaml
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "8080"
+```
+
+### Grafana Agent / Alloy
+
+Use the `prometheus.scrape` component pointing at the same targets shown above.
+
+### Datadog Agent
+
+Use the OpenMetrics check:
+
+```yaml
+instances:
+  - openmetrics_endpoint: http://dag-backend:80/metrics
+    namespace: dag
+    metrics:
+      - "process_*"
+      - "go_*"
+      - "system_*"
+      - "python_*"
+```
+
+### OpenTelemetry Collector
+
+Use the `prometheus` receiver with the same `scrape_configs` block.
+
+---
+
+## Grafana dashboard
+
+A starter Grafana dashboard is available with panels for:
+
+- CPU utilization ratio and CPU seconds rate
+- Resident memory (RSS) and memory usage ratio
+- CPU throttling rate
+- Goroutines and GC pause (Go services)
+- Open file descriptors
+- Uptime
+
+The dashboard includes a `$service` template variable for filtering by service. Import the JSON into your Grafana instance and select your Prometheus data source.
+
+---
+
+## Relationship to System Status
+
+The [System Status](/administration/system-status) page in the Hilt dashboard provides a curated health view of backend components using internal health checks. Prometheus metrics complement this with lower-level, time-series resource telemetry suitable for alerting, capacity planning, and long-term trend analysis.

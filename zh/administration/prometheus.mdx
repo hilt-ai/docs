@@ -1,0 +1,178 @@
+---
+title: "Prometheus 指标"
+sidebarTitle: "Prometheus"
+description: "使用 Prometheus 或任何兼容的采集代理抓取 Hilt 平台服务的进程和运行时遥测数据。"
+---
+
+每个 Hilt 后端服务都在标准 Prometheus 文本格式（`text/plain; version=0.0.4`）下暴露 `/metrics` 端点。您可以将这些指标接入自己的可观测性体系 — Prometheus、Grafana Agent / Alloy、VictoriaMetrics、OpenTelemetry Collector、Datadog 或任何兼容 OpenMetrics 的工具。
+
+导出器覆盖**进程和运行时遥测**（CPU、内存、GC、文件描述符）。应用层指标（如请求延迟或队列深度）目前尚未导出。
+
+---
+
+## 支持 `/metrics` 的服务
+
+| 服务 | 运行时 | 默认端口 | 端点 |
+| :-- | :-- | :-- | :-- |
+| 采集器（`dag-collector`） | Go | 80 | `/metrics` |
+| 后端（`dag-backend`） | Go | 80 | `/metrics` |
+| 富化（`dag-enrichment`） | Go | 8080 | `/metrics` |
+| 检测 ML（`dag-detectionML`） | Python | 8080 | `/metrics` |
+
+端点共享各服务现有的 HTTP 端口 — 无需额外的容器端口或安全组规则。在后端服务上，该端点挂载在认证中间件之前，因此抓取不需要会话或 Cookie。
+
+---
+
+## 标签
+
+每条指标序列都携带三个标签：
+
+| 标签 | 来源 | 示例 |
+| :-- | :-- | :-- |
+| `service` | `SERVICE_NAME` 环境变量 | `dag-backend` |
+| `instance` | `INSTANCE_ID` / `POD_NAME` / `HOSTNAME` | `enrichment-6f8b4-xz9kp` |
+| `environment` | `ENVIRONMENT` / `ENV` | `prod` |
+
+这些标签由导出器在发送时打上。如果您的抓取配置也添加了 `environment` 标签，请设置 `honor_labels: true` 以保留导出器的值。
+
+---
+
+## 配置
+
+所有服务共享相同的环境变量约定：
+
+| 变量 | 默认值 | 用途 |
+| :-- | :-- | :-- |
+| `METRICS_ENABLED` | `true` | 设为 `false` 以完全禁用端点 |
+| `METRICS_PATH` | `/metrics` | 覆盖端点路径 |
+| `SERVICE_NAME` | *（因服务而异）* | `service` 标签的值 |
+| `ENVIRONMENT` / `ENV` | `unknown` | `environment` 标签的值 |
+| `INSTANCE_ID` / `POD_NAME` / `HOSTNAME` | 操作系统主机名 | `instance` 标签的值 |
+
+<Note>
+  端点**默认启用**。如果不希望在某个服务上暴露，请设置 `METRICS_ENABLED=false`。
+</Note>
+
+---
+
+## 指标族
+
+### CPU
+
+- `process_cpu_seconds_total` — 累计 CPU 时间
+- `process_cpu_utilization_ratio` — 瞬时 CPU 使用率（0–1）
+- `process_cpu_throttled_seconds_total` — cgroup 节流时间
+- `process_cpu_throttled_periods_total` — cgroup 节流周期计数
+- `process_cpu_core_usage_ratio{core}` — 每核使用率（仅 Linux）
+
+### 内存
+
+- `process_resident_memory_bytes` — RSS
+- `process_virtual_memory_bytes` — 虚拟内存
+- `process_heap_bytes` / `process_heap_sys_bytes` — Go 堆（仅 Go 服务）
+- `system_memory_total_bytes` / `system_memory_available_bytes` — 主机内存
+- `process_memory_usage_ratio` — RSS 与 cgroup 限制的比率
+
+### 运行时
+
+- `process_uptime_seconds` — 启动后的秒数
+- `process_open_fds` / `process_max_fds` — 文件描述符
+- `go_goroutines`、`go_threads`、`go_gc_duration_seconds` — Go 运行时（Go 服务）
+- `python_gc_collections_total`、`python_info` — Python 运行时（检测 ML）
+
+<Note>
+  cgroup 和 `/proc` 派生的指标（节流、每核、系统内存）仅在 Linux 上发送。在其他平台上会被静默忽略。
+</Note>
+
+---
+
+## 抓取配置
+
+### Prometheus / VictoriaMetrics
+
+最小的静态目标配置：
+
+```yaml
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: "dag-backend"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["dag-backend:80"]
+
+  - job_name: "dag-collector"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["dag-collector:80"]
+
+  - job_name: "dag-enrichment"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["dag-enrichment:8080"]
+
+  - job_name: "dag-detectionml"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["dag-detectionml:8080"]
+```
+
+请将静态目标替换为您的服务发现机制（Kubernetes Pod 注解、ECS Cloud Map、Consul 等）。
+
+### Kubernetes Pod 注解
+
+对于集群内 Prometheus 基于 Pod 的服务发现，请为 Pod 添加注解：
+
+```yaml
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "8080"
+```
+
+### Grafana Agent / Alloy
+
+使用 `prometheus.scrape` 组件指向与上述相同的目标。
+
+### Datadog Agent
+
+使用 OpenMetrics 检查：
+
+```yaml
+instances:
+  - openmetrics_endpoint: http://dag-backend:80/metrics
+    namespace: dag
+    metrics:
+      - "process_*"
+      - "go_*"
+      - "system_*"
+      - "python_*"
+```
+
+### OpenTelemetry Collector
+
+使用 `prometheus` 接收器，配合相同的 `scrape_configs` 块。
+
+---
+
+## Grafana 仪表盘
+
+提供了一个入门 Grafana 仪表盘，包含以下面板：
+
+- CPU 利用率和 CPU 时间速率
+- 常驻内存（RSS）和内存使用率
+- CPU 节流速率
+- Goroutine 数量和 GC 暂停时间（Go 服务）
+- 打开的文件描述符
+- 运行时间
+
+仪表盘包含 `$service` 模板变量，可按服务筛选。将 JSON 导入您的 Grafana 实例并选择 Prometheus 数据源即可。
+
+---
+
+## 与系统状态的关系
+
+Hilt 仪表盘中的[系统状态](/zh/administration/system-status)页面通过内部健康检查提供后端组件的精选健康视图。Prometheus 指标以更底层的时间序列资源遥测作为补充，适用于告警、容量规划和长期趋势分析。
