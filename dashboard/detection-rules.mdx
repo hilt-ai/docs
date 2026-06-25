@@ -1,10 +1,10 @@
 ---
 title: "Detection Rules"
-sidebarTitle: "Detection Rules"
+sidebarTitle: "Rules"
 description: "Creating and managing custom detection rules for your environment."
 ---
 
-Custom _if-this-then-alert_ rules over live telemetry. When a rule's condition matches, it raises a finding on the Anomalies page. In the app this page is labeled **Rules**.
+Custom _if-this-then-alert_ rules over live telemetry. When a rule's condition matches, it raises a finding on the Anomalies page. In the sidebar nav this page is labeled **Rules**.
 
 ## Permissions
 
@@ -30,7 +30,7 @@ The list is a table:
 | **Last** | When it last fired (_Never_, _Just now_, _Xm ago_, …) |
 | **Action** | View anomalies, Edit, Delete |
 
-The **View anomalies** action jumps to the Anomalies page scoped to that rule. 
+The **View anomalies** action is an **icon-only** target button that jumps to the Anomalies page scoped to that rule.
 
 ---
 
@@ -83,7 +83,7 @@ Choose **Always on** or **Time windows**. Time windows let you define recurring 
 
 ### Saving
 
-The footer offers **Save draft** (when creating), **Cancel**, **Test (24h)**, and **Create rule** / **Save changes**. Validation errors (missing name, no conditions, no hosts, etc.) appear in red. If you close with unsaved edits, you're prompted to **Save as draft**, **Keep editing**, or **Discard**.
+The footer offers **Cancel**, **Test (24h)**, and **Create rule** / **Save changes**. **Save draft** is only available when creating a new rule, not when editing an existing one. Validation errors (missing name, no conditions, no hosts, etc.) appear in red. If you close with unsaved edits, you're prompted to **Save as draft**, **Keep editing**, or **Discard**.
 
 ### Drafts
 

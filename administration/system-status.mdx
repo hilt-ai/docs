@@ -14,9 +14,10 @@ A banner at the top shows the aggregate health across all components:
 
 | Status | Meaning |
 | --- | --- |
-| **Operational** | All components are healthy |
-| **Degraded** | One or more components are experiencing issues but the system is functional |
-| **Outage** | A critical component is down |
+| **All systems operational** | Every monitored component is healthy |
+| **N service(s) need(s) attention** | One or more components are experiencing issues but the system is functional |
+| **Some services disabled** | One or more components have been intentionally disabled |
+| **No services monitored** | No backend components are reporting status |
 
 ---
 
@@ -24,13 +25,15 @@ A banner at the top shows the aggregate health across all components:
 
 Each backend component has a status card showing:
 
-- **Component name** (e.g., API server, ingestion pipeline, scoring engine).
-- **Current status**: operational, degraded, or outage.
+- **Component name** (e.g., Anomaly Narratives, TRACE Anomaly Detection, Event Enrichment, Backend Process, ClickHouse, Postgres).
+- **Current status**: Operational, Degraded, Disabled, or No data.
 - **Uptime history**: a 90-day visual history showing availability over time.
+
+Component cards can also display **remediation steps** when a service is unhealthy, and a **backend vitals strip** with additional detail such as response times, queue depths, or resource usage.
 
 ### Infrastructure components
 
-Infrastructure-level components (ClickHouse, PostgreSQL) use an expandable card with a per-signal breakdown — individual health metrics like query latency, connection pool usage, and replication lag.
+Infrastructure-level components (ClickHouse, Postgres) use an expandable card with a per-signal breakdown — individual health metrics like query latency, connection pool usage, and replication lag.
 
 ---
 

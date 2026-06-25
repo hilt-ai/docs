@@ -6,11 +6,15 @@ description: "Deep-dive investigation view for exploring host activity across ti
 
 The raw event explorer. Investigate lets you scope to hosts and a time window, narrow down with structured filters, and read individual events in chronological order, with anomaly windows highlighted inline. It's where most "Investigate events" links across the dashboard land.
 
+The Investigate page enforces a **24-hour maximum time window**. The 7-day time preset is disabled or clamped to 24 hours. On fresh visits, the page **auto-selects all activity hosts** (up to 500).
+
+Re-clicking **Investigate** in the sidebar resets all URL state and remounts the page from scratch.
+
 ---
 
 ## Context banner
 
-When you arrive from another page, a context banner gives you a one-click way back, labeled for the source.
+When you arrive from another page, a context banner gives you a one-click way back, labeled for the source. Context banner sources include **Data Lineage**, **Networks**, **Session**, and **Files** drill-downs.
 
 ## Filters
 
@@ -19,7 +23,7 @@ Filters are grouped into tabs across the header, **Event**, **Process**, **Netwo
 | Tab | What you filter on |
 | --- | --- |
 | **Event** | Event types, grouped as Process, Files, Network, and Workloads (e.g. _Process started_, _File opened_, _Network flow_) |
-| **Process** | Command, parent command, PID, thread ID, parent PID, UID, effective UID, user, workload ID |
+| **Process** | Command, parent command, Process ID (kernel tgid), Thread ID (kernel pid), parent PID, UID, effective UID, user, workload ID |
 | **Network** | Source/destination IP and port, protocol, connection type, bytes sent/received thresholds |
 | **File** | Path prefix, open flags, permission bits, command-line contains |
 | **Topology** | Program ID, session ID, process instance ID |

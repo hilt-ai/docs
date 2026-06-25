@@ -4,17 +4,24 @@ sidebarTitle: "报告"
 description: "基于 Hilt 发现项生成并导出安全报告。"
 ---
 
-基于遥测数据和发现项生成基础设施与安全报告，可导出为 PDF。提供两种报告类型：面向高管的 **Overview**（概览）报告，以及更为深入的 **Process Intel**（进程情报）拆解报告。
+基于遥测数据和发现项生成基础设施与安全报告，可导出为 PDF。提供两种报告类型：**执行摘要**（Executive Summary）报告，以及更为深入的 **Process Intel**（进程情报）拆解报告。
+
+## 时段选择器
+
+页面顶部的时段选择器可让你选择报告的时间窗口：**24h**、**7d**、**30d**、**90d** 或 **1y**。
 
 ---
 
-## Overview 报告
+## 执行摘要报告
 
-一份覆盖所选时间段的单页高管摘要：
+一份覆盖所选时间段的单页执行摘要：
 
 - **Risk identified**（已识别风险）：一个按类别划分检测结果的环形图，中心显示异常总数。
-- **Detection funnel**（检测漏斗）：从 _anomalies flagged_（标记的异常）经 _analyst reviewed_（分析师已审查）、_validated threats_（已验证的威胁）、_hosts quarantined_（已隔离的主机）到 _hosts restored_（已恢复的主机）的各个阶段，并附带准确率 KPI。
-- **ROI 卡片**：采集器覆盖情况（活跃/离线/用户）、被拦截的出站请求，以及被阻止的敏感文件活动。
+- **Detection funnel**（检测漏斗）：从 _anomalies flagged_（标记的异常）经 _analyst reviewed_（分析师已审查）、_validated threats_（已验证的威胁）、_hosts quarantined_（已隔离的主机）、_hosts sanitized_（已清理的主机）到 _hosts restored_（已恢复的主机）的各个阶段，并附带准确率 KPI，包括 **Detection accuracy** 和 **False positive rate**。
+- **ROI 卡片**：
+  - **Data Collectors Ensuring Complete System Coverage** — 附带 Active、Offline 和 Users 子磁贴。
+  - **Anomalous out requests intercepted** — 附带 egress 和 file outbound 子磁贴。
+  - **Sensitive file opens blocked** — 附带 deletions 和 permission changes 子磁贴。
 - **图表**：该时间段内的传输量（随时间变化的字节数）和文件活动。
 
 如果该时间段内没有任何检测结果，风险环形图会做出相应说明。

@@ -4,18 +4,18 @@ sidebarTitle: "Quarantine"
 description: "Isolating compromised hosts from the network while preserving forensic access."
 ---
 
-Quarantine is Hilt's network isolation response. When a host shows signs of compromise or active data exfiltration, an authorized user can quarantine it, severing its network access to prevent lateral movement or continued data loss, while preserving the ability to investigate.
+Quarantine is Hilt's network isolation response. When a host shows signs of compromise or active data exfiltration, it can be quarantined — severing its network access to prevent lateral movement or continued data loss, while preserving the ability to investigate.
 
 ---
 
 ## How quarantine works
 
-When you quarantine a host:
+When a host is quarantined:
 
 1. **Network isolation**: the host's security group (AWS) or equivalent network policy is replaced with a quarantine security group that blocks all inbound and outbound traffic except the Hilt collector's ingest path.
 2. **Collector continues**: the Hilt collector maintains its outbound connection, so telemetry continues flowing for forensic analysis.
 3. **State recorded**: the original security group IDs are saved so the action can be reversed.
-4. **Audit trail**: the quarantine action, the user who initiated it, and the timestamp are recorded in the audit log.
+4. **Audit trail**: the quarantine action and timestamp are recorded.
 
 <Warning>
 Quarantine severs the host's network connections. Running workloads on the host will lose connectivity. Only use quarantine when the security risk of continued operation outweighs the availability impact.
@@ -23,29 +23,32 @@ Quarantine severs the host's network connections. Running workloads on the host 
 
 ---
 
-## Quarantining a host
+## Quarantine page
 
-You can quarantine a host from multiple places in the dashboard:
+The Quarantine page provides a fleet-wide view of isolation status.
 
-- **Anomalies page**: when viewing a finding, the action menu includes **Quarantine host**
-- **Collectors page**: the host detail panel includes a **Quarantine** action
-- **Finding detail**: confirmed findings show a quarantine option in the response actions
+### Summary strip
 
-### Requirements
+Three metrics at the top of the page:
 
-- Your dashboard user must have the **quarantine hosts** permission
-- The host must be in a cloud environment where Hilt has the required IAM permissions to modify security groups
-- The deployment must have quarantine capability enabled (configured during provisioning)
+- **Active quarantines**: the number of hosts currently isolated
+- **Connections blocked**: total blocked connection attempts across quarantined hosts
+- **Fleet hosts**: total host count for context
 
----
+### Host list
 
-## Viewing quarantined hosts
+Each quarantined host appears as a row showing:
 
-Quarantined hosts are marked throughout the dashboard:
+- **Status badge**: Isolated (actively quarantined) or Pending review (flagged for quarantine decision)
+- **Host ID** and identifying details
+- **Network footprint**: a summary of the host's recent communication — internal hosts reached, external destinations, and critical services
 
-- A **Quarantined** badge appears on the host in the Collectors fleet list
-- Finding cards show a **Host quarantined · View** link when the host has been isolated
-- The finding detail narrative includes a **Quarantined** indicator
+### Fleet posture
+
+The Node Readiness table shows the fleet's overall quarantine posture:
+
+- **Mode**: Observing (monitoring without enforcement) or Enforcing (active quarantine capability)
+- **Per-node readiness**: accuracy and confidence metrics for each host's quarantine eligibility
 
 ---
 
@@ -53,23 +56,23 @@ Quarantined hosts are marked throughout the dashboard:
 
 To restore a quarantined host to normal operation:
 
-1. Navigate to the quarantined host (via Collectors or the quarantine badge on a finding)
-2. Select **Release from quarantine**
-3. Confirm the action
+1. Navigate to the quarantined host on the Quarantine page
+2. Click **Unquarantine host**
+3. Confirm with **Yes, restore access**
 
-The host's original security group is restored, re-establishing its previous network access. The release is recorded in the audit log.
+The host's original security group is restored, re-establishing its previous network access.
 
 ---
 
-## Blast-radius assessment
+## Network footprint
 
-Before quarantining, the dashboard shows a blast-radius summary:
+After quarantine, the dashboard shows a network footprint summary for the isolated host:
 
-- **Workloads affected**: services running on the host that will lose connectivity
-- **Dependent connections**: other hosts or services that connect to this host
-- **Active sessions**: users currently connected to the host
+- **Internal hosts reached**: other hosts this host communicated with in the 7 days before isolation
+- **External destinations**: outside addresses this host connected to
+- **Critical services**: key services that depended on or were accessed by this host
 
-This helps you make an informed decision about the availability impact of isolation.
+This helps assess the blast radius and prioritize follow-up investigation.
 
 ---
 

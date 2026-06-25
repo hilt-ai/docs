@@ -10,6 +10,12 @@ The triage queue for behavioral findings. Each finding represents a deviation de
 
 ---
 
+## Page header
+
+The page header includes a **host selector** to scope findings to specific hosts, and **time presets** (5m, 15m, 1h, 6h, 24h, 7d) to control the time window.
+
+When no finding is deep-linked, the page **auto-selects the first finding in the Review tab**.
+
 ## Filters
 
 Filtering is structured through the **Filters** popover:
@@ -49,7 +55,7 @@ Each finding is a card showing:
 - **User / Reviewer** and **Confidence** (High / Medium / Low).
 - A **Host quarantined · View** link when the host has been isolated.
 
-The selected card is highlighted with a green accent. Severity is available as a filter but isn't printed on the card.
+The selected card is highlighted with a green accent. A **severity badge** (Critical, High, Medium, Low) is shown on each card. When available, **Time to Detect (TTD)** is also displayed (e.g. "detected ~30s after it began").
 
 ---
 
@@ -64,7 +70,7 @@ The top band explains the finding:
 - **Headline**, with the **host** and finding **time**.
 - A **type** badge and a **confidence** badge (hover for "Model Confidence").
 - A **Quarantined** link when applicable.
-- The narrative itself, _what happened_ and a **Why unusual** section, plus context chips.
+- The narrative itself — _what happened_ and _why it's unusual_ — plus context chips.
 - **Identity** badges for the job, application, or workload involved.
 
 Two context banners may appear: a **workload phase change** note (explaining that volume-only signals were de-emphasized), and a **feedback-suppression** note when the pattern matches a prior finding a reviewer denied, including the pattern similarity (an exact match or a percentage).
@@ -77,8 +83,19 @@ In the narrative band you act on the finding:
 - **Dismiss**: mark it as benign or a false positive (moves it to **Denied**).
 - A notes field (_"Add review notes..."_) lets you record context.
 
-### Event timeline
+<Note>
+**Read-only users** (Viewer role) do not see the Confirm/Dismiss buttons or the notes field. These HITL controls are only available to users with review permissions.
+</Note>
 
-Below the narrative, a **swimlane timeline** plots the evidence across a five-minute window in three lanes, **Process**, **Network**, and **File**. Nodes are colored by how strongly they contributed (the legend covers _key contributor_, _involved_, _background_, and _strongest link_), and clicking one pins a tooltip with the PID, parent, time, a relevance score and rank, and its linked events. Connecting arcs are labeled _strong_, _moderate_, or _weak link_. 
+### Action buttons
+
+Two buttons in the detail panel provide quick next steps:
+
+- **Explain**: launches a guided walkthrough of the finding, stepping through the narrative, evidence, and context to help you understand what happened.
+- **Investigate**: opens a scoped event timeline on the [Investigate](/dashboard/investigate) page, pre-filtered to the finding's host and time window.
+
+### Causal Graph
+
+Below the narrative, the **Causal Graph** visualizes the chain of events that led to the anomaly. It is a vertical causal story graph with expandable process steps — each node shows what a process did and its downstream branch effects. Expanding a step reveals the specific actions (file accesses, network connections, child processes) that occurred at that point in the chain.
 
 ---

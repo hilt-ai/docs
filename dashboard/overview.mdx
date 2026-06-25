@@ -20,7 +20,7 @@ New users start with six widgets:
 | --- | --- |
 | 1 | Events analyzed · Monitored hosts · Users tracked |
 | 2 | Security impact (full width) |
-| 3 | Threat profile · Recent findings |
+| 3 | Threat profile · Recent Anomalies |
 
 You can add more widgets, remove defaults, and rearrange the grid. Your layout is saved per user.
 
@@ -77,11 +77,11 @@ Click **Save** to persist your layout, or **Cancel** to discard changes.
 
 ### Security impact
 
-**Shows:** A full-width panel with impact metrics and a trend chart over a selectable time window (24h, 7d, 30d).
+**Shows:** A full-width panel with metric tiles and a trend chart over a selectable time window (3h, 24h, 7d, 30d).
 
-**How to read it:** Shows anomaly volume, triage load, and model accuracy signals over time.
+**How to read it:** Click the metric tiles — Anomalies, Accuracy, and False positive rate — to switch the chart series. Each tile includes a period-over-period comparison badge. A separate quarantine tile shows the active quarantine count.
 
-**Navigates to:** Anomalies.
+**Navigates to:** Drag-select a region on the chart to navigate to the Anomalies page filtered to that time range.
 
 ---
 
@@ -98,15 +98,14 @@ Click **Save** to persist your layout, or **Cancel** to discard changes.
 | Sensitive file | Access to sensitive file paths |
 | Lateral movement | Cross-host or phase-related movement |
 | Detection rule | Matches from custom detection rules |
-| Combined signal | Findings spanning multiple categories |
 
 **Navigates to:** Click a category sector to open Anomalies filtered to that type.
 
 ---
 
-### Recent findings
+### Recent Anomalies
 
-**Shows:** The three most recent anomaly findings, each with severity, type, affected host, and timestamp.
+**Shows:** The three most recent anomaly findings. Each item shows the finding title and a subtitle in the format `owner · host`.
 
 **How to read it:** Easy access triage inbox.
 
@@ -140,7 +139,7 @@ _Not in the default layout. Add via **Add widget**._
 
 ### File mutations
 
-**Shows:** Fleet-wide file activity in the last 24 hours, opens, deletes, and unique paths, plus the most active hosts by mutation count (renames, chmods, unlinks).
+**Shows:** Fleet-wide file activity in the last 24 hours — opens, deletes, and paths — plus the four most active hosts by mutation count (renames, chmods, unlinks).
 
 **How to read it:** Surfaces bulk file changes across the fleet. Spikes can indicate deployments, configuration updates, or destructive activity.
 
@@ -164,7 +163,7 @@ _Not in the default layout. Add via **Add widget**._
 
 ### Detection rules
 
-**Shows:** Count of enabled detection rules out of total configured, plus a scrollable list of rule names with enabled/disabled status.
+**Shows:** `{enabled} of {total} enabled` detection rules, plus a scrollable list of rule names with enabled/disabled status.
 
 **How to read it:** Shows rule coverage deployment and activity.
 

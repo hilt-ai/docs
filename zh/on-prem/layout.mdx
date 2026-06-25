@@ -1,8 +1,13 @@
 ---
-title: "本地部署运维"
+title: "运维操作"
 sidebarTitle: "结构"
-description: "用于发布新 Hilt 版本的自动更新代理，以及用于在本地部署中进行模型训练的匿名化数据导出。"
+description: "自动更新、数据导出与模型生命周期等运维功能现已归入管理部分。"
 ---
 
-- [自动更新代理](/zh/on-prem/auto-update-overview)：一个 Kubernetes CronJob，用于镜像新的 Hilt 发布镜像并自动推送更新。
-- [匿名化数据导出](/zh/on-prem/data-export-overview)：在保留 ML 模型所需统计结构的前提下，对本地部署的遥测数据进行匿名化，供 Hilt 模型训练使用。
+自动更新、数据导出和模型生命周期等功能现已整合到 Platform 选项卡下的 **Admin** 区域。
+
+如需访问这些功能，请参阅 [系统管理](/zh/administration/layout)，其中包含所有管理页面的完整列表，包括：
+
+- [自动更新](/zh/on-prem/auto-update-overview)：自动平台更新配置
+- [数据导出](/zh/on-prem/data-export-overview)：匿名化数据导出的审核与审批
+- [模型生命周期](/zh/on-prem/model-lifecycle)：TRACE 检测模型的状态、升级与回滚

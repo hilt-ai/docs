@@ -4,7 +4,7 @@ sidebarTitle: "AWS"
 description: "Hilt's single-tenant deployment architecture and provisioning on AWS."
 ---
 
-Hilt runs as a single-tenant platform inside your own AWS account. A managed EKS cluster hosts the analytics engine (ClickHouse) and the dashboard, collectors on your hosts stream telemetry through a private PrivateLink ingest endpoint into MSK (Kafka), and all traffic stays inside your account with no public internet exposure.
+Hilt runs as a single-tenant platform inside your own AWS account. Ingest tasks run on ECS Fargate behind a PrivateLink + NLB endpoint, the dashboard (frontend, backend, and query service) runs on ECS Fargate behind an internal ALB, enrichment and classification workloads run on EKS, and ClickHouse runs on a dedicated EC2 instance. Collectors stream telemetry through the private ingest endpoint into MSK (Kafka), and all traffic stays inside your account with no public internet exposure.
 
 ---
 
@@ -12,10 +12,12 @@ Hilt runs as a single-tenant platform inside your own AWS account. A managed EKS
 
 | Service | Role |
 | :-- | :-- |
-| EKS | Managed Kubernetes for platform services |
+| ECS Fargate | Ingest service (behind NLB + PrivateLink) and dashboard services (frontend, backend, query — behind internal ALB) |
+| EKS | Managed Kubernetes for enrichment and classification workloads |
+| EC2 | Dedicated instance for ClickHouse analytics database (optionally ClickHouse Cloud via PrivateLink) |
 | MSK (Kafka) | Event streaming |
 | PrivateLink | Private ingest endpoint: collectors connect without traversing the public internet |
-| S3 | Long-term storage and data exports |
+| S3 | Cold storage tiering, data-export staging, and app configuration |
 | RDS (PostgreSQL) | Dashboard database |
 | ACM + Route 53 | TLS certificates and private DNS |
 
@@ -35,6 +37,6 @@ Hilt runs as a single-tenant platform inside your own AWS account. A managed EKS
 Hilt provisions your AWS deployment using Terraform. The typical process:
 
 1. You provide a target AWS account with the agreed IAM permissions
-2. Hilt applies the Terraform configuration to create all infrastructure (EKS, MSK, RDS, S3, PrivateLink, and networking)
+2. Hilt applies the Terraform configuration to create all infrastructure (ECS, EKS, EC2, MSK, RDS, S3, PrivateLink, and networking)
 3. PrivateLink connectivity is established between your workload VPCs and the platform VPC
 4. Collectors are deployed to your hosts using the guides in this documentation

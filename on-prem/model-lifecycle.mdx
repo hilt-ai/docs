@@ -1,50 +1,47 @@
 ---
 title: "Model Lifecycle"
 sidebarTitle: "Model Lifecycle"
-description: "Managing the on-prem TRACE detection model: status, updates, promotion, and rollback."
+description: "Managing the TRACE detection model: status, updates, promotion, and rollback."
 ---
 
-The Model Lifecycle page shows the current state of the on-prem TRACE anomaly detection model and lets authorized administrators promote or roll back model versions. This page requires the **view audit** permission.
+The Model Lifecycle page shows the current state of the TRACE anomaly detection model and lets authorized administrators promote or roll back model versions. Viewing this page requires the **`view_audit`** permission; promote and rollback actions require the **`manage_users`** permission.
 
 ---
 
 ## Model status
 
-The hero section at the top shows the current model state:
+The hero section at the top displays a **verdict headline** summarizing the current state of protection (e.g., "Your protection is running…"). It also shows:
 
-- **Active version**: the model version currently scoring events in production.
-- **Shadow version**: a newer model version being evaluated side-by-side with the active model (if a training run has completed).
-- **Training status**: whether a training run is currently in progress, and its progress.
+- **Detection timing** — when the model last scored events.
+- **Change summary** — a brief description of the most recent model change.
+
+<Note>
+The shadow model version is not displayed in the UI. It is tracked internally and its presence controls whether the **Promote** button is enabled.
+</Note>
 
 ---
 
 ## Health checks
 
-A set of automated health checks that run after each model update to verify the new version is performing correctly:
+A **trigger log** shows update recommendations from the system:
 
-- **Detection coverage**: whether the model detects the expected set of known-bad patterns.
-- **False-positive rate**: whether the false-positive rate stays within acceptable bounds.
-- **Latency**: whether inference latency remains within service-level targets.
-- **Score distribution**: whether anomaly scores are distributed similarly to the previous model (no sudden drift).
-
-Each check shows a pass/fail status and a brief explanation.
+| Recommendation | Meaning |
+| --- | --- |
+| **Update recommended** | A new shadow model is available and the system suggests promotion |
+| **No update needed** | The current model is performing well and no action is required |
+| **Blocked** | An update cannot proceed due to a prerequisite or constraint |
 
 ---
 
 ## Performance journey
 
-A timeline visualization showing how model performance metrics have evolved across recent versions. Click a version marker to view its specific metrics. The most recent (current) version is selected by default.
+A chart showing three metrics over time:
 
----
+- **Threats caught** — the total number of threats detected by the model.
+- **Real threats kept (TP retained)** — true positives retained across model versions.
+- **False alarms reduced (FP avoided)** — false positives eliminated by model improvements.
 
-## Update history
-
-A table of recent model updates showing:
-
-- **Version**: the model version identifier.
-- **Status**: whether the update succeeded, failed, or is in progress.
-- **Timestamp**: when the update was applied.
-- **Changes**: a summary of what changed (e.g., retraining, feature additions).
+Range toggles: **1M**, **3M**, **1Y**, **All**. Click a version marker to view that version's specific metrics. The most recent (current) version is selected by default.
 
 ---
 
@@ -52,10 +49,12 @@ A table of recent model updates showing:
 
 ### Promote shadow to active
 
-When a shadow model passes all health checks, you can **promote** it to become the active scoring model. This replaces the current active model. Promotion requires confirmation.
+When a shadow model exists, you can **promote** it to become the active scoring model. This replaces the current active model. Promotion requires confirmation and the **`manage_users`** permission.
 
 ### Rollback
 
-If the active model is misbehaving, you can **roll back** to the previous version (or the baked-in base model if no prior version exists). Rollback also requires confirmation and takes effect immediately.
+If the active model is misbehaving, you can **roll back** to the previous version (or the baked-in base model if no prior version exists). Rollback also requires confirmation, the **`manage_users`** permission, and takes effect immediately.
 
-Both actions require the **manage users** permission.
+<Note>
+When the deployment is running the **baked-in base model** (no prior versions and no shadow model), both the Promote and Rollback buttons are disabled.
+</Note>

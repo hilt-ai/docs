@@ -23,7 +23,7 @@ The macOS collector extends Hilt's data detection and response coverage to macOS
 
 ## Architecture
 
-The macOS collector consists of two components:
+The macOS collector consists of three components:
 
 ### System extension
 
@@ -44,6 +44,10 @@ A managed Chrome extension deployed via MDM that observes:
 - Upload activity to cloud storage and file-sharing services
 
 The extension operates in read-only mode and does not modify, block, or inject into browser activity.
+
+### Network Extension
+
+A macOS Network Extension that monitors network connection metadata. The EDR agent header shows both the Endpoint Security and Network Extension component status, letting you verify that both are active.
 
 ---
 
@@ -72,7 +76,7 @@ Consistent with the Linux collector's design philosophy:
 
 - **Does not read file contents**: only metadata (path, operation type, size)
 - **Does not capture keystrokes or screen content**
-- **Does not block or modify activity**: strictly observational
+- **Does not modify activity**: the collector is observational by default, though the EDR agent can block specific actions when configured (see [Endpoint Detection (EDR)](/dashboard/edr))
 - **Does not require Full Disk Access**: operates within Endpoint Security framework permissions
 - **Does not capture packet payloads**: only connection metadata and byte counts
 
@@ -88,6 +92,8 @@ Telemetry from macOS endpoints flows through the same pipeline as Linux collecto
 4. Available in the same dashboard views (Investigate, Networks, Files, Users, Anomalies)
 
 macOS hosts appear in the [Collectors](/dashboard/collectors) fleet view alongside Linux hosts, with a **macOS** host-type badge.
+
+For detailed endpoint detection findings — persistence, tamper detection, data movement, and credential access — see [Endpoint Detection (EDR)](/dashboard/edr).
 
 ---
 

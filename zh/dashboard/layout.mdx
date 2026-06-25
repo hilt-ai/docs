@@ -1,31 +1,52 @@
 ---
 title: "仪表盘结构"
 sidebarTitle: "布局"
-description: "Hilt 仪表盘的组织方式，各导航分区，以及每个页面所涵盖的内容。"
+description: "Hilt 仪表盘的组织方式：导航分区，以及每个页面所涵盖的内容。"
 ---
 
-仪表盘与 Hilt Web 应用中的侧边栏一一对应。页面分为 **概览**、**采集器**、**数据流** 和 **安全** 四组。
+仪表盘与 Hilt Web 应用中的侧边栏一一对应。页面分为 **概览**、**采集器**、**云端**、**终端**、**安全** 和 **管理** 六组，另有独立的 **设置** 页面。
 
 ## 概览
 
-- [概览](/zh/dashboard/overview)：着陆页，展示健康信号、近期发现项与威胁画像
+- [概览](/zh/dashboard/overview)：着陆页，展示健康信号、近期异常与威胁画像
 
 ## 采集器
 
 - [采集器](/zh/dashboard/collectors)：已部署 Hilt 采集器的主机群列表，以及单台主机的详情
 
-## 数据流
+## 云端
 
 - [数据血缘](/zh/dashboard/data-lineage)：跨主机的进程与数据流可视化
 - [网络](/zh/dashboard/networks)：TCP 连接、目的地址与数据传输
 - [文件](/zh/dashboard/files)：文件的打开、写入、重命名与删除
-- [用户](/zh/dashboard/users)：全主机群范围内的用户身份与活动
-- [查询](/zh/dashboard/query)：自然语言与结构化遥测数据查询
+- [用户时间线](/zh/dashboard/users)：全主机群范围内的用户身份与活动
+
+## 终端
+
+- [EDR](/zh/dashboard/edr)：macOS 终端检测 — 持久化、篡改检测、数据移动、凭据与隐私访问
 
 ## 安全
 
+- [检测与准确度](/zh/dashboard/detection-accuracy)：Hilt 如何检测异常并衡量模型准确度
 - [异常](/zh/dashboard/anomalies)：供分流处理的机器学习与基于规则的发现项
-- [检测规则](/zh/dashboard/detection-rules)：自定义检测规则构建器
+- [规则](/zh/dashboard/detection-rules)：自定义检测规则构建器
+- [异常窗口](/zh/administration/behavioral-suppression)：在已知嘈杂时段对 ML 异常进行计划性抑制
 - [主机群行为](/zh/dashboard/fleet-behavior)：行为聚类与主机迁移
 - [调查](/zh/dashboard/investigate)：深入分析的事件时间线与过滤器
+- [查询](/zh/dashboard/query)：自然语言与结构化遥测数据查询
 - [隔离](/zh/dashboard/quarantine)：主机隔离与影响范围评估
+- [报告](/zh/administration/reports)：安全报告的生成与 PDF 导出
+
+## 设置
+
+- [设置](/zh/dashboard/settings)：密码、用户名与会话管理
+
+## 管理
+
+- [系统管理](/zh/administration/layout)：用户、团队、身份映射与平台配置
+- [模型生命周期](/zh/on-prem/model-lifecycle)：TRACE 检测模型的状态、升级与回滚
+- [数据导出](/zh/on-prem/data-export-overview)：匿名化数据导出的审核与审批
+- [自动更新](/zh/on-prem/auto-update-overview)：自动平台更新配置
+- [存储](/zh/administration/storage)：遥测数据存储用量、分层与生命周期策略
+- [审计日志](/zh/administration/audit-log)：身份认证与管理操作的历史记录
+- [MCP Server](/zh/dashboard/mcp-server)：用于 AI 助手集成的 Model Context Protocol 服务器

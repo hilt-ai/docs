@@ -15,7 +15,7 @@ Every EDR tab has the same structure:
 - **Agent header**: a bar showing the current host ID, its risk level, last-seen time, Endpoint Security and Network Extension status, policy version, and finding/event counts.
 - **Summary cards**: one card per activity group showing the count and top severity for that group.
 - **Timeline**: a 60-minute area chart of findings per minute — spikes highlight bursts of activity.
-- **Severity / Status filters**: filter findings by severity (critical, high, medium, low, info) and agent response (blocked, alerted, logged).
+- **Severity / Status filters**: filter findings by severity (critical, high, medium, low, info) and agent response (blocked, alerted, allowed, logged).
 - **Findings table**: a grouped, collapsible table of findings with columns for Time, Type / Target, App, Severity, and Status. Duplicate findings are collapsed into expandable groups with a count badge.
 - **Finding detail panel**: selecting a finding shows a six-part breakdown: What happened, Process responsible, What was touched, Why it matters, Evidence, and Recommended action.
 
@@ -35,6 +35,7 @@ Every EDR tab has the same structure:
 | --- | --- |
 | **Blocked** | The action was actively stopped on the device |
 | **Alerted** | Flagged for review |
+| **Allowed** | The action was permitted to proceed |
 | **Logged** | Recorded for the record |
 
 ---
@@ -95,7 +96,7 @@ Data Movement findings include a **Flow** section showing the path data took: th
 
 ---
 
-## Credentials & Privacy Access
+## Credential & Privacy
 
 **Route:** `/edr/credential`
 

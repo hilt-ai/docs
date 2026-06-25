@@ -8,6 +8,8 @@ Shows where your hosts are talking on the network, which processes connect to wh
 
 ## Page layout
 
+A subtitle below the page title shows the current **host count** and **total signal count**.
+
 The header adapts to your scope:
 
 - **Host selector** and **time range** (shared with the rest of the dashboard).
@@ -35,6 +37,8 @@ With no host selected, the page shows cross-host network activity: a host roster
 ### Compared Hosts sidebar
 
 Lists the hosts in scope, click to spotlight, again to clear. It has its own search (press `/` to focus), and each row shows the host label, status, signal count, and flow count. Clicking a host spotlights it and centers the graph; clicking again clears the spotlight.
+
+A **Hide offline hosts** toggle filters stale and dead hosts from the roster and graph. When disabled, offline hosts sink to the bottom of the roster by default.
 
 ### Connections graph
 

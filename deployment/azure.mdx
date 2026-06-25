@@ -4,7 +4,7 @@ sidebarTitle: "Azure"
 description: "Hilt's single-tenant deployment architecture and provisioning on Azure."
 ---
 
-Hilt runs as a single-tenant platform inside your own Azure subscription. A managed AKS cluster hosts the analytics engine (ClickHouse) and the dashboard, collectors on your hosts stream telemetry through a private Azure Private Link ingest endpoint into Event Hubs, and all traffic stays inside your subscription with no public internet exposure.
+Hilt runs as a single-tenant platform inside your own Azure subscription. A managed AKS cluster hosts the platform workloads, ClickHouse runs on a dedicated Azure VM (or external ClickHouse Cloud), collectors on your hosts stream telemetry through a private Azure Private Link ingest endpoint into Event Hubs, and all traffic stays inside your subscription with no public internet exposure.
 
 ---
 
@@ -13,11 +13,12 @@ Hilt runs as a single-tenant platform inside your own Azure subscription. A mana
 | Service | Role |
 | :-- | :-- |
 | AKS | Managed Kubernetes for platform services |
+| Azure VM | Dedicated VM for ClickHouse analytics database (or external ClickHouse Cloud) |
 | Event Hubs | Event streaming (Kafka-compatible) |
 | Private Link | Private ingest endpoint |
-| Blob Storage | Long-term storage and data exports |
+| Blob Storage | Terraform remote state |
 | Azure Database for PostgreSQL | Dashboard database |
-| App Gateway / Front Door | TLS termination (private only) |
+| ingress-nginx + Kubernetes TLS secrets | TLS termination with private DNS A records |
 
 ---
 
@@ -34,7 +35,7 @@ Hilt runs as a single-tenant platform inside your own Azure subscription. A mana
 
 Hilt provisions your Azure deployment using Terraform. The typical process:
 
-1. You provide a target Azure subscription with the agreed IAM permissions
-2. Hilt applies the Terraform configuration to create all infrastructure (AKS, Event Hubs, Azure Database for PostgreSQL, Blob Storage, Private Link, and networking)
+1. You provide a target Azure subscription with the agreed Azure RBAC / subscription permissions
+2. Hilt applies the Terraform configuration to create all infrastructure (AKS, Azure VM, Event Hubs, Azure Database for PostgreSQL, Private Link, and networking)
 3. Private Link connectivity is established between your workload VNets and the platform VNet
 4. Collectors are deployed to your hosts using the guides in this documentation
