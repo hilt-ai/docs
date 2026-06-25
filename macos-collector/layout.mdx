@@ -1,0 +1,70 @@
+---
+title: "macOS Collector"
+sidebarTitle: "Layout"
+description: "What the Hilt macOS Collector is, what it observes, and how to navigate this guide."
+---
+
+This guide describes the Hilt macOS Collector: a notarized macOS app that extends Hilt's endpoint detection and response coverage from Linux servers to employee Macs, what it observes, how it's deployed standalone or through MDM, and how it integrates with the Hilt data-plane you received separately.
+
+<Note>
+The macOS collector is in **early access**. The notarized `.pkg` with System Integrity Protection (SIP) left enabled, described throughout this guide, is the target shipping model. Capabilities and configuration may change, and some features available on Linux (auto-update, on-device quarantine response) are not yet available on macOS. Contact your account team to enable it for your deployment.
+</Note>
+
+<Note>
+In bundle identifiers, service names, and Kafka topics you may see the prefix `edr` or `dag.endpoint.*` (e.g. `Hilt.EDRApp.ESensor`, `dag.endpoint.exec`). This is the internal codename of Hilt's endpoint telemetry engine and is functionally equivalent to "Hilt macOS Collector" throughout this documentation.
+</Note>
+
+## What is the macOS collector
+
+The macOS collector is a single notarized macOS application, **Hilt EDR** (bundle `EDRApp.app`, signed by team **Cybe Corporation / MVMB6LCP2A**), that embeds two Apple System Extensions. Everything runs in user space on Apple's modern frameworks — there is **no kernel extension (kext)**.
+
+| Component | Type | Bundle id | Role |
+| :-- | :-- | :-- | :-- |
+| **EDRApp.app** | Notarized macOS app | — | Host container for the System Extensions; signed with a Developer ID Application certificate, Hardened Runtime, notarized and stapled by Apple. |
+| **ESensor** | Endpoint Security (ES) system extension | `Hilt.EDRApp.ESensor` | The telemetry sensor. Subscribes to Apple Endpoint Security NOTIFY events for process, file, persistence, device, and network activity. |
+| **NetFilter** | NetworkExtension content-filter system extension | `Hilt.EDRApp.NetFilter` | Per-flow network attribution. Maps outbound flows to the owning process and bundle id. |
+
+The key story is what makes this possible on a normal, hardened Mac:
+
+- **Restricted entitlement, granted by Apple.** ESensor uses the restricted entitlement `com.apple.developer.endpoint-security.client`, which Apple granted to the Cybe Corporation team.
+- **Signed, profiled, hardened, notarized.** The app and both extensions are signed with a Developer ID Application certificate, carry an embedded provisioning profile that authorizes the ES entitlement, use the Hardened Runtime, and are notarized and stapled by Apple.
+- **SIP stays on.** Because of the above, the collector runs with **System Integrity Protection (SIP) enabled** — no `csrutil disable`, no developer mode, no third-party kext approval. This is the headline: a normal, hardened Mac.
+- **No App Sandbox on the ES extension.** The ES extension must not use the App Sandbox; doing so makes `es_new_client` fail with `ERR_NOT_PERMITTED`.
+
+Once installed and approved, ESensor emits events as JSON lines, a small forwarder LaunchDaemon ships them over outbound HTTPS to the Hilt `edr-collector`, and they land in the same dashboard you use for Linux hosts — with a **macOS** host-type badge in the Collectors fleet and full presence in the Investigate, Networks, Files, and Users views. See [End-to-end data flow](/macos-collector/data-flow) for the full pipeline.
+
+### The macOS differentiator
+
+Unlike the Linux collector, **every** macOS event carries code-signing trust and application attribution as first-class fields:
+
+- **Code-signing trust:** `code_signature` verdict (`platform` | `developer_id` | `adhoc` | `unsigned_or_invalid`), `signing_id` (e.g. `com.google.Chrome`), `team_id` (Apple developer Team ID), and `cdhash` (binary integrity hash on exec).
+- **Application attribution:** `application_id` and `application_display_name` (helpers fold to the owning app, e.g. "Google Chrome Helper" becomes "Google Chrome"), `responsible_pid` (Apple ES "responsible process"), `session_id` (per app-instance session), and `device_name` (the human Mac name).
+
+This means a query like "which **unsigned** app read `~/.ssh`" is a single `WHERE` clause — something the Linux collector cannot express. See the [Event data model](/macos-collector/event-data-model) and [Event coverage](/macos-collector/event-coverage) for the full field and event catalogs.
+
+## What the collector does _not_ do
+
+The macOS collector is strictly observational. It does **not**:
+
+- **Read file contents.** It captures only metadata — path, operation type, size, and the signing/attribution fields above. It never opens or reads the bytes of your files.
+- **Capture keystrokes or screen content.** There is no input monitoring, no screen recording, no clipboard capture.
+- **Block, modify, or alter activity.** ESensor subscribes only to Apple Endpoint Security **NOTIFY** events (never AUTH/blocking events), and NetFilter observes flows for attribution without dropping or rewriting them. The collector observes; it never injects, drops, or blocks. On-device quarantine response is not available on macOS during early access.
+- **Capture packet payloads.** Network events carry connection metadata only — destination, ports, byte counts, and the owning bundle id — not the contents of the traffic.
+- **Install a kernel extension.** Everything rides Apple's user-space System Extensions on the Endpoint Security and NetworkExtension frameworks. There is no kext, no `csrutil disable`, and SIP stays enabled.
+- **Expose network services.** The collector only makes outbound HTTPS to your configured ingest endpoint. There are no inbound sockets.
+- **Perform external callbacks.** No license checks, telemetry beacons, or "phone-home" behavior. The only outbound communication is the configured event stream.
+
+## In this guide
+
+- [System requirements](/macos-collector/system-requirements)
+- [Release artifacts](/macos-collector/release-artifacts)
+- [Install flow](/macos-collector/install-flow)
+- [Deploy standalone](/macos-collector/deploy-standalone)
+- [Deploy via MDM](/macos-collector/deploy-mdm)
+- [Configuration reference](/macos-collector/configuration)
+- [Networking and security](/macos-collector/networking-security)
+- [Event data model](/macos-collector/event-data-model)
+- [Event coverage](/macos-collector/event-coverage)
+- [Sizing and capacity](/macos-collector/sizing-capacity)
+- [End-to-end data flow](/macos-collector/data-flow)
+- [Troubleshooting](/macos-collector/troubleshooting)

@@ -15,7 +15,7 @@ Collector releases are distributed as versioned artifacts from Hilt-controlled s
 - **Release artifacts.** Each collector release ships as static Linux tarballs (one per architecture, `aarch64` and `x86_64`) plus a matching multi-arch container image, published under a versioned path in Hilt's release storage. See [Release artifacts](/linux-collector/release-artifacts).
 - **Static binaries.** The Linux collector is a single static binary with no runtime dependencies and no kernel modules, which reduces the dependency surface on your hosts.
 - **Airgapped bundle.** For airgapped environments, an offline bundle ships the full artifact set plus a `docker save`-ed image, so nothing is fetched at runtime. See [Networking and security](/linux-collector/networking-security).
-- **macOS packaging.** The macOS system extension is distributed as a signed `.pkg` installer approved through your MDM, and the managed Chrome extension is force-installed via enterprise policy. See [macOS Collector](/macos-collector).
+- **macOS packaging.** The macOS system extension is distributed as a signed `.pkg` installer approved through your MDM, and the managed Chrome extension is force-installed via enterprise policy. See [macOS Collector](/macos-collector/layout).
 
 Release tags follow `vMAJOR.MINOR.PATCH`. For checksum or signature verification of downloaded artifacts, contact your Hilt representative.
 

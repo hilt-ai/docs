@@ -1,0 +1,177 @@
+---
+title: "End-to-end data flow"
+sidebarTitle: "Data flow"
+description: "How a macOS endpoint event travels from the ESensor system extension, through the local forwarder and edge collector, into MSK and enrichment, and onto ClickHouse and the dashboard."
+---
+
+Every event observed on a Mac follows one path from the kernel to the dashboard. The macOS collector is the notarized **Hilt EDR** app (`EDRApp.app`, Team ID `MVMB6LCP2A`), which embeds the **ESensor** Endpoint Security system extension as the telemetry source. ESensor emits JSON, a local forwarder LaunchDaemon batches and ships it over outbound HTTPS, and the same Hilt control plane that serves the Linux collector enriches and stores it — the only platform-specific divergence is the enrichment profile and the destination table.
+
+This page traces a single event end to end. For the on-host architecture see [the collector overview](/macos-collector/layout); for what is captured and the column schema see [the event data model](/macos-collector/event-data-model).
+
+## Pipeline at a glance
+
+<Steps>
+  <Step title="ESensor (Endpoint Security extension)">
+    The ESensor system extension subscribes to Apple Endpoint Security `NOTIFY` events and emits each one as a single JSON line, stamped with code-signing trust and application attribution. No kernel extension is involved — ESensor is a pure user-space System Extension running on Apple's modern frameworks.
+  </Step>
+  <Step title="Local forwarder (LaunchDaemon)">
+    A small forwarder LaunchDaemon tails the ESensor JSON stream, batches events, and HTTP-POSTs them over outbound HTTPS to the configured Hilt ingest endpoint. If the endpoint is unreachable it spools events to disk and drains them when connectivity returns.
+  </Step>
+  <Step title="edr-collector /ingest (edge VPC)">
+    The collector terminates the HTTPS POST at its `/ingest` endpoint, validates the batch, and routes each event to a Kafka topic by event class. It lives alone in a public edge VPC so roaming Macs can reach it directly over the internet — no VPN.
+  </Step>
+  <Step title="MSK Kafka (dag.endpoint.*)">
+    The collector produces events to the core Amazon MSK cluster on the `dag.endpoint.exec`, `dag.endpoint.file`, and `dag.endpoint.net` topics, which buffer the stream and decouple ingest from enrichment.
+  </Step>
+  <Step title="Enrichment (ENRICH_PLATFORM=macos)">
+    The enrichment service consumes the `dag.endpoint.*` topics with the macOS profile. It resolves each event's `responsible_pid` into an owning application and a per-instance session, normalizes the code-signing identity, and writes typed rows.
+  </Step>
+  <Step title="ClickHouse (endpoint_events)">
+    Enriched rows land in the purpose-built, macOS-native ClickHouse table `endpoint_events`, typed by `event_class` / `event_type`, carrying the code-signing and application-attribution columns plus an `attrs` map for the security long tail.
+  </Step>
+  <Step title="Dashboard">
+    macOS hosts surface in the Collectors fleet with a macOS host-type badge, and their events appear across the Investigate, Networks, Files, and Users views — queryable by signing trust and owning application.
+  </Step>
+</Steps>
+
+---
+
+## Stage 1 — ESensor emits JSON
+
+ESensor is an **Endpoint Security (ES) system extension** (bundle id `Hilt.EDRApp.ESensor`) embedded in the Hilt EDR app. It opens an ES client, subscribes to a fixed set of `NOTIFY` events, applies aggressive userspace filtering, and writes each surviving event as a single JSON line.
+
+**What it subscribes to.** ESensor captures process, file, persistence, device, and network telemetry:
+
+| Class | Event types |
+| :-- | :-- |
+| **process** | `exec` (with `argv` + signing identity), `fork`, `signal` (kill attempts) |
+| **file** | `file_open` (open/create), `file_unlink`, `file_rename`, `file_chmod`, `xattr_set` / `xattr_delete` (Gatekeeper quarantine tamper) |
+| **persistence** | `btm_add` — launch agent/daemon/login item installed (macOS 13+ Background Task Management) |
+| **device** | `mount` — removable media |
+| **network** | `net_flow` — outbound TCP flow with destination, ports, bytes, and bundle id |
+
+**Volume reality.** `file_open` dominates the stream at roughly 95%+ of all events, so ESensor filters aggressively in userspace before anything is emitted. Only the security-relevant remainder is written to the JSON stream and handed to the forwarder.
+
+<Note>
+  The network source is the per-flow Network Extension content filter (`Hilt.EDRApp.NetFilter`, with an `lsof` fallback), not Endpoint Security. ES has no network events; this is why network attribution arrives as `net_flow` rather than an ES `NOTIFY` type. See [event data model](/macos-collector/event-data-model).
+</Note>
+
+### Trust and attribution stamped at the source
+
+The defining property of the macOS collector is that **every event** carries first-class code-signing trust and application attribution — fields the Linux collector cannot express. These are resolved from the Endpoint Security process record at emit time, not bolted on later:
+
+| Field | Meaning |
+| :-- | :-- |
+| `code_signature` | Trust verdict: `platform`, `developer_id`, `adhoc`, or `unsigned_or_invalid` |
+| `signing_id` | Bundle id of the acting binary, e.g. `com.google.Chrome` |
+| `team_id` | Apple developer Team ID (empty for Apple platform binaries, which is correct) |
+| `cdhash` | Code-directory hash — binary integrity, set on `exec` |
+| `application_id` / `application_display_name` | Owning app — helpers fold to the parent (e.g. `Google Chrome Helper` → `Google Chrome`) |
+| `responsible_pid` | Apple ES "responsible process" — the basis for application and session attribution |
+| `session_id` | Per app-instance session |
+| `device_name` | The human-readable Mac name |
+
+Because trust and application identity travel with the event, a query like "which **unsigned** app read `~/.ssh`" is a single `WHERE` clause downstream.
+
+---
+
+## Stage 2 — Local forwarder batches and ships over HTTPS
+
+The forwarder is a lightweight LaunchDaemon installed alongside the Hilt EDR app. It owns the network path; ESensor itself opens no sockets.
+
+- **Tails and batches.** It reads ESensor's JSON line stream, accumulates events into batches, and POSTs them to the collector's `/ingest` endpoint.
+- **Outbound HTTPS only.** The single destination is the configured Hilt ingest endpoint, reached over outbound HTTPS. There are **no inbound sockets and no phone-home** — the host initiates every connection.
+- **Roaming-friendly.** Because the collector lives in a public edge VPC, the forwarder reaches it directly over the internet from wherever the Mac is. No VPN or corporate network is required.
+
+### Spool on disconnect
+
+When the ingest endpoint is unreachable — a closed laptop, a flaky network, a captive portal — the forwarder does not drop events. It **spools them to disk locally** and continues accepting new events from ESensor. When connectivity returns, the spool is drained to the collector in order, so a Mac that was offline backfills its timeline rather than leaving a gap.
+
+<Note>
+  Spooling makes the macOS collector resilient to the intermittent connectivity that is normal for laptops. The trade-off is that an event's appearance in the dashboard reflects when the host reconnected, not necessarily when the activity occurred — the event's own kernel timestamp remains the source of truth for ordering.
+</Note>
+
+---
+
+## Stage 3 — edr-collector /ingest
+
+The **edr-collector** is the edge ingest service. It runs alone in a **public edge VPC** so roaming Macs can reach it over the internet, and it is the only component the host ever talks to.
+
+- **Receives** the batched HTTPS POST at `/ingest`, validates the payload, and acknowledges the batch so the forwarder can release it from the spool.
+- **Routes by class.** It maps each event to a Kafka topic — process events to `dag.endpoint.exec`, file events to `dag.endpoint.file`, and network flows to `dag.endpoint.net`.
+- **Produces** to the core MSK cluster through a write-only path: the collector can publish to the `dag.endpoint.*` topics but cannot read back or reach anything else in the core network.
+
+The collector holds no long-term state and performs no enrichment; it is a routing and buffering hop between the public internet and the internal Kafka bus. See [networking and security](/macos-collector/networking-security) for the trust boundary.
+
+---
+
+## Stage 4 — MSK Kafka (dag.endpoint.*)
+
+Events are buffered on **Amazon MSK** across three topics, partitioned by event class:
+
+| Topic | Carries |
+| :-- | :-- |
+| `dag.endpoint.exec` | process events — `exec`, `fork`, `signal` |
+| `dag.endpoint.file` | file events — `file_open`, `file_unlink`, `file_rename`, `file_chmod`, `xattr_set`, `xattr_delete` |
+| `dag.endpoint.net` | network events — `net_flow` |
+
+Kafka decouples ingest from enrichment: the collector can keep accepting events even if enrichment is briefly behind, and enrichment can be restarted or scaled without losing the stream. The same `dag.endpoint.*` topics carry the Linux collector's endpoint stream — the platform is distinguished downstream, not by topic.
+
+---
+
+## Stage 5 — Enrichment (ENRICH_PLATFORM=macos)
+
+A dedicated, fault-isolated enrichment deployment consumes the `dag.endpoint.*` topics with **`ENRICH_PLATFORM=macos`**. This profile is what makes the rows macOS-native rather than Linux-shaped:
+
+- **Resolves `responsible_pid` → application + session.** Apple's ES "responsible process" is turned into the owning `application_id` / `application_display_name` and a per-instance `session_id`, folding helper processes back to their parent app. This is the step that lets the dashboard group activity by application instead of by raw process.
+- **Normalizes code-signing identity.** The `code_signature` verdict, `signing_id`, `team_id`, and `cdhash` are validated and written as first-class, typed columns.
+- **Types the event.** Each event is keyed by `event_class` / `event_type` so file, process, persistence, device, and network events share one table without Linux cgroup/k8s/container clutter.
+- **Preserves the long tail.** Security-relevant attributes that don't warrant their own column (e.g. `xattr` name on a quarantine strip, removable-media flags on a `mount`) are written into an `attrs` map.
+
+The macOS enrichment runs as a separate consumer from the Linux endpoint path so that a problem on one platform's stream cannot stall the other.
+
+---
+
+## Stage 6 — ClickHouse (endpoint_events)
+
+Enriched rows are written to the purpose-built ClickHouse table **`endpoint_events`** — the live macOS telemetry table. It is macOS-native by design:
+
+- typed by `event_class` / `event_type` rather than cloned from the Linux schema;
+- carries the code-signing identity columns (`code_signature`, `signing_id`, `team_id`, `cdhash`) and application-attribution columns (`application_id`, `application_display_name`, `responsible_pid`, `session_id`, `device_name`) as first-class fields;
+- includes an `attrs` map for the security long tail;
+- omits Linux-only concepts (cgroup, container, pod, node, k8s) entirely.
+
+The single table is the join-free backing store for every macOS view in the dashboard — `device_name` means no host-inventory join is needed to render a host.
+
+<Note>
+  Earlier macOS rows were written to a clone of the Linux schema (`dag_events_endpoint`); that table is retired and is no longer written. `endpoint_events` is the authoritative destination. See [the event data model](/macos-collector/event-data-model) for the full column list.
+</Note>
+
+---
+
+## Stage 7 — Dashboard views
+
+macOS hosts and their events surface across the dashboard:
+
+- **Collectors fleet** — each enrolled Mac appears with a **macOS host-type badge**, identified by its `device_name`, alongside Linux collectors in the same fleet view.
+- **Investigate** — process, file, and persistence activity, filterable by signing trust (`code_signature`) and owning application (`application_display_name`).
+- **Networks** — outbound `net_flow` activity attributed to the responsible application and bundle id.
+- **Files** — file opens, deletes, renames, chmods, and quarantine-tamper events.
+- **Users** — activity grouped by the acting user and session.
+
+Because trust and application identity are columns rather than derived fields, the dashboard supports queries the Linux collector cannot express — for example, surfacing every `developer_id`-but-not-`platform` binary that touched a sensitive path, or every app whose `code_signature` is `unsigned_or_invalid`.
+
+---
+
+## What this data flow does not do
+
+The macOS collector observes system activity at the metadata level only. The data flow explicitly does **not** include:
+
+- **Inbound connections or a phone-home.** The forwarder makes only outbound HTTPS to the configured ingest endpoint; nothing listens for inbound sockets.
+- **File contents, packet payloads, memory, or environment variables.** Events carry metadata only — paths, identifiers, signing identity, and flow tuples — never the data a process reads or writes.
+- **A kernel extension.** ESensor and NetFilter are user-space System Extensions; there is no kext and no `csrutil disable`. The collector runs with **System Integrity Protection enabled**. See [system requirements](/macos-collector/system-requirements).
+- **On-device response or auto-update.** During early access the pipeline is telemetry-only; auto-update and on-device quarantine response are not yet available on macOS.
+
+<Note>
+  **Status: early access.** The notarized `.pkg` with SIP-on install and the data flow described here are the shipping model. On-device response and agent auto-update are planned but not yet available on macOS.
+</Note>
