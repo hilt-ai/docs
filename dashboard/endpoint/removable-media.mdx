@@ -1,0 +1,157 @@
+---
+title: "Removable Media"
+sidebarTitle: "Removable Media"
+description: "What gets plugged into a Mac, and what is written to it: the USB and DMG exfiltration and software-delivery vector, built on mount and file events on /Volumes — each write attributed in-kernel to the application that made it, with its code-signing verdict attached."
+---
+
+The **Removable Media** page answers a physical question that the network never sees: *what got plugged in, and what was written to it?* It is the physical-media half of data movement — the USB stick and the mounted disk image — where bytes leave a Mac not over a wire but on a volume someone can carry out the door, and where unknown software arrives not from a download but from a drive that was handed across a desk.
+
+This is one of the five shared-layout detection pages described in the [Endpoint foundation](/dashboard/endpoint/foundation). It requires selecting an endpoint, and its findings table is filtered to the **Removable media** group.
+
+<Note>
+The page was carved out of the old **Data Movement** page. The *network* half of data movement — which app sent how many bytes to which off-host destination — now lives in [Network Egress](/dashboard/endpoint/network-egress). This page is the *physical* half: removable volumes and the files written to them. Together they cover the two ways data leaves a Mac.
+</Note>
+
+---
+
+## Why removable media is its own page
+
+Exfiltration over removable media is, by design, invisible to every network control you have. A volume that is never connected to the internet does not show up in [Network Egress](/dashboard/endpoint/network-egress), does not cross a proxy, and does not register a DNS query. The only place the action is observable is at the kernel, on the endpoint itself — which is exactly what the [macOS collector](/macos-collector/event-data-model) sees.
+
+The macOS differentiator is what makes the page worth reading rather than just a list of mounts. Because every `endpoint_events` row carries a `code_signature` verdict and the owning `application_id`, a single write to a USB volume arrives already stamped with **which application wrote it, signed by whom**. The story a row tells is not "a file appeared on `/Volumes/USB`" — it is **"an `adhoc`-signed binary copied a file onto a USB volume."** That sentence is one `WHERE` clause, not a forensic reconstruction.
+
+| The page leans on | Column(s) | Maps to MITRE |
+| :-- | :-- | :-- |
+| **A volume was mounted** | `mount` event, `path` + `removable` (via `attrs`) | [T1200 — Hardware Additions](https://attack.mitre.org/techniques/T1200/) |
+| **A file was written to it** | `file_open` (write `flags`) / `file_rename` (`dest_path` under `/Volumes`) | [T1052.001 — Exfiltration Over USB](https://attack.mitre.org/techniques/T1052/001/) |
+| **Who did the writing** | `application_display_name`, `code_signature`, `signing_id`, `team_id` | the attribution that makes both severable |
+
+---
+
+## The two halves of a removable-media story
+
+The page reads as a two-act structure, because the underlying telemetry comes in two acts.
+
+### 1. A volume is mounted
+
+A `mount` event fires the moment a filesystem appears — a USB drive plugged in, or a `.dmg` double-clicked and attached. It is a `device`-class event and carries, in its `attrs` map, the **mount point** (`/Volumes/Kingston`, `/Volumes/Installer`) and a **removable** flag distinguishing physical media and disk images from the internal boot volume.
+
+Mounts are rare by nature — a quiet host shows none over a short window — which is exactly why they are high-signal. In live data this page surfaces roughly **4 removable-mount findings**. Each one is the start of a story: a new surface just became writable.
+
+### 2. Files are written to it
+
+Once a removable volume is mounted, every subsequent file event whose path or rename destination falls under that mount point is a candidate write to external media. The page watches two event types:
+
+| Event | Write signal | What it captures |
+| :-- | :-- | :-- |
+| `file_open` | write/create `flags` on a path under `/Volumes/...` | A file being created or opened for writing directly on the volume |
+| `file_rename` | `dest_path` under `/Volumes/...` | A file *moved* onto the volume — the classic drag-to-USB copy |
+
+Every one of those rows carries the in-kernel attribution layer, so the write is never anonymous. In live data the page surfaces roughly **12 removable-write findings**. The severity of each is driven by the trust tier of the writer: a `developer_id`-signed backup utility writing to an external disk is routine; an `adhoc` or `unsigned_or_invalid` binary copying files onto a USB stick is the finding you open first.
+
+<Warning>
+The collector observes the **path and operation**, never file contents. A removable-write finding tells you *that* a file was copied to a volume, by which app, signed by whom — never *what was in* the file. See [What the collector does not capture](/macos-collector/event-data-model#what-the-collector-does-not-capture).
+</Warning>
+
+---
+
+## Page layout
+
+The page uses the shared detection layout documented in the [foundation](/dashboard/endpoint/foundation#shared-layout); this section describes how each element specializes to removable media.
+
+- **Agent header** — the standard status bar for the selected Mac: device name, risk level, last-seen time, Endpoint Security and Network Extension run state, policy version, and live finding/event counts. The **Change** control switches endpoints.
+- **Summary cards** — one card per sub-group, splitting the page along its two acts so the shape is legible before you read a row:
+
+  | Card | Counts | Built on |
+  | :-- | :-- | :-- |
+  | **Volumes mounted** | removable `mount` findings (~4) | `mount` + `removable` flag |
+  | **Files written** | writes to `/Volumes` paths (~12) | `file_open` / `file_rename` |
+  | **Untrusted writers** | of those writes, the subset by `adhoc` / `unsigned_or_invalid` apps | `code_signature` |
+
+- **Timeline** — a 60-minute, per-minute chart of removable-media findings. A mount followed by a cluster of writes in the same minute *is* an exfiltration burst; flat is calm.
+- **Severity / Status filters** — narrow to a severity (`critical` → `info`) or to how the agent responded (`blocked`, `alerted`, `logged`).
+- **Findings table** — grouped and collapsible: **Time · Type / Target · App · Severity · Status**. Repeated writes by the same app to the same volume collapse into one `N×` row, so a backup tool copying 700 files onto an external disk reads as one line you can expand, not seven hundred.
+
+### Findings table columns
+
+| Column | What it shows for removable media |
+| :-- | :-- |
+| **Time** | When the mount or the first write in the group occurred |
+| **Type / Target** | `Volume mounted` with the mount point, or `File written to removable media` with the destination path under `/Volumes` |
+| **App** | The owning `application_display_name`, with a **trust chip** rendering its `code_signature` verdict (`platform` / `developer_id` / `adhoc` / `unsigned_or_invalid`) |
+| **Severity** | Driven by the writer's trust tier and the action — an untrusted writer to USB ranks high |
+| **Status** | `blocked` / `alerted` / `logged` — what the agent did |
+
+---
+
+## Finding detail
+
+Selecting a row slides in the shared six-part breakdown. For a removable-write finding it reads:
+
+| Panel | Contents |
+| :-- | :-- |
+| **What happened** | "`<app>` wrote `<filename>` to removable volume `<mount point>`" — the operation, the source path, and the destination under `/Volumes` |
+| **Process responsible** | The owning application and the code-signing verdict that anchors the whole finding: `application_display_name`, `signing_id`, `team_id`, `cdhash`, `code_signature`, `is_platform_binary` |
+| **What was touched** | The volume (mount point, removable flag) and the file path or rename `dest_path` |
+| **Why it matters** | The MITRE mapping — T1052.001 for writes, T1200 for the mount — and why an untrusted writer to external media is exfiltration-shaped |
+| **Evidence** | The underlying `mount` / `file_*` rows, with `responsible_pid` and `session_id` so you can pivot to the full session |
+| **Recommended action** | Containment guidance scaled to the trust tier of the writer |
+
+The **Process responsible** panel is the point of the page. On Linux you would know a file landed on `/media/usb` and have to reconstruct who put it there. Here the writer, its signing identity, and its trust verdict are columns on the same row as the write.
+
+---
+
+## Querying removable media directly
+
+Every finding on this page resolves to rows in `endpoint_events`. The page filters to the **Removable media** group for one endpoint; the same shape expressed in SQL pairs the mount with the writes that followed it.
+
+```sql
+-- Untrusted writes to a removable volume: who copied what onto USB/DMG,
+-- joined to the mount that opened the surface.
+WITH mounts AS (
+    SELECT device_name,
+           attrs['path']      AS mount_point,
+           event_time         AS mounted_at
+    FROM endpoint_events
+    WHERE event_type = 'mount'
+      AND attrs['removable'] = '1'
+)
+SELECT  e.event_time,
+        e.device_name,
+        e.application_display_name,
+        e.code_signature,
+        e.signing_id,
+        e.team_id,
+        e.event_type,                       -- file_open (write) or file_rename
+        coalesce(e.dest_path, e.filename)  AS written_path,
+        m.mount_point
+FROM endpoint_events AS e
+INNER JOIN mounts AS m
+    ON e.device_name = m.device_name
+   AND coalesce(e.dest_path, e.filename) LIKE concat(m.mount_point, '/%')
+WHERE e.event_class = 'file'
+  AND e.event_type IN ('file_open', 'file_rename')
+  AND e.code_signature IN ('adhoc', 'unsigned_or_invalid')
+ORDER BY e.event_time DESC;
+```
+
+The `code_signature IN ('adhoc', 'unsigned_or_invalid')` clause is the whole point: it is the difference between *"files were written to a USB drive"* (true on every laptop with a backup) and *"an untrusted binary wrote files to a USB drive"* (the finding). On the Linux collector this filter cannot be written — there is no per-event signing verdict to filter on.
+
+<Note>
+The `removable` flag separates physical media and disk images from the internal boot volume, and the `/Volumes/...` path prefix is how external writes are isolated from the rest of the filesystem. Both ride on telemetry the collector already emits — see [Event coverage](/macos-collector/event-coverage).
+</Note>
+
+---
+
+## Hardware Additions: the mount as its own signal
+
+Not every removable-media finding is about data leaving. A `mount` event with an unexpected removable volume — especially one that is immediately followed by an `exec` of an `adhoc` or `unsigned_or_invalid` binary *from* that volume — is **T1200 (Hardware Additions)**: software, not data, arriving on physical media. Because exec carries the same `code_signature` and `cdhash` as every other event, a binary run straight off `/Volumes/Installer` is attributable the instant it launches, and you can pivot from the mount to everything that ran out of it via `responsible_pid` and `session_id`.
+
+---
+
+## Related pages
+
+- [Endpoint foundation](/dashboard/endpoint/foundation) — the shared layout, the trust model, and how the section is organized.
+- [Network Egress](/dashboard/endpoint/network-egress) — the *other* half of the old Data Movement page: data leaving over the network instead of on a volume.
+- [Files](/dashboard/endpoint/files) — the broader file-activity and provenance view that removable writes are a slice of.
+- [Event data model](/macos-collector/event-data-model) and [Event coverage](/macos-collector/event-coverage) — the ground truth for the `mount` and `file_*` events this page is built on.

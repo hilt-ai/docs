@@ -72,6 +72,9 @@ The top band explains the finding:
 - A **Quarantined** link when applicable.
 - The narrative itself — _what happened_ and _why it's unusual_ — plus context chips.
 - **Identity** badges for the job, application, or workload involved.
+- A **Time to detection** line, when available, showing how quickly Hilt caught the finding, for example _"Detected ~5 min after the first sign of unusual activity."_
+
+The "first sign of unusual activity" is the earliest point the model saw the host's behavior start to drift from normal, and the time is how long from there until Hilt raised the finding. Detection is measured in five-minute windows, so the figure is approximate (shown with a ~).
 
 Two context banners may appear: a **workload phase change** note (explaining that volume-only signals were de-emphasized), and a **feedback-suppression** note when the pattern matches a prior finding a reviewer denied, including the pattern similarity (an exact match or a percentage).
 

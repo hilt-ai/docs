@@ -1,0 +1,140 @@
+---
+title: "Tamper Detection"
+sidebarTitle: "Tamper"
+description: "Attempts to weaken macOS security controls — Gatekeeper quarantine removal, configuration-profile changes, and attacks on the Hilt agent itself, which the sensor denies in-kernel and surfaces as blocked findings."
+---
+
+The **Tamper Detection** page answers one question: *what tried to weaken this Mac's defenses — or the agent watching it?* It is a [shared-layout detection page](/dashboard/endpoint/foundation#shared-layout) for `/edr/tamper`, built on the typed kernel events the [macOS collector](/macos-collector/event-data-model) emits — and on a property the rest of the section only describes: ESensor doesn't just *watch* tampering, it **denies** it.
+
+Defense evasion is the tell that an operator is settling in. Before the payload runs, before the data leaves, an attacker strips the OS warnings, flips a security setting, and tries to blind the sensor. Each of those leaves a kernel event, and on macOS each event arrives already stamped with [code-signing trust and application attribution](/dashboard/endpoint/foundation#why-endpoint-kernel-telemetry-is-different) — so *which unsigned app cleared the quarantine flag* is one `WHERE` clause, not a forensic reconstruction.
+
+---
+
+## Page layout
+
+Tamper Detection uses the [shared detection layout](/dashboard/endpoint/foundation#shared-layout) and resolves to a single Mac via the [endpoint picker](/dashboard/endpoint/foundation#selecting-an-endpoint).
+
+| Region | What it shows |
+| :-- | :-- |
+| **Agent header** | The selected Mac: device name, risk level, last-seen, **Endpoint Security** and **Network Extension** run state, policy version, live finding/event counts. The run-state pills double as a tamper indicator — if the sensor were ever stopped, you would see it here. |
+| **Summary cards** | One card per activity group (Gatekeeper, MDM / Profiles, Agent Tamper) with finding count and worst severity. |
+| **Timeline** | A 60-minute, per-minute chart of tamper findings. A spike here is rarely benign. |
+| **Severity / Status filters** | Narrow by severity (`critical` → `info`) or by how the agent responded (`blocked`, `alerted`, `logged`). |
+| **Findings table** | Grouped, collapsible: **Time · Type / Target · App · Severity · Status**. Repeat tampering by the same app on the same target collapses to one `N×` row. |
+| **Finding detail** | The six-part breakdown — **What happened · Process responsible · What was touched · Why it matters · Evidence · Recommended action**. The "Process responsible" panel carries the `code_signature` verdict and the owning application. |
+
+<Note>
+The **Status** column is the heart of this page. On most pages a finding is `alerted` or `logged` — a record of something that already happened. On Tamper Detection a finding can be `blocked`: the action was **denied in the kernel before it completed**. See [the self-protection model](#agent-self-protection-the-auth-deny-model) below.
+</Note>
+
+---
+
+## Activity groups
+
+The page organizes tamper into three groups, each a different control under attack.
+
+| Group | Built on | Worst severity | ATT&CK |
+| :-- | :-- | :-- | :-- |
+| **Gatekeeper** | `xattr_delete` / `xattr_set` on `com.apple.quarantine` | High | [T1553.001](/dashboard/endpoint/attack-matrix) Gatekeeper Bypass |
+| **MDM / Profiles** | `file_*` on configuration-profile and managed-preference paths | High | [T1562.001](/dashboard/endpoint/attack-matrix) Disable or Modify Tools |
+| **Agent Tamper** | `signal` / `file_unlink` / `file_rename` targeting the collector | Critical | [T1562.001](/dashboard/endpoint/attack-matrix) Disable or Modify Tools |
+
+### Gatekeeper — quarantine-attribute removal
+
+When you download a file, macOS stamps it with the **`com.apple.quarantine`** extended attribute — the "downloaded from the internet" flag. On first launch, Gatekeeper reads that attribute, checks notarization, and prompts you. Strip the attribute and the prompt never fires: the OS runs the file as if it had always been local. That is the classic **Gatekeeper bypass**, and it is one of the most common manual steps in macOS malware delivery (`xattr -d com.apple.quarantine ./payload`).
+
+The collector subscribes to both `xattr_delete` and `xattr_set`, so both shapes are caught: outright **removal** of the quarantine attribute (`xattr_delete`, `xattr_name = com.apple.quarantine`) and **rewriting** it to a benign value (`xattr_set`). Each finding names the file whose protection was stripped (`filename`), the responsible app, and its trust tier — and because trust rides on the same row, the severity input is built in: a quarantine strip by a `developer_id` installer is routine; the same strip by an `unsigned_or_invalid` or `adhoc` binary is the malware pattern.
+
+```sql
+-- Gatekeeper bypass: who stripped the "downloaded from the internet" flag,
+-- and were they themselves trusted?
+SELECT event_time, device_name, application_display_name,
+       comm, signing_id, code_signature, filename
+FROM endpoint_events
+WHERE event_type = 'xattr_delete'
+  AND xattr_name = 'com.apple.quarantine'
+ORDER BY event_time DESC;
+```
+
+<Note>
+`xattr_delete` is a rare event by nature — see [Event coverage](/macos-collector/event-coverage). A quiet host may show none for hours; a single row is high-signal. The page treats every quarantine removal by a non-platform, non-`developer_id` binary as `high`.
+</Note>
+
+### MDM / Profiles
+
+Configuration profiles are how a Mac's security posture is set — FileVault enforcement, firewall state, password policy, restrictions. An attacker (or an insider) who edits or removes a profile can quietly relax those controls. This group surfaces `file_*` activity against configuration-profile and managed-preference paths, attributing each write to the responsible application and its signing tier. A write from the MDM agent's own `developer_id` binary is expected; a profile write from an `adhoc` or `unsigned_or_invalid` process is the **T1562.001 Disable or Modify Tools** pattern and is flagged accordingly.
+
+### Agent Tamper
+
+The last and highest-severity group is tampering with the sensor itself: attempts to **kill, delete, or rename** the Hilt EDR app or its ESensor extension. On most products this is the blind spot — the agent records right up until it is killed, then goes dark. ESensor closes that gap, and how it does so is the subject of the next section.
+
+---
+
+## Agent self-protection — the AUTH-deny model
+
+This is the page's deepest idea, and it is unique to Apple's Endpoint Security design.
+
+Most ES events are *notifications*: the kernel tells the sensor an action **already happened**. But ES also exposes **AUTH** events, where the kernel **pauses** the action and asks the sensor for a verdict — `ALLOW` or `DENY` — *before* it completes. ESensor subscribes its self-protection-relevant events as AUTH precisely so it can answer `DENY`:
+
+| Event | Apple ES form | What an attack looks like | Sensor response |
+| :-- | :-- | :-- | :-- |
+| `signal` | `AUTH_SIGNAL` | `kill -9` aimed at the collector | **Denied in-kernel** → finding `status = blocked` |
+| `file_unlink` | `AUTH_UNLINK` | deleting the agent binary or its config | **Denied in-kernel** → finding `status = blocked` |
+| `file_rename` | `AUTH_RENAME` | renaming the agent out of the way | **Denied in-kernel** → finding `status = blocked` |
+
+When a process tries to `SIGKILL` the collector, the kernel hands ESensor the pending signal as an `AUTH_SIGNAL`; ESensor sees its own PID as the target, returns `DENY`, and **the kill never lands**. The same logic protects the agent binary on disk from unlink and rename. The action is stopped on the device — and it still produces a full telemetry row, so the attempt becomes a `critical`, `blocked` finding with the attacker fully attributed.
+
+The `signal` payload makes the attempt legible:
+
+| Column | Meaning |
+| :-- | :-- |
+| `target_pid` | The PID the signal was sent **to** — the collector's PID when the agent is the victim. |
+| `signum` | The signal number, e.g. `9` = `SIGKILL`, `15` = `SIGTERM`. |
+| `comm` / `signing_id` / `code_signature` | Who tried it, and whether *they* were trusted. |
+| `application_display_name` | The owning application behind the attempt. |
+
+```sql
+-- Who tried to kill the collector — and was the kill blocked?
+-- (:agent_pid is the responsible_pid of the running ESensor / Hilt EDR app)
+SELECT event_time, device_name, comm, signing_id, code_signature,
+       application_display_name, target_pid, signum
+FROM endpoint_events
+WHERE event_type = 'signal'
+  AND target_pid = :agent_pid
+  AND signum IN (9, 15)        -- SIGKILL, SIGTERM
+ORDER BY event_time DESC;
+```
+
+<Warning>
+A `blocked` finding means the tamper attempt **failed** — the agent is still running and reporting. But a burst of `blocked` agent-tamper findings is among the strongest signals on the platform: something on the host is actively trying to go dark. Treat clustered `critical` / `blocked` rows as an active intrusion, not noise.
+</Warning>
+
+For the framework-level details of which events are AUTH-subscribed and why kill/delete/rename attempts on the sensor are denied rather than merely logged, see [What is never filtered → all tamper signals](/macos-collector/event-coverage#what-is-never-filtered) and the [self-protection note](/macos-collector/event-coverage#event-coverage).
+
+---
+
+## What the data looks like
+
+Representative volumes from live telemetry, to calibrate expectations:
+
+| Group | Typical findings | Severity | Notes |
+| :-- | :-- | :-- | :-- |
+| **Gatekeeper** (T1553.001) | ~55 | High | Quarantine-attribute removals; spikes around software installs and downloads. |
+| **Agent Tamper** (T1562.001) | ~78 | Critical | `signal` / `unlink` / `rename` against the collector — all surfacing as `blocked`. |
+| **MDM / Profiles** (T1562.001) | a handful | High | Configuration-profile writes; low volume, high consequence. |
+
+Agent-tamper findings outnumbering Gatekeeper findings is expected on an instrumented host: every probe of the sensor's defenses is recorded and denied, so testing and adversary reconnaissance both accumulate here.
+
+---
+
+## How it connects
+
+- **[Foundation](/dashboard/endpoint/foundation)** — the shared layout, the trust columns, and the severity/status model this page inherits.
+- **[ATT&CK Matrix](/dashboard/endpoint/attack-matrix)** — Tamper Detection populates the **Defense Evasion** column: T1553.001 (Gatekeeper Bypass) and T1562.001 (Disable or Modify Tools).
+- **[Persistence](/dashboard/endpoint/persistence)** — defense evasion and persistence travel together; a quarantine strip is often followed by a `btm_add`.
+- **[Process Lineage](/dashboard/endpoint/process-lineage)** — pivot from a `signal` finding's `comm` to the full process tree that spawned the would-be killer.
+- **[Event data model](/macos-collector/event-data-model#per-event-payloads)** and **[Event coverage](/macos-collector/event-coverage)** — the ground truth for `xattr_*`, `signal`, and the AUTH subscriptions behind self-protection.
+
+<Note>
+As with every Endpoint page, this is **metadata, not content**. Tamper Detection shows *that* a quarantine attribute was removed, *that* a kill was attempted and denied, signed by whom and on behalf of which app — never the contents of any file. See [What the collector does not capture](/macos-collector/event-data-model#what-the-collector-does-not-capture).
+</Note>

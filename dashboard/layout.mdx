@@ -8,7 +8,7 @@ The dashboard mirrors the sidebar in the Hilt web app. Pages are grouped into **
 
 ## Overview
 
-- [Overview](/dashboard/overview): landing page with health signals, recent anomalies, and threat profile
+- [Overview](/dashboard/overview): the unified landing for both Cloud (Linux) and Endpoint (macOS) — health signals, recent anomalies, and threat profile across the whole fleet
 
 ## Collectors
 
@@ -23,7 +23,19 @@ The dashboard mirrors the sidebar in the Hilt web app. Pages are grouped into **
 
 ## Endpoint
 
-- [EDR](/dashboard/edr): macOS endpoint detection — persistence, tamper detection, data movement, credential & privacy access
+macOS endpoint detection built on Apple Endpoint Security kernel telemetry. See the [Foundation](/dashboard/endpoint/foundation) page for the shared model and layout.
+
+- [Foundation](/dashboard/endpoint/foundation): what every endpoint event carries, the shared layout, and how the section is organized
+- [Persistence](/dashboard/endpoint/persistence): launch agents, daemons, and login items that survive reboot
+- [Tamper Detection](/dashboard/endpoint/tamper): Gatekeeper bypass, profile changes, and agent self-protection
+- [Credential & Privacy](/dashboard/endpoint/credential-privacy): Keychain, browser credentials, TCC, camera/mic
+- [Removable Media](/dashboard/endpoint/removable-media): USB/DMG mounts and the files written to them
+- [Network Egress](/dashboard/endpoint/network-egress): per-app outbound flows, destinations, ports, and volume
+- [ATT&CK Matrix](/dashboard/endpoint/attack-matrix): MITRE technique coverage across the endpoint fleet
+- [Process Lineage](/dashboard/endpoint/process-lineage): the kernel's exec/fork spawn graph
+- [Credential Access](/dashboard/endpoint/credential-access): which process touched which class of secret
+- [Activity](/dashboard/endpoint/activity): the raw, live endpoint event stream
+- [Files](/dashboard/endpoint/files): macOS file explorer with provenance and signed-writer attribution
 
 ## Security
 

@@ -73,7 +73,17 @@
               {
                 "group": "Endpoint",
                 "pages": [
-                  "dashboard/edr"
+                  "dashboard/endpoint/foundation",
+                  "dashboard/endpoint/persistence",
+                  "dashboard/endpoint/tamper",
+                  "dashboard/endpoint/credential-privacy",
+                  "dashboard/endpoint/removable-media",
+                  "dashboard/endpoint/network-egress",
+                  "dashboard/endpoint/attack-matrix",
+                  "dashboard/endpoint/process-lineage",
+                  "dashboard/endpoint/credential-access",
+                  "dashboard/endpoint/activity",
+                  "dashboard/endpoint/files"
                 ]
               },
               {
@@ -145,7 +155,19 @@
           {
             "tab": "macOS Collector",
             "pages": [
-              "macos-collector"
+              "macos-collector/layout",
+              "macos-collector/system-requirements",
+              "macos-collector/release-artifacts",
+              "macos-collector/install-flow",
+              "macos-collector/deploy-standalone",
+              "macos-collector/deploy-mdm",
+              "macos-collector/configuration",
+              "macos-collector/networking-security",
+              "macos-collector/event-data-model",
+              "macos-collector/event-coverage",
+              "macos-collector/sizing-capacity",
+              "macos-collector/data-flow",
+              "macos-collector/troubleshooting"
             ]
           },
           {
@@ -326,6 +348,11 @@
       "permanent": true
     },
     {
+      "source": "/macos-collector",
+      "destination": "/macos-collector/layout",
+      "permanent": true
+    },
+    {
       "source": "/on-prem/overview",
       "destination": "/administration/layout",
       "permanent": true
@@ -353,6 +380,11 @@
     {
       "source": "/dashboard/reports",
       "destination": "/administration/reports",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/edr",
+      "destination": "/dashboard/endpoint/foundation",
       "permanent": true
     },
     {

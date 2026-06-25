@@ -1,0 +1,157 @@
+---
+title: "Deploy standalone (direct download)"
+sidebarTitle: "Deploy standalone"
+description: "Install the Hilt macOS Collector on a single Mac or small team with the notarized .pkg, no MDM: double-click install, one-time approve + Full Disk Access, and verification."
+---
+
+The standalone path installs the macOS Collector from a notarized, Developer ID-signed `.pkg` on a single Mac without any MDM. It is the right choice for an individual machine, a pilot, or a small team where you do not yet have a managed device fleet. The package places **Hilt EDR** (`EDRApp.app`) into `/Applications` and registers a small forwarder `LaunchDaemon`; the user then performs a one-time, ~30-second approval of the system extension and grants it Full Disk Access.
+
+This works on a **normal, hardened Mac** — System Integrity Protection (SIP) stays **enabled**, there is no `csrutil disable`, no developer mode, and no Terminal required for the consents. That is possible because the app and its embedded extensions are signed with a Developer ID Application certificate, carry an embedded provisioning profile that authorizes the restricted Endpoint Security entitlement, use the Hardened Runtime, and are notarized and stapled by Apple. See [Architecture](/macos-collector/networking-security) for the full entitlement and signing story.
+
+<Note>
+The macOS Collector is in **early access**. The notarized `.pkg` with SIP-on install described here is the target shipping model. For zero-click fleet rollout via Jamf, Kandji, or Intune, see [Deploy with MDM](/macos-collector/deploy-mdm).
+</Note>
+
+## Requirements
+
+| Requirement | Detail |
+| :-- | :-- |
+| **macOS version** | 13.0 (Ventura) or later. BTM persistence events (`btm_add`) require macOS 13+. |
+| **Architecture** | Universal: Apple Silicon (arm64) and Intel (x86_64) in a single `.pkg`. |
+| **Admin rights** | An administrator account. The installer and the system-extension approval each require an authentication. |
+| **SIP** | Enabled (the default). No `csrutil disable`, no developer mode. |
+| **Outbound network** | HTTPS (443) to your configured Hilt `edr-collector` ingest endpoint. No inbound sockets. |
+
+## Host resources
+
+The package installs a small, well-defined set of items on the host:
+
+| Path | Purpose |
+| :-- | :-- |
+| `/Applications/EDRApp.app` | The Hilt EDR app bundle. Hosts the two embedded system extensions (ESensor, NetFilter). |
+| `/Library/SystemExtensions/` | Where macOS stages and activates the approved extensions (managed by the OS, not the installer). |
+| `/Library/Application Support/Hilt/EDR/` | Runtime state, on-disk JSON-line event spool, and forwarder configuration. |
+| `/Library/LaunchDaemons/` (forwarder plist) | The forwarder `LaunchDaemon` that ships events over outbound HTTPS to the collector. |
+
+The two extensions delivered inside the app bundle are:
+
+| Extension | Type | Bundle id | Role |
+| :-- | :-- | :-- | :-- |
+| **ESensor** | Endpoint Security (ES) system extension | `Hilt.EDRApp.ESensor` | Telemetry sensor: process, file, persistence, device, and signal events. Holds the restricted `com.apple.developer.endpoint-security.client` entitlement. |
+| **NetFilter** | NetworkExtension content-filter system extension | `Hilt.EDRApp.NetFilter` | Per-flow network attribution (outbound TCP flows with destination, ports, bytes, owning bundle id). |
+
+There is **no kernel extension (kext)**. Both components are pure user-space System Extensions on Apple's modern frameworks.
+
+## Installation
+
+The standalone install is a double-click followed by two one-time consents. For the click-by-click walkthrough with the exact System Settings panes and screenshots, see [Install flow](/macos-collector/install-flow); the summary below mirrors that procedure.
+
+<Steps>
+  <Step title="Run the installer">
+    Double-click `Hilt-EDR-<version>.pkg` and follow the prompts. Authenticate with an administrator password when asked. The installer copies `EDRApp.app` into `/Applications` and registers the forwarder `LaunchDaemon`.
+  </Step>
+  <Step title="Open the app once">
+    Launch **Hilt EDR** from `/Applications` (or Spotlight). On first launch it requests activation of its system extension. Click **Open System Settings** (or **Allow**) when prompted.
+  </Step>
+  <Step title="Approve the system extension">
+    Go to **System Settings → General → Login Items & Extensions → Endpoint Security Extensions**, enable **ESensor**, and authenticate. This is the system-extension approval; SIP remains enabled throughout.
+  </Step>
+  <Step title="Grant Full Disk Access">
+    Go to **System Settings → Privacy & Security → Full Disk Access** and enable the **ESensor** entry, which appears automatically after step 3. It is listed as **ESensor / "Hilt EDR Sensor"**, **not** as "EDRApp".
+  </Step>
+</Steps>
+
+That is the entire user experience: **approve the extension once, toggle Full Disk Access once.** No SIP changes, no developer mode, no Terminal.
+
+<Note>
+**Full Disk Access is required.** Any third-party Endpoint Security client needs it, and the same is true for CrowdStrike, SentinelOne, and similar products. These two consents (system-extension approval and Full Disk Access) are Apple security requirements and **cannot** be suppressed without MDM — the user must physically authenticate at least once. If you need a fully silent, zero-click install, use [Deploy with MDM](/macos-collector/deploy-mdm) instead.
+</Note>
+
+## Configuration
+
+The forwarder reads its configuration from `/Library/Application Support/Hilt/EDR/`. The collector ships events to a single configured ingest endpoint and identifies the host by its human-readable Mac name (`device_name`). Relevant settings:
+
+| Setting | Purpose |
+| :-- | :-- |
+| Ingest endpoint | The HTTPS URL of your Hilt `edr-collector` (for example `https://<name>-ingest.hilt.ai`). |
+| Device name | Defaults to the Mac's host name; surfaces as `device_name` on every event. |
+
+ESensor emits events as JSON lines, which the forwarder `LaunchDaemon` ships over outbound HTTPS to the `edr-collector`. The collector routes events to MSK Kafka topics (`dag.endpoint.exec`, `dag.endpoint.file`, `dag.endpoint.net`), the enrichment service processes them with `ENRICH_PLATFORM=macos`, and they land in the ClickHouse `endpoint_events` table. See [Data flow](/macos-collector/data-flow) for the full pipeline.
+
+## Verification
+
+After approving the extension, confirm ESensor is activated and enabled:
+
+```bash
+systemextensionsctl list
+```
+
+Expected output includes the ESensor extension in the `[activated enabled]` state:
+
+```text
+1 extension(s)
+--- com.apple.system_extension.endpoint_security
+enabled	active	teamID	bundleID (version)	name	[state]
+*	*	MVMB6LCP2A	Hilt.EDRApp.ESensor (<version>)	ESensor	[activated enabled]
+```
+
+Confirm the forwarder `LaunchDaemon` is loaded and running:
+
+```bash
+sudo launchctl list | grep -i hilt
+```
+
+Finally, verify the host appears in the dashboard. Within a minute or two of activation the Mac shows up in the [Collectors](/dashboard/collectors) fleet with a **macOS** host-type badge, and its events become queryable in the Investigate, Networks, Files, and Users views.
+
+<Note>
+If `systemextensionsctl list` shows ESensor as `[activated waiting for user]`, the extension has not yet been approved — return to **System Settings → General → Login Items & Extensions → Endpoint Security Extensions** and enable ESensor. If the sensor activates but no events reach the dashboard, confirm Full Disk Access is granted to ESensor and that outbound HTTPS (443) to your ingest endpoint is permitted.
+</Note>
+
+## What this install does not do
+
+- **No SIP changes.** It never runs `csrutil disable` and never enables developer mode; SIP stays enabled.
+- **No kernel extension.** Both components are user-space System Extensions; nothing loads into the kernel.
+- **No inbound listener and no phone-home.** The only network egress is outbound HTTPS to your configured ingest endpoint.
+- **No file contents.** ESensor captures event metadata (paths, signing identity, attribution), not the contents of files.
+- **No blocking or quarantine response.** The standalone collector is strictly observational; on-device quarantine response is not yet available on macOS (early access).
+- **No auto-update.** Upgrades are performed by re-running a newer `.pkg`; in-place auto-update is not yet available on macOS.
+
+## Upgrade
+
+Because the app and extension are signed with the same Team ID (`MVMB6LCP2A`), an upgrade does **not** require re-approval — the existing system-extension approval and Full Disk Access grant carry over, and `launchd` relaunches the new extension build automatically.
+
+<Steps>
+  <Step title="Quit the app">
+    Quit **Hilt EDR** if it is running.
+  </Step>
+  <Step title="Run the new package">
+    Double-click the newer `Hilt-EDR-<version>.pkg` and authenticate. It replaces `EDRApp.app` in `/Applications` in place.
+  </Step>
+  <Step title="Confirm the new build">
+    Run `systemextensionsctl list` and confirm ESensor shows the new version in the `[activated enabled]` state.
+  </Step>
+</Steps>
+
+<Note>
+**macOS major upgrades.** Full Disk Access grants can occasionally reset across a major macOS upgrade (a known TCC behavior). On a standalone Mac you may need to re-toggle Full Disk Access for ESensor once after such an upgrade. MDM-managed hosts have this re-applied automatically via PPPC — see [Deploy with MDM](/macos-collector/deploy-mdm).
+</Note>
+
+## Uninstall
+
+Deactivate the system extension and remove the installed components:
+
+```bash
+# Deactivate the ES system extension (requires the app to request deactivation)
+systemextensionsctl list
+
+# Remove the forwarder LaunchDaemon and the app
+sudo launchctl bootout system /Library/LaunchDaemons/<forwarder>.plist
+sudo rm -rf /Applications/EDRApp.app
+sudo rm -rf "/Library/Application Support/Hilt/EDR"
+```
+
+After deactivation, remove the stale **ESensor** entries from **System Settings → Privacy & Security → Full Disk Access** and from **Login Items & Extensions → Endpoint Security Extensions**. No reboot is required.
+
+<Note>
+System Extensions are deactivated through the system-extension lifecycle, not by deleting files alone. Use the app's uninstall action (or its deactivation request) so macOS removes the extension from `/Library/SystemExtensions/`; removing only the app bundle can leave a deactivated-but-staged extension behind.
+</Note>

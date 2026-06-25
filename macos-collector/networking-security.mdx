@@ -1,0 +1,87 @@
+---
+title: "Networking and trust model"
+sidebarTitle: "Networking and security"
+description: "Outbound HTTPS posture, the Apple trust chain (Developer ID, notarization, Hardened Runtime, the ES entitlement, SIP), the two runtime gates, and System Extension tamper-resistance."
+---
+
+The Hilt macOS Collector is a notarized macOS app, **Hilt EDR** (bundle `EDRApp.app`, team Cybe Corporation / `MVMB6LCP2A`), that embeds two Apple System Extensions: **ESensor** (the Endpoint Security telemetry sensor, bundle id `Hilt.EDRApp.ESensor`) and **NetFilter** (a NetworkExtension content filter for per-flow attribution, bundle id `Hilt.EDRApp.NetFilter`). There is **no kernel extension** — the collector is pure user-space on Apple's modern System Extension frameworks. This page covers the network surface it presents and the Apple trust chain that lets it run on a normal, hardened Mac.
+
+## Outbound
+
+- **One destination only.** `ESensor` emits events as JSON lines to a local forwarder LaunchDaemon, which ships them over **outbound HTTPS** to the Hilt `edr-collector` ingest endpoint. From there the collector routes to MSK Kafka and the enrichment pipeline — see [Data flow](/macos-collector/data-flow).
+- **HTTPS / TCP 443.** Traffic is standard TLS to the configured ingest endpoint. The forwarder is the only component that opens a socket to the network; the System Extensions themselves never talk to the internet.
+- **Firewall rule:** allow the Mac's source range to reach the ingest endpoint on TCP/443. Nothing else needs to be opened — inbound or outbound.
+
+## What it does NOT do
+
+- **No inbound sockets.** The collector never listens for connections. There is no management port, no remote shell, no agent API surface on the host.
+- **No phone-home.** Outside the single outbound HTTPS stream to the configured ingest endpoint, the collector makes no network calls — no telemetry to Hilt, no license check-in, no beacon.
+- **No public DNS dependency for control.** The only name it resolves is your ingest endpoint.
+- **No auto-update channel (yet).** Early access builds do not self-update; there is no update-fetch path at runtime. New versions ship as a fresh notarized `.pkg`. See [Status](#requirements-and-status).
+- **No on-device response actions (yet).** ESensor subscribes to Apple Endpoint Security `NOTIFY` events only — it observes and reports. It does not block, kill, or quarantine on the host, so there is no inbound command channel to drive such actions.
+
+## The Apple trust chain
+
+The headline is that the collector runs on a **normal, hardened Mac with System Integrity Protection (SIP) enabled** — no `csrutil disable`, no developer mode, no kext. That is only possible because the app and its extensions satisfy Apple's full trusted-execution chain end to end.
+
+| Layer | What it provides | How the collector satisfies it |
+| :-- | :-- | :-- |
+| **Developer ID Application signing** | Code is signed by an Apple-verified developer identity (team `MVMB6LCP2A`), not ad-hoc. | App + both extensions signed with a Developer ID Application certificate. |
+| **Notarization + stapling** | Apple scans the build for malware and known issues and issues a ticket; Gatekeeper trusts it offline. | Build is submitted with `notarytool`, then the ticket is **stapled** to the bundle. |
+| **Hardened Runtime** | Restricts code injection, unsigned memory execution, and DYLD overrides; required by the notary service. | Enabled on the app and extensions (a notarization requirement). |
+| **Embedded provisioning profile** | An Apple-issued profile that explicitly allowlists the restricted ES entitlement, embedded in the signed bundle. | Each bundle carries a profile authorizing its capability; without it, AMFI rejects the entitlement under SIP. |
+| **Endpoint Security entitlement** | The restricted `com.apple.developer.endpoint-security.client` capability, granted to the team by Apple. | Carried by the `ESensor` extension and authorized by the embedded profile. |
+| **System Integrity Protection (SIP)** | Kernel-level protection of system files and trusted execution; the default secure posture. | Left **enabled**. The full chain above is what lets the ES client load with SIP on. |
+
+A few details that matter:
+
+- **The entitlement grant alone changes nothing.** With SIP on, the kernel's trusted-execution layer (AMFI) only honors `com.apple.developer.endpoint-security.client` when an Apple-issued provisioning profile that allowlists it is embedded in a properly signed bundle. That is exactly why the ES client lives inside a **System Extension bundle** rather than a bare command-line binary — a loose binary has nowhere to carry the profile.
+- **The ES extension must not use the App Sandbox.** App Sandbox is incompatible with an Endpoint Security client: `es_new_client()` fails with `ERR_NOT_PERMITTED` when the host is sandboxed. ESensor therefore runs un-sandboxed (but still under the Hardened Runtime and SIP).
+- **Notarization is a malware scan, not an activation.** A stapled, notarized build still has to be *approved* before the extension loads — either by the user in System Settings or by an MDM System Extensions payload. See [Install flow](/macos-collector/install-flow).
+
+## The two runtime gates
+
+Two **independent** gates decide whether ESensor's Endpoint Security client comes up. They fail with different error codes and have different fixes — keep them straight.
+
+| Gate | What it checks | Failure code | How it passes |
+| :-- | :-- | :-- | :-- |
+| **1. Entitlement / profile** | The embedded provisioning profile in the signed bundle authorizes the ES entitlement (enforced by AMFI under SIP). | `ES_NEW_CLIENT_RESULT_ERR_NOT_ENTITLED` | Apple's team grant + explicit App ID with the ES capability + embedded provisioning profile + Apple-issued-certificate signing. |
+| **2. Full Disk Access** | The host process holds TCC **Full Disk Access**. | `ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED` | The user grants FDA, the extension inherits it, or an MDM PPPC profile pre-grants it. |
+
+- **`ERR_NOT_ENTITLED` is the trust/SIP path.** It means the entitlement is not *authorized* — a missing or invalid embedded profile, an ad-hoc signature, or SIP rejecting it. A correctly signed and profiled build run on a SIP-enabled Mac clears this gate.
+- **`ERR_NOT_PERMITTED` is the Full Disk Access path.** A fully profiled, Apple-signed ES client still fails with `ERR_NOT_PERMITTED` until it has Full Disk Access. **Full Disk Access is required for every Endpoint Security client** — there is no configuration that avoids it.
+
+<Note>
+Because these gates are independent, an extension can clear the entitlement gate and still not start. In standalone installs the Full Disk Access entry appears under the sensor's identity — **ESensor / "Hilt EDR Sensor"**, not "EDRApp" — which is the toggle that clears Gate 2. See [Install flow](/macos-collector/install-flow).
+</Note>
+
+## Tamper-resistance
+
+System Extensions are protected by macOS itself, not by a self-defense agent:
+
+- **Cannot be unloaded without admin and the app.** A System Extension is registered with the OS and can only be deactivated by the **owning app** (`EDRApp.app`) issuing a deactivation request, and that request requires **administrator authorization**. A standard user cannot stop or remove the sensor; `kill`-ing the process simply lets `launchd` relaunch it.
+- **SIP protects the on-disk bundle.** With SIP enabled, the activated extension's files in the system extensions store are protected from tampering by non-system processes.
+- **Removal is deliberate.** Uninstalling means the app deactivates the extension (admin prompt) or, on managed fleets, MDM withdraws the System Extensions configuration profile. There is no silent "just delete the binary" path.
+- **Self-healing under launchd.** ESensor is run by `launchd`; if it exits — for example after being denied Full Disk Access — it is relaunched in roughly ten seconds and picks up the grant the moment it is added, with no app restart.
+
+## Trust as first-class telemetry
+
+Beyond the host posture, code-signing trust is also captured in **every event** the collector emits, which is the macOS differentiator versus the Linux collector:
+
+- **`code_signature`** verdict — one of `platform`, `developer_id`, `adhoc`, or `unsigned_or_invalid`.
+- **`signing_id`** — the bundle identifier of the running code (e.g. `com.google.Chrome`).
+- **`team_id`** — the Apple developer Team ID behind the signature.
+- **`cdhash`** — the code-directory hash (binary integrity) recorded on `exec`.
+
+This means a query like *"which **unsigned** application read `~/.ssh`?"* is a single `WHERE` clause — an expression the Linux collector cannot form. See [Event data model](/macos-collector/event-data-model) for the full schema.
+
+## Data residency
+
+Events travel from the Mac over outbound HTTPS to **your** ingest endpoint, into your MSK Kafka and ClickHouse (`endpoint_events`). Hilt does not receive, mirror, or hold out-of-band access to host events.
+
+## Requirements and status
+
+- **macOS 13.0 (Ventura) or later.** Background Task Management persistence events (`btm_add`) require macOS 13+. Universal binary: Apple Silicon and Intel.
+- **Status: early access.** The notarized `.pkg` with SIP-on install described here is the shipping model. Auto-update and on-device quarantine response are **not yet available** on macOS — which is why there is no inbound channel and no self-update path today.
+
+For the full Apple trust chain in deployment terms, see [Install flow](/macos-collector/install-flow). For where macOS hosts surface in the product, see [Data flow](/macos-collector/data-flow).

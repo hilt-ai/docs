@@ -1,0 +1,142 @@
+---
+title: "Process Lineage"
+sidebarTitle: "Process Lineage"
+description: "The kernel's process-spawn graph: who launched what, drawn left-to-right from launchd down, with code-signing trust on every edge. Built directly on the exec and fork stream."
+---
+
+Process Lineage answers the oldest question in incident response — **who spawned what?** — by drawing the macOS process tree exactly as the kernel saw it form. It is an exploration page built directly on the raw `exec` and `fork` stream in `endpoint_events`, not the shared [finding layout](/dashboard/endpoint/foundation#shared-layout). There are no severity rows here, just the spawn graph and the trust stamped on every node in it.
+
+The data comes straight from Apple Endpoint Security: every `exec` is a `NOTIFY_EXEC` and every `fork` is a `NOTIFY_FORK`, captured the moment the kernel honors the call. And because this is macOS, each `exec` arrives already carrying its full `argv`, its `signing_id`, its `team_id`, its `cdhash`, and its `code_signature` verdict — so the lineage is not just *which program ran*, but *who signed it and whether to trust it*, on the same row. See the [Foundation](/dashboard/endpoint/foundation) for why that stamp is the whole point of the Endpoint section.
+
+<Note>
+`exec` is the spine of the process model and is **never filtered** — the collector records every execution, including from Apple platform binaries and signed apps, with `argv`, `cdhash`, and signing identity always captured. See [What is never filtered](/macos-collector/event-coverage#what-is-never-filtered).
+</Note>
+
+---
+
+## Page layout
+
+The page resolves to a single Mac via the shared [endpoint picker](/dashboard/endpoint/foundation#selecting-an-endpoint), with the device name and time range in the header. Below that the page is two things: a KPI strip and the graph.
+
+### KPI strip
+
+Four counts summarize the spawn activity in range, computed over the selected host's `process`-class events:
+
+| KPI | Source | On the reference Mac |
+| :-- | :-- | :-- |
+| **Processes launched** | `count()` of `exec` rows | 455,118 |
+| **Forks observed** | `count()` of `fork` rows | 103,150 |
+| **Distinct programs** | `uniqExact(comm)` | 486 |
+| **Spawn relationships** | distinct `parent_comm → comm` edges | the graph's edge count |
+
+The ratio of these numbers is itself a read on the host: a Mac that execs far more than it forks is a developer machine running interpreters and build tools, exactly the shape the reference numbers show.
+
+---
+
+## The lineage graph
+
+The centerpiece is a **directed graph laid out left-to-right** with [dagre](https://github.com/dagrejs/dagre), so spawn flows the way you read: roots on the left, their children to the right, depth increasing across the canvas. Each **node is a program** (its `comm`), and each **edge is a spawn relationship** (`parent_comm → comm`) observed in range.
+
+### Reading the graph
+
+| Encoding | Meaning |
+| :-- | :-- |
+| **Node size** | Scaled by `exec` count — the programs that run most are the largest. |
+| **Glowing roots** | `(kernel)` and `launchd` (PID 1) are drawn as glowing roots; everything on the Mac descends from them. |
+| **Node color** | Programs are color-coded by class: **shells** (`bash`, `sh`, `zsh`), **developer tools** (`git`, `python`, `node`), and **other binaries** each get their own hue, so a shell sitting under an unexpected parent stands out instantly. |
+| **Edge weight** | The heaviest edges are drawn thickest and **labeled with their spawn count**, so the busiest relationships are legible at a glance. |
+
+On the reference Mac, the heaviest edges tell a coherent story about a developer's day:
+
+| Parent (`parent_comm`) | Child (`comm`) | Spawns |
+| :-- | :-- | --: |
+| `python` | `bash` | 80,266 |
+| `python` | `sh` | 79,917 |
+| `python` | `mdls` | 74,682 |
+| `Cursor Helper (Plugin)` | `git` | 25,527 |
+| `launchd` | `xpcproxy` | (the OS service backbone) |
+
+The `python → {bash, sh, mdls}` cluster is a toolchain shelling out tens of thousands of times; `Cursor Helper (Plugin) → git` is an editor running version control on every keystroke-worth of activity; `launchd → xpcproxy` is macOS itself, the `xpcproxy` trampoline that every launchd-managed service passes through on its way to becoming a real process.
+
+### Node drawer
+
+Clicking a node slides in a drawer that decomposes that one program's place in the tree:
+
+| Section | Contents |
+| :-- | :-- |
+| **Children** | Every program this node spawned, each as `spawned X — N times`, sorted by count. |
+| **Parents** | Every program that spawned this node, as `spawned by Y`. |
+| **Identity** | The node's `signing_id`, `team_id`, `cdhash`, and `code_signature` verdict — the trust stamp from its `exec` rows. |
+
+This is where lineage becomes investigation: from any node you can walk *up* to its accountable ancestors or *down* to everything it set in motion, and at every step the code-signing verdict travels with you.
+
+---
+
+## Why this is a security page, not a curiosity
+
+A spawn graph is pretty. What makes it a detection surface is the trust column riding on every edge.
+
+### Living-off-the-land, made visible
+
+The classic intrusion signal on any platform is a **trusted application spawning an interpreter or a shell** — a browser, an Office app, or a signed updater that suddenly execs `bash`, `python`, `osascript`, or `sh`. On most platforms you have to reconstruct that relationship after the fact. Here it is an edge in the graph, color-coded the moment it appears: a shell node (its own hue) hanging off a parent that has no business spawning one.
+
+The reference Mac shows the *benign* version of this everywhere — `python → bash` 80,266 times is a developer's toolchain, not an attack. That is the point. Lineage lets you learn what *normal* spawning looks like for a host so the abnormal edge is obvious: a shell under `Microsoft Word`, not a shell under `python`.
+
+### Unsigned children of signed parents
+
+Because each `exec` carries `code_signature` **and** `cdhash`, the graph can do something Linux cannot: flag an **`adhoc` or `unsigned_or_invalid` child of a `developer_id` parent**. A notarized, trusted application that drops and runs a binary with no identity behind it is a textbook payload-execution pattern — and it is a join the kernel hands you for free, on the same two rows.
+
+```sql
+-- Heaviest spawn edges on a host: who launches what, and how often.
+SELECT parent_comm, comm, count() AS spawns
+FROM endpoint_events
+WHERE event_type = 'exec'
+  AND device_name = 'Zin''s MacBook Pro'
+GROUP BY parent_comm, comm
+ORDER BY spawns DESC
+LIMIT 20;
+```
+
+```sql
+-- The living-off-the-land join: an UNSIGNED or AD-HOC child
+-- exec'd by a notarized (developer_id) parent. Trust on both ends.
+SELECT child.event_time,
+       parent.comm           AS parent_comm,
+       parent.code_signature AS parent_trust,
+       child.comm            AS child_comm,
+       child.signing_id,
+       child.cdhash,
+       child.code_signature  AS child_trust,
+       child.argv
+FROM endpoint_events AS child
+INNER JOIN endpoint_events AS parent
+  ON child.ppid = parent.pid
+ AND child.device_name = parent.device_name
+WHERE child.event_type = 'exec'
+  AND parent.event_type = 'exec'
+  AND parent.code_signature = 'developer_id'
+  AND child.code_signature IN ('adhoc', 'unsigned_or_invalid')
+ORDER BY child.event_time DESC;
+```
+
+<Warning>
+A `developer_id` parent spawning an `unsigned_or_invalid` child is one of the highest-signal patterns the Endpoint section surfaces. The same `cdhash` appearing under multiple unrelated parents — or an `argv` that pipes a download straight into an interpreter — is worth opening immediately.
+</Warning>
+
+---
+
+## What lineage does and does not show
+
+| Lineage shows | Lineage does not show |
+| :-- | :-- |
+| Every `exec` and `fork` the kernel observed, with `argv` and signing identity | Process **exit** — `NOTIFY_EXIT` is a [roadmap hook](/macos-collector/event-coverage#roadmap-hooks-not-yet-enabled), so durations are not yet drawn |
+| `parent_comm → comm` spawn edges with counts | The contents of what a process did to a file or socket — see the per-action pages below |
+| The `code_signature`, `team_id`, and `cdhash` of every node | Privilege changes (`setuid`) or task-port access (injection) — also roadmap hooks |
+
+Lineage is the spine; the other Endpoint pages hang the rest of a process's behavior off it. Pivot from a suspicious node to:
+
+- **[Files](/dashboard/endpoint/files)** — what that process opened, deleted, renamed, or where each file came from (provenance).
+- **[Activity](/dashboard/endpoint/activity)** — the same process's full, time-ordered footprint across every event class.
+- **[ATT&CK Matrix](/dashboard/endpoint/attack-matrix)** — how the spawn pattern maps to MITRE techniques and where it sits in the fleet's coverage.
+
+And the [Foundation](/dashboard/endpoint/foundation) page explains the trust columns that make every one of those pivots a single `WHERE` clause. For the underlying schema and how `exec`/`fork` are captured, see the [Event data model](/macos-collector/event-data-model#process-payload--exec-fork-signal) and [Event coverage](/macos-collector/event-coverage#event-coverage).

@@ -1,0 +1,252 @@
+---
+title: "Sizing and capacity"
+sidebarTitle: "Sizing and capacity"
+description: "Per-endpoint event rates, System Extension CPU/memory footprint, compressed HTTPS bandwidth, and how the collector tier scales with macOS host count. Early-access figures."
+---
+
+This page describes the resource footprint of the **Hilt EDR** macOS collector: how
+many events a single Mac generates, how much CPU, memory, and network bandwidth the
+System Extension and forwarder consume, and how the server-side collector tier scales
+as you add macOS hosts.
+
+<Note>
+All numbers on this page are **typical ranges from early-access measurements**, taken
+from the notarized `EDRApp.app` build running with SIP enabled. macOS endpoint volume
+is workload-dependent: a developer's laptop running builds, containers, and IDEs
+generates far more `file_open` traffic than a kiosk or an executive's mail-and-browser
+machine. Treat these as planning baselines, not SLAs. See
+[System requirements](/macos-collector/system-requirements) for the supported OS
+matrix.
+</Note>
+
+## Per-endpoint event rates
+
+The macOS collector subscribes to **12 Apple Endpoint Security (ES) NOTIFY events**
+plus a per-flow network source, and emits them as JSON lines that the forwarder ships
+to the Hilt `edr-collector`. The volume is **heavily dominated by `file_open`** — a
+single macOS host routinely emits **thousands of ES events per minute**, and the vast
+majority are file opens. Apple's own framework guidance describes macOS as emitting
+thousands of ES events per minute per host, and our live data confirms it.
+
+The table below shows a representative 15-minute window from one enrolled developer Mac
+(`Zin's MacBook Pro`, Apple Silicon), normalized to per-minute rates. `file_open`
+accounts for roughly **95%+** of all telemetry.
+
+| Event type | `event_class` | Typical rate (per host) | Share of volume |
+| :-- | :-- | :-- | :-- |
+| `file_open` (open/create) | file | ~3,000–55,000 / min | **~95%+** |
+| `net_flow` (outbound TCP flow) | network | ~50–1,000 / min | ~1–2% |
+| `exec` (process spawn) | process | ~200–500 / min | \< 1% |
+| `fork` (process fork) | process | ~100–350 / min | \< 1% |
+| `file_unlink` (delete) | file | ~100–300 / min | \< 1% |
+| `file_rename` | file | ~80–250 / min | \< 1% |
+| `file_chmod` | file | ~80–200 / min | \< 1% |
+| `signal` (kill attempts) | process | ~50–150 / min | \< 1% |
+| `xattr_set` / `xattr_delete` (quarantine tamper) | file | ~10–80 / min | \< 1% |
+| `mount` (removable media) | device | rare (event-driven) | negligible |
+| `btm_add` (persistence installed) | persistence | rare (event-driven) | negligible |
+
+**Why `file_open` dominates.** Every process touch of the filesystem — dynamic library
+loads, font and cache reads, plist lookups, IDE indexing, Spotlight, package managers —
+surfaces as an open/create. A busy developer machine compiling or running containers can
+spike `file_open` to **tens of thousands per minute** for short bursts. This is exactly
+why the collector applies **aggressive userspace filtering** before anything leaves the
+host (see [Agent filtering](/macos-collector/event-coverage)).
+
+**The low-frequency events are the high-signal ones.** `exec` carries `argv`, the
+signing identity (`signing_id`, `team_id`, `cdhash`) and the `code_signature` trust
+verdict; `btm_add` means a launch agent/daemon or login item was registered
+(persistence); `xattr_set`/`xattr_delete` is Gatekeeper quarantine tampering;
+`signal` is a kill attempt. These cost almost nothing in volume but are the events a
+detection engineer queries. See the
+[Event data model](/macos-collector/event-data-model) for the full field inventory.
+
+## Event volume distribution
+
+Because the distribution is so skewed, capacity planning is essentially a `file_open`
+problem. Roughly **19 out of every 20 events** a Mac ships are file opens; everything
+else combined — process, network, persistence, device, signal, xattr — is a few percent.
+
+| Category | Events captured | Approx. share of shipped volume |
+| :-- | :-- | :-- |
+| File (`file_open` mostly, + unlink/rename/chmod/xattr) | open, create, delete, rename, chmod, xattr set/delete | **~96–97%** |
+| Network (`net_flow`) | outbound TCP flow w/ dest, ports, bytes, bundle id | ~1–2% |
+| Process (`exec`, `fork`, `signal`) | spawn, fork, kill attempts | ~1–2% |
+| Persistence / device (`btm_add`, `mount`) | launch items, removable media | \< 0.1% (event-driven) |
+
+A practical consequence: tuning the `file_open` filter is the single highest-leverage
+lever for controlling both endpoint CPU and ingest bandwidth. The other event families
+can be enabled in full without materially moving the volume needle.
+
+## System Extension CPU and memory footprint
+
+The collector ships as a notarized macOS app, `EDRApp.app`, that embeds two Apple
+**System Extensions** running in **user space** (there is no kernel extension):
+
+- **`ESensor`** — the Endpoint Security system extension. This is the telemetry sensor
+  that subscribes to the ES events above. Bundle id `Hilt.EDRApp.ESensor`.
+- **`NetFilter`** — a NetworkExtension content-filter system extension that provides
+  per-flow network attribution. Bundle id `Hilt.EDRApp.NetFilter`.
+
+A small forwarder LaunchDaemon ships the JSON event stream over outbound HTTPS. Because
+the extensions run on Apple's modern frameworks (no kext, no `csrutil disable`,
+**SIP enabled**), the footprint is that of an ordinary hardened user-space process.
+
+| Component | Typical RSS | Typical CPU (steady state) | CPU (burst, e.g. build) |
+| :-- | :-- | :-- | :-- |
+| `ESensor` (ES system extension) | ~40–90 MB | \< 1–2% of one core | up to ~5–10% of one core |
+| `NetFilter` (NE content filter) | ~15–35 MB | \< 1% of one core | low |
+| Forwarder LaunchDaemon | ~10–25 MB | \< 1% of one core | low |
+
+**Notes on the footprint.**
+
+- macOS delivers ES events synchronously on the extension's message queue. The sensor's
+  job is to classify, filter, and enqueue fast so it never becomes the bottleneck for a
+  busy machine. Memory is dominated by the per-process and signing-identity caches that
+  let helpers fold to their owning app (e.g. `Google Chrome Helper` →
+  `Google Chrome`) and that propagate `responsible_pid` / `session_id`.
+- The figures above are for a **NOTIFY-only telemetry posture**. The agent subscribes to
+  a few events as **AUTH** (`signal`, `unlink`, `rename`) purely for self-protection
+  (it can deny tampering with itself); AUTH handling adds negligible steady-state cost
+  because these events are rare, but it does keep the sensor on the synchronous decision
+  path for those specific operations.
+- CPU scales with **un-filtered** `file_open` rate, not with shipped volume — the
+  expensive work is inspecting the firehose. Filtering happens before serialization, so
+  tightening the filter reduces both CPU and bandwidth at once.
+
+<Note>
+These are early-access measurements. The collector does **not** apply a hard CPU or
+memory ceiling to the System Extension itself; Apple manages the extension lifecycle.
+If you require a strict ceiling for fleet policy, coordinate with your account team —
+on-device resource caps are not part of the early-access shipping model.
+</Note>
+
+## Network bandwidth
+
+The forwarder ships events as **batched, compressed, outbound HTTPS** to the configured
+Hilt ingest endpoint. There are **no inbound sockets and no phone-home** — only outbound
+HTTPS to the one configured endpoint (see
+[Networking and security](/macos-collector/networking-security)).
+
+Bandwidth is again a function of `file_open` volume after filtering. Each event is a
+compact JSON line; the dominant `file_open` records are small (path, flags, actor,
+signing identity, application attribution). Batching and compression are what make the
+firehose affordable on the wire.
+
+| Posture | Shipped events/min | Approx. compressed egress |
+| :-- | :-- | :-- |
+| Idle / light user (mail, browser) | ~1,000–4,000 | ~0.2–1 MB/min |
+| Typical knowledge worker | ~4,000–15,000 | ~1–4 MB/min |
+| Developer / heavy build host | ~15,000–55,000+ | ~4–15 MB/min (bursty) |
+
+**What drives the wire cost.**
+
+- **Compression** typically achieves a high ratio on this payload because event JSON is
+  highly repetitive (the same paths, bundle ids, and signing identities recur), so the
+  compressed egress is a fraction of the raw line volume.
+- **Batching** amortizes TLS and request overhead: events are accumulated and flushed
+  together rather than one request per event, which keeps connection overhead flat as
+  volume rises.
+- **Filtering first** — because aggressive userspace `file_open` filtering runs before
+  the forwarder ever sees an event, the bytes on the wire reflect post-filter volume,
+  not the raw ES firehose.
+
+A practical planning figure for a typical workstation fleet is **single-digit MB per
+minute per host**, with short bursts above that during builds or large file operations.
+Over a workday this is comfortably within normal corporate egress and does not require
+any special network provisioning beyond outbound 443.
+
+## How the collector tier scales with host count
+
+On the server side, macOS hosts flow through the **same pipeline as Linux**, with the
+macOS-specific enrichment platform:
+
+<Steps>
+  <Step title="Forwarder → edr-collector">
+    Each Mac's forwarder LaunchDaemon ships compressed HTTPS batches to the Hilt
+    `edr-collector`. Connections are outbound-only and long-lived/batched, so the
+    collector sees a steady request rate proportional to host count, not to raw event
+    rate.
+  </Step>
+  <Step title="edr-collector → MSK Kafka">
+    The collector routes events to MSK Kafka topics by class:
+    `dag.endpoint.exec`, `dag.endpoint.file`, and `dag.endpoint.net`. Because
+    `file_open` is ~95%+ of volume, the `dag.endpoint.file` topic carries the bulk of
+    the partition load and should be sized first.
+  </Step>
+  <Step title="Enrichment (ENRICH_PLATFORM=macos)">
+    The enrichment service consumes the topics, stamps code-signing trust and
+    application attribution, and normalizes records. This is the consumer tier that
+    scales with aggregate events/sec across the fleet.
+  </Step>
+  <Step title="ClickHouse (endpoint_events)">
+    Enriched rows land in the purpose-built, macOS-native `endpoint_events` table.
+    Storage and query cost scale with total fleet event volume — again dominated by
+    `file_open`.
+  </Step>
+  <Step title="Dashboard">
+    macOS hosts appear in the [Collectors](/dashboard/collectors) fleet view with a
+    macOS host-type badge, and in the Investigate, Networks, Files, and Users views.
+  </Step>
+</Steps>
+
+**Scaling characteristics.**
+
+- **Aggregate volume is what sizes the tier, not host count alone.** A back-of-envelope
+  fleet estimate: multiply your host count by a per-host steady-state rate (use
+  ~5,000–15,000 events/min for a mixed workstation fleet, far higher for developer-heavy
+  populations) to get aggregate events/sec for Kafka partition and enrichment-consumer
+  sizing. One reference Mac alone produced **~844,000 rows in 15 minutes** (~940/sec)
+  during active developer use — so heavy hosts dominate the estimate.
+- **Size the `file_open` path first.** Because the distribution is so skewed,
+  `dag.endpoint.file` partitions and the macOS enrichment consumers keyed to file events
+  are the components that saturate first. The `exec`/`net` paths are comparatively light.
+- **Egress is bounded by compression.** Server-side ingest bandwidth scales linearly
+  with the compressed per-host egress figures above; there is no fan-out amplification on
+  the collector for macOS hosts.
+- **Per-host enrichment cost is uniform.** Every macOS event carries the same
+  code-signing and application-attribution enrichment, so enrichment CPU tracks aggregate
+  event rate cleanly — there is no host-specific enrichment hot spot.
+
+For control-plane and infrastructure sizing details shared with the Linux pipeline, see
+[End-to-end data flow](/macos-collector/data-flow).
+
+## Tuning levers
+
+When a fleet's volume or egress is higher than budgeted, the levers — in order of
+leverage — are:
+
+1. **Tighten `file_open` filtering.** This is ~95%+ of volume; excluding high-churn
+   cache and build directories is the single biggest reduction in both endpoint CPU and
+   egress. See [Agent filtering](/macos-collector/event-coverage).
+2. **Scope process events.** `exec`/`fork` are already low volume; no action needed in
+   most fleets, but they are the highest-signal-per-byte events and should generally stay
+   on.
+3. **Leave the security long-tail on.** `btm_add`, `xattr_set`/`xattr_delete`, `mount`,
+   and `signal` are event-driven and rare — they add negligible volume while providing
+   persistence, quarantine-tamper, removable-media, and kill-attempt visibility.
+
+## What this collector does not do
+
+Consistent with the rest of the macOS collector design:
+
+- **No on-device resource cap on the System Extension.** Apple manages the extension
+  lifecycle; the collector does not impose a hard `CPUQuota`/`MemoryMax` on the ES
+  extension the way the Linux VM installer can on a systemd unit. On-device resource caps
+  are not part of the early-access model.
+- **No inbound listeners.** Bandwidth is strictly outbound, batched, compressed HTTPS to
+  the one configured ingest endpoint — there is no inbound socket to size for and no
+  phone-home.
+- **No raw packet capture.** Network bandwidth reflects `net_flow` connection metadata
+  (destination, ports, byte counts, bundle id), not payload — so network telemetry adds
+  only ~1–2% to volume, never a packet-capture-scale load.
+- **No file-content shipping.** `file_open` is metadata (path, flags, actor, signing
+  identity); the collector never reads or ships file contents, so file volume is bounded
+  by event count, not by file size.
+
+<Note>
+The macOS collector is in **early access**. The notarized `.pkg` install with SIP
+enabled described across these pages is the target shipping model; auto-update and
+on-device quarantine response are not yet available on macOS. Sizing figures will be
+refreshed as the fleet grows beyond early-access deployments.
+</Note>
