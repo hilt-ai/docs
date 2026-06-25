@@ -41,14 +41,9 @@ Exports with fewer than 5 distinct hosts are rejected. This prevents exports fro
 
 ## Running an export
 
-The export runs as a one-shot Kubernetes Job on the existing EKS cluster, using the same ClickHouse credentials as the enrichment service.
+The export pipeline is provisioned as part of every deployment and runs on a daily schedule. You can also trigger a one-shot Kubernetes Job on the existing EKS cluster, using the same ClickHouse credentials as the enrichment service.
 
 <Steps>
-  <Step title="Enable the export capability">
-    ```bash
-    terraform -chdir=envs/app apply -var data_export_enabled=true
-    ```
-  </Step>
   <Step title="Trigger the export job">
     ```bash
     kubectl create job --from=cronjob/dag-data-export dag-data-export-$(date +%s)

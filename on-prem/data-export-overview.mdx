@@ -6,7 +6,7 @@ description: "How telemetry is anonymized for Hilt model improvement while prese
 
 ## Purpose
 
-Hilt's detection models improve when trained on diverse, real-world behavioral patterns. For customers who opt in, a structured export pipeline produces anonymized statistical summaries that help calibrate detection thresholds across different infrastructure types.
+Hilt's detection models improve when trained on diverse, real-world behavioral patterns. Anonymized data export is a core part of every Hilt deployment: a structured pipeline produces anonymized statistical summaries on a daily schedule, helping calibrate detection thresholds across different infrastructure types.
 
 ---
 
@@ -30,7 +30,7 @@ The Admin UI provides an export management panel:
 - **Delete (reject)** — a button to delete and reject the export, with a confirmation dialog.
 - **Sample table** — a preview showing the first 20 rows of the export data.
 
-When no exports exist, an empty state reads: _"Exports run on a daily schedule"_ with a note to contact your Hilt representative to enable exports.
+When no exports exist, an empty state reads: _"Exports run on a daily schedule"_.
 
 **Permissions**: viewing exports requires the **`view_audit`** permission; approving or deleting exports requires the **`manage_users`** permission.
 

@@ -4,7 +4,7 @@ sidebarTitle: "Compliance"
 description: "How Hilt's deployment model shapes data residency, processing roles, privacy, certifications, and subprocessors."
 ---
 
-Hilt's single-tenant, customer-owned deployment model shapes its compliance posture: your telemetry stays in your account, and the data Hilt itself processes is limited to the opt-in anonymized export. This page explains that posture and points to the materials available under NDA.
+Hilt's single-tenant, customer-owned deployment model shapes its compliance posture: your telemetry stays in your account, and the data Hilt itself processes is limited to the anonymized exports you approve for transfer. This page explains that posture and points to the materials available under NDA.
 
 <Note>
 This page is informational and does not replace your agreement with Hilt. The binding terms for data processing, certifications, and notification are in your contract and data processing agreement.
@@ -16,7 +16,7 @@ This page is informational and does not replace your agreement with Hilt. The bi
 
 Telemetry is generated, processed, and stored entirely within your cloud account. Hilt does not receive, mirror, or hold out-of-band access to your events. The data lives in the region of the account you provision, so data residency follows your own cloud footprint. See [Architecture and data flow](/trust-security/architecture).
 
-The single exception is the [anonymized data export](/on-prem/data-export-overview), which is off by default and, when enabled, transfers only anonymized statistical features after your review.
+The single exception is the [anonymized data export](/on-prem/data-export-overview), which transfers only anonymized statistical features after your review and approval.
 
 ---
 
@@ -27,7 +27,7 @@ Because the deployment runs in your account, you control the personal data withi
 | Scenario | Hilt's role |
 | :-- | :-- |
 | Platform operating in your account | You own and control the telemetry; Hilt operates the platform under approval-gated access and does not hold a separate copy |
-| Opt-in anonymized export enabled | Hilt processes only the anonymized features you approve for transfer, which exclude identifiers (see what is never exported in the [export overview](/on-prem/data-export-overview)) |
+| Anonymized data export (approved transfers) | Hilt processes only the anonymized features you approve for transfer, which exclude identifiers (see what is never exported in the [export overview](/on-prem/data-export-overview)) |
 
 The formal controller and processor designations for your engagement are set out in your data processing agreement.
 
@@ -38,7 +38,7 @@ The formal controller and processor designations for your engagement are set out
 Hilt's design minimizes exposure of personal data:
 
 - The collector captures metadata only, never file contents, packet payloads, environment variables, or credentials. See [Data collection and handling](/trust-security/data-handling).
-- Telemetry does not leave your account except through the opt-in export, which strips or remaps identifying values (host IDs, user IDs, and identity strings) before any transfer.
+- Telemetry does not leave your account except through the anonymized export pipeline, which strips or remaps identifying values (host IDs, user IDs, and identity strings) before any transfer you approve.
 - You can delete telemetry and exported data from your account at any time, because the storage is yours.
 
 For region-specific privacy commitments (for example, GDPR), request the relevant terms and the data processing agreement from your Hilt representative.

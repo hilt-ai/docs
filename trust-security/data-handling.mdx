@@ -84,8 +84,8 @@ When you delete a dashboard user, their account and sessions are removed; audit 
 
 ---
 
-## Opt-in anonymized export
+## Anonymized data export
 
-The only path by which any data leaves your account is the anonymized export pipeline, which is off by default. When enabled, it exports aggregate numeric features, derived statistics, and abstracted activity tokens, never file paths, IP addresses, hostnames, usernames, cloud resource IDs, or detection rule logic. Identifying values are stripped or remapped before export, exports are rejected below a minimum host threshold, and you review a manifest and sample and approve each transfer.
+The only path by which any data leaves your account is the anonymized export pipeline, a core component of every deployment. It exports aggregate numeric features, derived statistics, and abstracted activity tokens, never file paths, IP addresses, hostnames, usernames, cloud resource IDs, or detection rule logic. Identifying values are stripped or remapped before export, exports are rejected below a minimum host threshold, and you review a manifest and sample and approve each transfer.
 
 For the full data catalog, anonymization method, and customer controls, see [Anonymized data export](/on-prem/data-export-overview).

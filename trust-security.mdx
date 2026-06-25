@@ -11,7 +11,7 @@ Hilt is data detection and response that runs inside your own cloud account. You
 ## Trust principles
 
 - **Customer-owned infrastructure and data.** Every deployment is single-tenant, provisioned in your cloud account (AWS, GCP, Azure, or Ali Cloud). Telemetry, the analytics store, and the dashboard stay in your account.
-- **No covert egress.** Collector telemetry has one destination: the ingest endpoint in your account, reached over private networking. Nothing leaves your account except the opt-in, anonymized export that you control.
+- **No covert egress.** Collector telemetry has one destination: the ingest endpoint in your account, reached over private networking. Nothing leaves your account except the anonymized export pipeline, which you review and approve before each transfer.
 - **Least privilege, approval-gated access.** Hilt engineers hold no standing access to your environment. Access happens only through your approval workflow and is logged.
 - **Transparency.** What the collector observes (and what it never observes) is documented and enforced in the collector itself, at the metadata level only.
 - **Defense in depth.** Controls layer across network (private subnets, private link), identity (role-based access, team scoping), encryption (TLS 1.2+, KMS at rest), and application (event filtering, audit logging).
@@ -20,7 +20,7 @@ Hilt is data detection and response that runs inside your own cloud account. You
 
 ## Architecture at a glance
 
-Collectors on your hosts stream metadata-level telemetry over private networking to an ingest endpoint in your account. Events are buffered, enriched, scored, and stored in an analytics database, then surfaced in a dashboard, all within your cloud boundary. The only path out of your account is the anonymized export pipeline, which is off by default.
+Collectors on your hosts stream metadata-level telemetry over private networking to an ingest endpoint in your account. Events are buffered, enriched, scored, and stored in an analytics database, then surfaced in a dashboard, all within your cloud boundary. The only path out of your account is the anonymized export pipeline, a core component of every deployment that runs on a daily schedule and requires your approval before each transfer.
 
 For the component map, per-cloud service list, and a data-flow diagram, see [Architecture and data flow](/trust-security/architecture).
 
@@ -38,7 +38,7 @@ For the component map, per-cloud service list, and a data-flow diagram, see [Arc
 | Identity and access | Dashboard role-based access with team scoping | You |
 | Hilt engineer access | Approval-gated, time-bound, logged, no standing access | Shared |
 | Data collection | Metadata only, no file contents or payloads | Hilt design |
-| Data export | Opt-in, anonymized, reviewable before transfer | You (opt-in) |
+| Data export | Anonymized, reviewable before transfer | You (approve each export) |
 | Response controls | Quarantine and custom detection rules | You |
 
 ---
@@ -55,7 +55,7 @@ Hilt operates the platform; you own the cloud account it runs in. Responsibiliti
 | Platform infrastructure | Approve maintenance windows | Provision, patch, upgrade, and monitor platform components |
 | Dashboard user management | Create users, assign roles and teams | Provide the role-based access model |
 | Encryption keys | Own the cloud KMS in your account | Configure KMS encryption on all platform storage |
-| Data export opt-in | Opt in, review the manifest, approve or delete | Provide the pipeline and anonymization controls |
+| Data export approval | Review the manifest, approve or delete each export | Provide the pipeline and anonymization controls |
 | Incident response | Report incidents, act on findings, quarantine hosts | Investigate platform issues and notify you |
 
 ---
