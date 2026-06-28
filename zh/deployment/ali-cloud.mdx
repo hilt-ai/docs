@@ -4,7 +4,7 @@ sidebarTitle: "阿里云"
 description: "Hilt 在阿里云上的单租户部署架构与预配。"
 ---
 
-Hilt 作为单租户平台部署在您自己的阿里云账户中。由托管 ACK 集群运行分析引擎（ClickHouse）和仪表板，部署在您主机上的采集器通过私有 PrivateLink 接入端点将遥测数据流式传输到 Message Queue for Apache Kafka，所有流量都保持在您的账户内，不暴露于公共互联网。
+Hilt 作为单租户平台部署在您自己的阿里云账户中。由托管 ACK 集群运行所有平台工作负载，ClickHouse 提供分析数据库（支持 ECS 自建、ApsaraDB 企业版或 ClickHouse Cloud 私网连接三种模式），部署在您主机上的采集器通过私有 PrivateLink 接入端点将遥测数据流式传输到 Message Queue for Apache Kafka，所有流量都保持在您的账户内，不暴露于公共互联网。
 
 ---
 
@@ -12,11 +12,14 @@ Hilt 作为单租户平台部署在您自己的阿里云账户中。由托管 AC
 
 | 服务 | 角色 |
 | :-- | :-- |
-| ACK | 托管 Kubernetes，运行平台服务 |
-| Message Queue for Apache Kafka | 事件流处理 |
-| PrivateLink | 私有接入端点 |
-| OSS | 长期存储和数据导出 |
-| ApsaraDB RDS (PostgreSQL) | 仪表板数据库 |
+| ACK | 托管 Kubernetes，运行所有平台服务（采集器、富化、分类、仪表板） |
+| 阿里云 ECS（VM）或 ApsaraDB ClickHouse 企业版 | 分析数据库（三种部署模式：ECS 自建、托管企业版、ClickHouse Cloud 私网连接） |
+| Message Queue for Apache Kafka | 采集器与富化之间的事件流处理 |
+| PrivateLink | 私有接入端点：采集器无需经过公共互联网即可连接 |
+| OSS | Terraform 远程状态、应用配置及数据导出暂存 |
+| ApsaraDB RDS (PostgreSQL) | 仪表板认证/HITL 数据库 |
+| CAS（证书管理服务） | NLB 和 ALB 的 TLS 证书（未提供时自动生成） |
+| NAS（文件存储 NAS） | 本地 ML 模型工件存储的共享 RWX 卷（可选） |
 
 ---
 
@@ -24,8 +27,23 @@ Hilt 作为单租户平台部署在您自己的阿里云账户中。由托管 AC
 
 - 采集器通过 VPC 内的 **PrivateLink** 端点连接
 - 平台部署在专用 VSwitch 中，使用安全组隔离
-- 使用 RAM 角色进行服务间身份验证
-- 仅在需要拉取镜像时使用出站互联网访问（可配置为使用私有镜像仓库）
+- 使用 RAM 角色和 RRSA（服务账户 RAM 角色）进行 Pod 级身份验证
+- 仅在需要拉取镜像时使用出站互联网访问（可配置为使用 ACR 私有镜像仓库）
+- 可选 DashScope PrivateLink 用于私有 LLM 推理
+
+---
+
+## 功能
+
+| 功能 | 描述 |
+| :-- | :-- |
+| 富化管道 | Kafka 消费者将富化的遥测数据写入 ClickHouse，支持 GNN 边 |
+| ML 分类 | 异常检测评分，自动漂移监控（每 6 小时 CronJob） |
+| 本地 ML 训练 | 可选的自主 TRACE 模型再训练，使用 NAS 支持的工件存储 |
+| 数据导出 | 定时匿名数据导出到 OSS，带管理员审批工作流 |
+| 可观测性 | 集群内 Prometheus 和 Grafana 用于平台指标 |
+| 仪表板 | 前端、后端和查询服务，通过 ALB 基于路径路由 |
+| 自动扩缩容 | 富化的 HPA（CPU/内存目标），可配置最小/最大副本数 |
 
 ---
 
@@ -34,6 +52,17 @@ Hilt 作为单租户平台部署在您自己的阿里云账户中。由托管 AC
 Hilt 使用 Terraform 来预配您的阿里云部署。典型的流程如下：
 
 1. 您提供一个目标阿里云账户，并配置约定的 RAM 权限
-2. Hilt 执行 Terraform 配置以创建所有基础设施（ACK、Message Queue for Apache Kafka、ApsaraDB RDS、OSS、PrivateLink 以及网络）
+2. Hilt 执行 Terraform 配置以创建所有基础设施（ACK、ClickHouse、Message Queue for Apache Kafka、ApsaraDB RDS、OSS、NAS、CAS、PrivateLink 以及网络）
 3. 在您的工作负载 VPC 与平台 VPC 之间建立 PrivateLink 连接
-4. 按照本文档中的指南将采集器部署到您的主机上
+4. Postgres 认证数据库初始化架构
+5. 按照本文档中的指南将采集器部署到您的主机上
+
+## 镜像交付
+
+容器镜像支持三种交付方式：
+
+| 模式 | 描述 |
+| :-- | :-- |
+| ACR 企业版 | 从 Hilt ECR 镜像同步到您的 ACR 实例（推荐用于生产环境） |
+| ACR 个人版 | 适用于较小部署的免费方案 |
+| ECR 直连 | Pod 直接从 Hilt 的 AWS ECR 拉取（仅限测试，令牌 12 小时后过期） |

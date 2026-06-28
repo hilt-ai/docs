@@ -4,7 +4,7 @@ sidebarTitle: "Ali Cloud"
 description: "Hilt's single-tenant deployment architecture and provisioning on Ali Cloud."
 ---
 
-Hilt runs as a single-tenant platform inside your own Ali Cloud account. A managed ACK cluster hosts the platform workloads, ClickHouse runs on a dedicated AliCloud ECS (VM), collectors on your hosts stream telemetry through a private PrivateLink ingest endpoint into Message Queue for Apache Kafka, and all traffic stays inside your account with no public internet exposure.
+Hilt runs as a single-tenant platform inside your own Ali Cloud account. A managed ACK cluster hosts all platform workloads, ClickHouse provides the analytics database (self-managed on ECS, ApsaraDB Enterprise Edition, or ClickHouse Cloud via PrivateLink), collectors on your hosts stream telemetry through a private PrivateLink ingest endpoint into Message Queue for Apache Kafka, and all traffic stays inside your account with no public internet exposure.
 
 ---
 
@@ -12,13 +12,14 @@ Hilt runs as a single-tenant platform inside your own Ali Cloud account. A manag
 
 | Service | Role |
 | :-- | :-- |
-| ACK | Managed Kubernetes for platform services |
-| AliCloud ECS (VM) | Dedicated VM for ClickHouse analytics database |
-| Message Queue for Apache Kafka | Event streaming |
-| PrivateLink | Private ingest endpoint |
-| OSS | Terraform remote state and VPC gateway |
-| ApsaraDB RDS (PostgreSQL) | Dashboard database |
-| CAS (Certificate Authority Service) | TLS certificates |
+| ACK | Managed Kubernetes for all platform services (collector, enrichment, classification, dashboard) |
+| AliCloud ECS (VM) or ApsaraDB ClickHouse Enterprise | Analytics database (three deployment modes: self-managed ECS, managed Enterprise Edition, or ClickHouse Cloud via PrivateLink) |
+| Message Queue for Apache Kafka | Event streaming between collector and enrichment |
+| PrivateLink | Private ingest endpoint: collectors connect without traversing the public internet |
+| OSS | Terraform remote state, app configuration, and data-export staging |
+| ApsaraDB RDS (PostgreSQL) | Dashboard auth/HITL database |
+| CAS (Certificate Authority Service) | TLS certificates for NLB and ALB (auto-generated when not supplied) |
+| NAS (File Storage NAS) | Shared RWX volume for on-prem ML model artifact store (optional) |
 
 ---
 
@@ -26,8 +27,23 @@ Hilt runs as a single-tenant platform inside your own Ali Cloud account. A manag
 
 - Collectors connect via a **PrivateLink** endpoint within your VPC
 - Platform deployed in a dedicated VSwitch with security group isolation
-- RAM roles for service-to-service authentication
-- Outbound internet access only where needed for image pulls (configurable to use private registries)
+- RAM roles with RRSA (RAM Roles for Service Accounts) for pod-level identity
+- Outbound internet access only where needed for image pulls (configurable to use private registries via ACR)
+- Optional DashScope PrivateLink for private LLM inference
+
+---
+
+## Features
+
+| Feature | Description |
+| :-- | :-- |
+| Enrichment pipeline | Kafka consumer writes enriched telemetry to ClickHouse with GNN edge support |
+| ML classification | Anomaly detection scoring with automated drift monitoring (CronJob every 6 hours) |
+| On-prem ML training | Optional autonomous TRACE model retraining with NAS-backed artifact store |
+| Data export | Scheduled anonymized data export to OSS with admin approval workflow |
+| Observability | In-cluster Prometheus and Grafana for platform metrics |
+| Dashboard | Frontend, backend, and query service behind ALB with path-based routing |
+| Auto-scaling | HPA on enrichment (CPU/memory targets) with configurable min/max replicas |
 
 ---
 
@@ -36,6 +52,17 @@ Hilt runs as a single-tenant platform inside your own Ali Cloud account. A manag
 Hilt provisions your Ali Cloud deployment using Terraform. The typical process:
 
 1. You provide a target Ali Cloud account with the agreed RAM permissions
-2. Hilt applies the Terraform configuration to create all infrastructure (ACK, AliCloud ECS, Message Queue for Apache Kafka, ApsaraDB RDS, OSS, CAS, PrivateLink, and networking)
+2. Hilt applies the Terraform configuration to create all infrastructure (ACK, ClickHouse, Message Queue for Apache Kafka, ApsaraDB RDS, OSS, NAS, CAS, PrivateLink, and networking)
 3. PrivateLink connectivity is established between your workload VPCs and the platform VPC
-4. Collectors are deployed to your hosts using the guides in this documentation
+4. The Postgres auth database is seeded with the initial schema
+5. Collectors are deployed to your hosts using the guides in this documentation
+
+## Image delivery
+
+Container images can be delivered in three ways:
+
+| Mode | Description |
+| :-- | :-- |
+| ACR Enterprise Edition | Images mirrored from Hilt ECR to your ACR instance (recommended for production) |
+| ACR Personal Edition | Free-tier alternative for smaller deployments |
+| ECR direct | Pods pull directly from Hilt's AWS ECR (testing only, tokens expire after 12 hours) |
