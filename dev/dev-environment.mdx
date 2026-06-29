@@ -1,0 +1,47 @@
+---
+title: "Dev Environment"
+description: "Local development setup for Hilt platform repos."
+---
+
+## Prerequisites
+
+{/* TODO: pin exact versions per repo */}
+
+- macOS or Linux (team standard)
+- Docker and Docker Compose
+- Go (for backend and collector work)
+- Node.js and npm/pnpm (for frontend work)
+- Access to required secrets and cloud dev accounts
+
+## Getting the Code
+
+Clone the repo you need from the `hilt-ai` GitHub organization:
+
+```bash
+git clone git@github.com:hilt-ai/dag-backend.git
+cd dag-backend
+```
+
+Repeat for other repos as needed. Each repository's README should list service-specific setup steps.
+
+{/* TODO: add org-wide conventions (branch naming, PR process) */}
+
+## Running Locally
+
+Local setup varies by service. Common patterns:
+
+- Backend: environment file from team vault, `docker compose up`, then run the Go service.
+- Frontend: install dependencies, point API URL at local or dev backend, start dev server.
+- Infra: Terraform workspaces in `cybe-dag-infra` for non-local environments.
+
+Check the target repo's README before assuming a single shared dev stack.
+
+{/* TODO: document any shared local stack or tilt/skaffold setup */}
+
+## Common Tasks
+
+{/* TODO: add real commands used day to day */}
+
+- Run tests: see repo Makefile or README
+- Lint/format: follow repo CI configuration
+- Deploy to dev: coordinate with infra docs in `cybe-dag-infra`

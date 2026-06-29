@@ -1,0 +1,39 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "sequoia",
+  "name": "Hilt",
+  "description": "Data detection and response for modern infrastructure.",
+  "colors": {
+    "primary": "#166E3F",
+    "light": "#26BD6C",
+    "dark": "#166E3F"
+  },
+  "favicon": "/favicon.ico",
+  "icons": {
+    "library": "lucide"
+  },
+  "logo": {
+    "light": "/logo/hilt-logo.png",
+    "dark": "/logo/hilt-logo.png"
+  },
+  "navbar": {
+    "primary": {
+      "type": "button",
+      "label": "Get a Demo",
+      "href": "https://hilt.ai"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Overview",
+        "pages": [
+          "introduction",
+          "how-it-works",
+          "why-hilt"
+        ]
+      }
+    ]
+  },
+  "footer": {}
+}
