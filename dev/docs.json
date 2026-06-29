@@ -1,0 +1,39 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "sequoia",
+  "name": "Hilt Engineering",
+  "description": "Internal developer documentation for the Hilt platform.",
+  "colors": {
+    "primary": "#166E3F",
+    "light": "#26BD6C",
+    "dark": "#166E3F"
+  },
+  "favicon": "/favicon.ico",
+  "icons": {
+    "library": "lucide"
+  },
+  "logo": {
+    "light": "/logo/hilt-logo.png",
+    "dark": "/logo/hilt-logo.png"
+  },
+  "navbar": {
+    "primary": {
+      "type": "button",
+      "label": "Platform",
+      "href": "https://app.hilt.ai"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Developer Guide",
+        "pages": [
+          "getting-started",
+          "architecture",
+          "dev-environment"
+        ]
+      }
+    ]
+  },
+  "footer": {}
+}
