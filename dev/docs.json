@@ -30,7 +30,21 @@
         "pages": [
           "getting-started",
           "architecture",
-          "dev-environment"
+          "dev-environment",
+          {
+            "group": "Detection ML",
+            "pages": [
+              "detection-ml/overview",
+              "detection-ml/inference",
+              "detection-ml/downstream",
+              "detection-ml/trace",
+              "detection-ml/gnn",
+              "detection-ml/data-contracts",
+              "detection-ml/local-development",
+              "detection-ml/training-batch",
+              "detection-ml/on-prem-training"
+            ]
+          }
         ]
       }
     ]

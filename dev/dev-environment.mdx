@@ -5,12 +5,11 @@ description: "Local development setup for Hilt platform repos."
 
 ## Prerequisites
 
-{/* TODO: pin exact versions per repo */}
-
 - macOS or Linux (team standard)
 - Docker and Docker Compose
-- Go (for backend and collector work)
-- Node.js and npm/pnpm (for frontend work)
+- Go 1.22+ (backend, enrichment, query)
+- Node.js 20 LTS and npm (frontend, Mintlify docs preview)
+- Python 3.12 (detection ML)
 - Access to required secrets and cloud dev accounts
 
 ## Getting the Code
@@ -24,7 +23,7 @@ cd dag-backend
 
 Repeat for other repos as needed. Each repository's README should list service-specific setup steps.
 
-{/* TODO: add org-wide conventions (branch naming, PR process) */}
+Branch convention: feature branches off `dev` for application repos; docs repo uses `main` with feature branches merged via PR.
 
 ## Running Locally
 
@@ -36,12 +35,10 @@ Local setup varies by service. Common patterns:
 
 Check the target repo's README before assuming a single shared dev stack.
 
-{/* TODO: document any shared local stack or tilt/skaffold setup */}
+**Detection ML:** Python setup, `.env` from `.env.example`, and Makefile smoke targets. See [Local ML Development](/detection-ml/local-development).
 
 ## Common Tasks
 
-{/* TODO: add real commands used day to day */}
-
-- Run tests: see repo Makefile or README
+- Run tests: see repo Makefile or README (`go test ./...`, `pytest`, `npm run test`)
 - Lint/format: follow repo CI configuration
 - Deploy to dev: coordinate with infra docs in `cybe-dag-infra`

@@ -1,0 +1,80 @@
+---
+title: "Local Development"
+description: "Python setup, smoke tests, and dev ClickHouse workflow for dag-detectionML."
+sidebarTitle: "Local development"
+---
+
+Local work targets unit tests, inference smoke against dev ClickHouse, and offline training scripts. Production deploys as `dag-classification` on EKS.
+
+## Prerequisites
+
+| Tool | Version |
+| --- | --- |
+| Python | 3.12 (match Dockerfile / pyproject) |
+| ClickHouse creds | From `.env` (dev cluster, not committed) |
+| Postgres | Optional for model registry refresh tests |
+
+Copy [`dag-detectionML/.env.example`](https://github.com/hilt-ai/dag-detectionML/blob/dev/.env.example) to `.env` locally. Never commit secrets.
+
+## Repo layout
+
+| Path | Purpose |
+| --- | --- |
+| `src/main.py` | FastAPI + poll loop entry |
+| `src/inference/` | TRACE scoring, ACI, state |
+| `src/consumer.py` | ClickHouse poll |
+| `training/pipelines/trace.py` | Offline training |
+| `tests/` | pytest |
+
+## Common commands
+
+```bash
+cd dag-detectionML
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+
+pytest tests/unit -q
+pytest tests/integration -q  # needs CH creds
+```
+
+Inference smoke (reads dev ClickHouse, writes if configured):
+
+```bash
+python -m src.main  # inference service against dev ClickHouse
+```
+
+For TRACE model-code changes, validate imports and tensor shapes with `make smoke-trace-shapes` (~30s); `make smoke-trace-train` runs the full pipeline on a tiny model (5-10 min).
+
+See [TRACE inference pipeline](https://github.com/hilt-ai/dag-detectionML/blob/dev/docs/trace/02-inference-pipeline.md) for env vars (`ML_SOURCE_TABLE`, `TRACE_WARMUP_THRESHOLD`, `ACI_*`).
+
+## ClickHouse verification
+
+Without the local stack, validate against dev ClickHouse:
+
+```sql
+SELECT count(), max(wall_time_ns) FROM dag_trace_scores;
+SELECT count() FROM dag_anomaly_scores WHERE `group` = 'EPOCH';
+```
+
+Compare watermark lag between source and scored tables ([Inference](/detection-ml/inference)).
+
+## Model artifacts
+
+Local runs load bundles from disk or S3 paths in config. Production uses Postgres registry + decrypt via [`model_refresh.py`](https://github.com/hilt-ai/dag-detectionML/blob/dev/src/model_refresh.py).
+
+## Mintlify preview (this docs site)
+
+From `docs/dev`:
+
+```bash
+nvm use 20   # Mintlify requires Node LTS
+npx mintlify dev
+```
+
+Newer Node majors can fail the Mintlify CLI; use Node 20 LTS (the platform standard in [Dev environment](/dev-environment)).
+
+## Related
+
+- [Inference](/detection-ml/inference)
+- [Training on Batch](/detection-ml/training-batch)
+- [Dev environment](/dev-environment)

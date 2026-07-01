@@ -5,41 +5,50 @@ description: "High-level overview of the Hilt platform architecture."
 
 ## High-Level Architecture
 
-{/* TODO: replace with an accurate diagram once validated with the team */}
-
 ```mermaid
 flowchart LR
-  Collectors[Collectors] --> Ingest[Ingest]
-  Ingest --> Enrichment[Enrichment]
-  Enrichment --> Storage[Analytics Storage]
-  Storage --> Detection[Detection ML]
-  Storage --> Query[Query]
-  Backend[Backend API] --> Frontend[Frontend]
+  Agent[data-access-governance] --> Ingest[Collector ingest]
+  Ingest --> Kafka[Kafka MSK]
+  Kafka --> Enrichment[dag-enrichment]
+  Enrichment --> Storage[ClickHouse]
+  Storage --> Detection[dag-detectionML]
+  Storage --> Backend[dag-backend]
+  Storage --> Query[dag-query]
+  Backend --> Frontend[dag-frontend]
   Query --> Backend
-  Detection --> Backend
+  Detection --> Storage
 ```
+
+Detection ML reads enriched epochs from ClickHouse and writes score tables back to ClickHouse; the backend reads those tables for the dashboard. For the Detection ML path in detail, see [Detection ML Overview](/detection-ml/overview).
 
 ## Key Services
 
-**Collector** — Agents on Linux and macOS that capture metadata-level telemetry and ship it to the customer ingest endpoint.
+**data-access-governance:** eBPF agents on Linux and macOS that capture metadata-level telemetry and ship to the customer ingest endpoint.
 
-**Backend** — Core API, auth, and platform logic consumed by the dashboard and integrations.
+**dag-enrichment:** Consumes Kafka events; normalizes telemetry, builds tokens and numeric features, writes ClickHouse.
 
-**Enrichment** — Normalizes and enriches raw events for downstream analytics and detection.
+**dag-detectionML (`dag-classification`):** TRACE online scoring service; polls ClickHouse and writes `dag_trace_scores`. See [Inference](/detection-ml/inference).
 
-**Detection ML** — Behavioral baselines and anomaly scoring over enriched telemetry.
+**dag-backend:** Core API, auth, findings endpoints, fusion narratives.
 
-**Query** — Search and historical query over stored events.
+**dag-query:** Natural-language query and MCP tools over backend APIs.
 
-**Frontend** — Web UI for investigation, administration, and operational workflows.
-
-{/* TODO: expand each service with repo paths and deployment notes */}
+**dag-frontend:** Web UI for investigation, administration, and operational workflows.
 
 ## Data Flow
 
-1. Collectors send metadata events to the private ingest endpoint in the customer environment.
-2. Enrichment processes and stores events in the analytics layer.
-3. Detection models consume enriched data and emit findings.
-4. The backend and query layers expose data to the dashboard and APIs.
+1. Collectors send metadata events through private ingest to Kafka.
+2. Enrichment processes events and stores tokens, scores, and graph edges in ClickHouse.
+3. Detection ML consumes enriched epochs and emits anomaly scores.
+4. Backend and query layers expose data to the dashboard and APIs.
 
-{/* TODO: expand with sequence diagrams and failure modes */}
+## Detection ML (summary)
+
+| Stage | Component |
+| --- | --- |
+| Inputs | `dag_anomaly_scores`, `dag_epoch_tokens` |
+| Scoring | TRACE + ACI/CCT in `dag-classification` |
+| Outputs | `dag_trace_scores`, `dag_ttd`, `dag_ttd_calibrator` |
+| Product | Anomalies page via `dag-backend` → fusion → narratives |
+
+Full documentation: [Detection ML section](/detection-ml/overview).

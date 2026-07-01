@@ -7,25 +7,22 @@ Welcome to Hilt engineering. This page is a starting point when you're joining a
 
 ## Prerequisites
 
-{/* TODO: expand with actual access requirements */}
-
 - GitHub access to the `hilt-ai` organization
 - Cloud and secrets access as required by your team
-- Local tooling: Git, Docker, Go, and Node.js (versions vary by repo)
+- Local tooling: Git, Docker, Go, Node.js, and Python (versions vary by repo)
 
 ## Repo Overview
 
 | Repo | Description |
-|------|-------------|
+| --- | --- |
+| `data-access-governance` | eBPF telemetry agents (Linux and macOS) |
 | `dag-backend` | Core backend API and platform services |
-| `dag-collector` | Linux and macOS collector agents |
 | `dag-frontend` | Customer-facing web dashboard |
-| `dag-enrichment` | Telemetry enrichment and processing |
-| `dag-query` | Query and search services |
-| `dag-detectionML` | Detection and ML pipelines |
-| `cybe-dag-infra` | Infrastructure and deployment (Terraform) |
-
-{/* TODO: add links and ownership contacts */}
+| `dag-enrichment` | Streaming enrichment, tokens, baselines, GNN edges |
+| `dag-detectionML` | TRACE prod scoring + offline training (TRACE, GNN) |
+| `dag-query` | Query layer and MCP tools |
+| `dag-tokenspec` | Token vocabulary contract for TRACE |
+| `cybe-dag-infra` | Infrastructure, ClickHouse migrations, Terraform |
 
 ## First Day Checklist
 
@@ -33,6 +30,5 @@ Welcome to Hilt engineering. This page is a starting point when you're joining a
 2. Clone the repo you'll work on and read its README.
 3. Set up local development using [Dev Environment](/dev-environment).
 4. Skim [Architecture](/architecture) for how services connect.
-5. Pair with your team lead on a first small task or bug fix.
-
-{/* TODO: expand with team-specific onboarding steps */}
+5. **ML engineers:** read [Detection ML Overview](/detection-ml/overview) and run smoke tests per [Local Development](/detection-ml/local-development).
+6. Pair with your team lead on a first small task or bug fix.
