@@ -1,0 +1,95 @@
+---
+title: "Uninstall (standalone)"
+sidebarTitle: "Uninstall"
+description: "Remove the Hilt macOS Collector from a Mac that was installed standalone: turn off its security extensions, restart, then remove the app, its auto-updater, and support files."
+---
+
+This page covers removing a **standalone** install of the Hilt macOS Collector, installed from the notarized `.pkg` on a single Mac without MDM. Because the collector is a notarized security product with tamper protection, removal is a short, deliberate sequence: turn its extensions **off**, **restart**, then **delete** the app.
+
+<Note>
+These steps need an **administrator at the Mac**. Turning off a security extension requires a local admin to authenticate; Apple does not allow it to be done silently.
+</Note>
+
+<Note>
+Steps below are written for **macOS 15 (Sequoia)**. On macOS 13 or 14 the layout is similar, but the extensions appear under **System Settings → Privacy & Security** instead of **Login Items & Extensions**.
+</Note>
+
+## Stop data collection right now
+
+If you only need the collector to **stop capturing immediately**, before or instead of a full uninstall, turn its two extensions off.
+
+<Steps>
+  <Step title="Open extension settings">
+    Go to **System Settings → General → Login Items & Extensions**.
+  </Step>
+  <Step title="Turn off the sensor">
+    Under **Endpoint Security Extensions**, turn off **Hilt EDR Sensor**.
+  </Step>
+  <Step title="Turn off the network filter">
+    Under **Network Extensions**, turn off **Hilt EDR Network Filter**. Enter an administrator password when asked.
+  </Step>
+</Steps>
+
+Collection stops as soon as both are off. To remove the collector entirely, continue below.
+
+## Remove the collector
+
+Removing the collector needs an administrator account. The last step uses **Terminal** and `sudo`. Run the steps in order.
+
+<Warning>
+Don't delete the app first. While the collector is running it protects its own files, so deleting it before you turn its extensions off is blocked by design (and recorded as a tamper event). Turn the extensions off and restart first to safely disable that protection, then remove everything below.
+</Warning>
+
+<Steps>
+  <Step title="Turn off both extensions">
+    Turn off **Hilt EDR Sensor** and **Hilt EDR Network Filter** as shown in [Stop data collection](#stop-data-collection-right-now). This stops collection and disables the self-protection.
+  </Step>
+  <Step title="Restart the Mac">
+    Restart so the security extensions shut down completely.
+  </Step>
+  <Step title="Remove the app and its background service">
+    Open **Terminal** and run the following. The first two commands stop the auto-updater and login helper. **Without this, the updater reinstalls the collector on its next check.**
+
+    ```bash
+    # Stop the auto-updater (root LaunchDaemon) and the login helper
+    sudo launchctl bootout system/com.hilt.edr.updater 2>/dev/null
+    sudo launchctl bootout "gui/$(id -u "$(stat -f%Su /dev/console)")/com.hilt.edr.activator" 2>/dev/null
+
+    # Remove the launch items, the app, and its support files
+    sudo rm -f /Library/LaunchDaemons/com.hilt.edr.updater.plist \
+               /Library/LaunchAgents/com.hilt.edr.activator.plist
+    sudo rm -rf /Applications/EDRApp.app "/Library/Application Support/Hilt"
+    ```
+
+    Enter your administrator password when prompted.
+  </Step>
+  <Step title="Restart once more">
+    Restart again to finish removing the two system extensions. Until this restart they stay listed but inactive. They are already turned off and collecting nothing.
+  </Step>
+</Steps>
+
+## Confirm it's removed
+
+Run these in **Terminal**. Each returns nothing; the `ls` checks may instead print "No such file or directory":
+
+```bash
+systemextensionsctl list | grep -i hilt                       # no Hilt extensions
+sudo launchctl list | grep -i hilt                            # no Hilt services
+ls /Library/LaunchDaemons/com.hilt.edr.* \
+   /Library/LaunchAgents/com.hilt.edr.* 2>/dev/null           # no launch items
+ls -d /Applications/EDRApp.app "/Library/Application Support/Hilt" 2>/dev/null   # gone
+```
+
+<Note>
+Right after removal, `systemextensionsctl list` may still list the two extensions (shown as `[activated disabled]` or waiting to uninstall). That's expected. They are turned off and running nothing, and they deregister completely on the next restart.
+</Note>
+
+Optionally, remove the leftover **Hilt EDR Sensor** entry under **System Settings → Privacy & Security → Full Disk Access**. It is inert once the app is gone.
+
+## What happens to data already collected
+
+Uninstalling stops all new collection immediately. Telemetry already delivered to your Hilt environment is retained per your agreement with Hilt. To review what was collected or request its deletion, contact Hilt.
+
+## Need help
+
+Reach out to your Hilt contact or **support@hilt.ai**. If anything looks unexpected during removal, include the Mac's model and macOS version and we'll help you finish.

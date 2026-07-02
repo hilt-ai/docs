@@ -162,6 +162,7 @@
               "macos-collector/install-flow",
               "macos-collector/deploy-standalone",
               "macos-collector/deploy-mdm",
+              "macos-collector/uninstall",
               "macos-collector/configuration",
               "macos-collector/networking-security",
               "macos-collector/event-data-model",
