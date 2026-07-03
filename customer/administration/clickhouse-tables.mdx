@@ -1,0 +1,124 @@
+---
+title: "ClickHouse Tables"
+sidebarTitle: "ClickHouse Tables"
+description: "A reference map of the ClickHouse tables behind the platform: what each one holds, what writes to it, what reads from it, and its default retention."
+---
+
+Hilt's [analytics database](/trust-security/architecture#components) is ClickHouse, running inside your own cloud account. Every dashboard page, the [Query](/dashboard/query) agent, and the [MCP server](/dashboard/mcp-server) all resolve to SQL against the tables on this page. It complements two other references: the [Data Catalog](/on-prem/data-catalog) describes data by *category* without internal names; this page names the actual tables for anyone writing SQL directly — an analyst confirming a finding against raw rows, or an on-prem administrator with direct ClickHouse access.
+
+<Note>
+For a fully worked example of querying a table directly, see the [Activity](/dashboard/endpoint/activity#querying-the-same-stream) page, which builds the exact SQL the dashboard runs.
+</Note>
+
+---
+
+## How to read this page
+
+Each table entry lists:
+
+- **Written by** — the pipeline stage that inserts rows
+- **Read by** — the dashboard pages, agent, or APIs that query it
+- **Retention** — the default TTL; all defaults are configurable per deployment on the [Storage](/administration/storage) page
+
+Table and column names are exactly what you'd see connecting to ClickHouse directly, so they double as a lookup when the Storage page's per-table breakdown or a raw query result shows a name you don't recognize.
+
+---
+
+## Event telemetry
+
+The two raw kernel-event streams. Every other table on this page is derived from one of these.
+
+### `dag_events` — Linux and cloud workloads
+
+The primary event stream for Linux hosts and containerized workloads: one row per observed kernel event (`exec`, `fork`, file operations, network flows). Columns cover the categories described in [Linux event data model](/linux-collector/event-data-model) — process and user identifiers, command line, file paths, network 5-tuples and byte counts, container/cgroup/Kubernetes context, and resolved workload and application identity.
+
+| | |
+| :-- | :-- |
+| **Written by** | The enrichment service, consuming the streaming buffer (Kafka / Pub-Sub / Event Hubs) |
+| **Read by** | [Investigate](/dashboard/investigate), [Data Lineage](/dashboard/data-lineage), [Networks](/dashboard/networks), [Files](/dashboard/files), the Query agent, MCP tools (`search_events`, `get_process_events`, `get_network_flows`, `get_file_activity`) |
+| **Retention** | 365 days |
+
+### `endpoint_events` — macOS devices
+
+The native macOS event stream, one row per Apple Endpoint Security message, with code-signing trust (`signing_id`, `code_signature`, `team_id`, `cdhash`) and application attribution (`application_id`, `application_display_name`, `responsible_pid`, `session_id`) on every row. Fully documented in [Event data model](/macos-collector/event-data-model), including the complete column reference and `event_type` catalog.
+
+| | |
+| :-- | :-- |
+| **Written by** | The enrichment service, running in macOS mode against `dag.endpoint.*` topics |
+| **Read by** | Every page in the [Endpoint](/dashboard/endpoint/foundation) section, the Query agent, MCP tools |
+| **Retention** | 90 days by default (many deployments raise this to 365 days) |
+
+### `dag_edr_events` — macOS EDR findings
+
+Curated security findings from the macOS EDR forwarder — one row per detection (persistence, tamper, credential access, removable media, network egress), each carrying severity, the MITRE ATT&CK technique, the acting process, and the agent's response (`blocked` / `alerted` / `logged`). An `incident_id` column groups related findings into one attack chain.
+
+| | |
+| :-- | :-- |
+| **Written by** | The macOS EDR forwarder |
+| **Read by** | The five [Endpoint detection pages](/dashboard/endpoint/foundation#shared-layout) (Persistence, Tamper, Credential & Privacy, Removable Media), [ATT&CK Matrix](/dashboard/endpoint/attack-matrix) |
+| **Retention** | 90 days |
+
+---
+
+## Process and identity
+
+Tables that reconstruct process lineage and resolve raw kernel identifiers into stable workload and application identities.
+
+| Table | Holds | Powers |
+| :-- | :-- | :-- |
+| `dag_process_tree` | One row per observed process, with resolved workload, application, and job identity attached | [Process Lineage](/dashboard/endpoint/process-lineage), [Data Lineage](/dashboard/data-lineage) process detail |
+| `dag_fork_edges` | Parent → child spawn edges (`fork`) with process identifiers on both sides | The Data Lineage spawn graph, `get_process_tree` (MCP) |
+| `dag_workload_inventory` | Catalog of resolved workloads (the logical service a set of processes belongs to) | Workload identity badges across Cloud pages |
+| `dag_application_inventory` | Catalog of resolved applications (binary + interpreter identity, independent of any one workload) | Application attribution in Investigate and Files |
+
+---
+
+## Network
+
+| Table | Holds | Powers |
+| :-- | :-- | :-- |
+| `dag_network_flow_halves` | Reconciled network flow records — one row per flow, joined from the two kernel-side halves of the connection, with byte counts and the resolved application | [Networks](/dashboard/networks) timeline, graph, and map views |
+
+macOS network flows live directly in `endpoint_events` (`event_type = 'net_flow'`) — there is no separate flow table for the Endpoint section, since NetFilter resolves the responsible application at capture time.
+
+---
+
+## Detection and anomalies
+
+The output of the scoring pipeline. Scoring runs on a 5-minute epoch cadence per host.
+
+| Table | Holds | Powers |
+| :-- | :-- | :-- |
+| `dag_anomaly_scores` | One row per host per 5-minute epoch: z-scores across detection channels, the aggregate anomaly flag, and the scoring phase (`cold_start`, `baseline`, `scoring`) | [Anomalies](/dashboard/anomalies) source data, `get_anomaly_scores` (MCP) |
+| `dag_anomaly_alerts` | The subset of epochs above the alert threshold — the working set behind the finding queue | [Anomalies](/dashboard/anomalies) queue, `get_anomaly_alerts` / `investigate_alert` (MCP) |
+| `dag_alert_narratives` | Cached AI-generated narrative text per alert: headline, what happened, why it's unusual, and cluster label | The Anomalies finding detail panel |
+| `dag_behavior_clusters` | Named clusters of similar host behavior, with size, persistence, and representative features | The "atypical for this host" cluster badge on findings |
+
+<Note>
+The full feature and score vectors that drive detection (individual z-scores, statistical baselines, the GNN provenance graph, and the TRACE token model's internal state) live in additional ClickHouse tables not listed here. They are implementation detail for the detection engine, not intended for direct query, and are deliberately excluded from this reference and from the [anonymized export](/on-prem/data-export-overview) for the same reason detection rule logic is excluded — they describe your security posture.
+</Note>
+
+---
+
+## Hourly rollups
+
+Pre-aggregated counters that keep fleet-wide dashboard widgets (like [Overview](/dashboard/overview)) fast without scanning raw events. Each row is a per-host, per-hour aggregate — counts and byte sums, never individual event details.
+
+| Table | Aggregates |
+| :-- | :-- |
+| `dag_events_hourly` | Event counts and unique-identity counts per host, per event type, per hour |
+| `dag_network_hourly` | Network flow and byte-count rollups per host, per hour |
+| `dag_file_hourly` | File operation and sensitive-path-hit rollups per host, per hour |
+| `dag_host_last_seen` | The single most recent activity timestamp per host — backs "alive / stale / dead" status everywhere in the dashboard |
+
+Retention on hourly rollups is longer than the raw tables they summarize (typically 730 days), since they're a fraction of the size.
+
+---
+
+## Retention and storage tiers
+
+Every table above lives in the **hot tier** (ClickHouse) while queryable, then moves to the **cold tier** (object storage) once its TTL is reached, per the tiering policy on the [Storage](/administration/storage) page. Postgres holds a separate set of operational tables — user accounts, teams, detection rules, and HITL feedback — which are out of scope for this page; see [Storage](/administration/storage#usage-by-tier) for the full tier breakdown including Postgres.
+
+<Note>
+Table and column names are stable within a major version but are an implementation detail of the current release. If you build tooling on direct SQL access, prefer the [MCP server](/dashboard/mcp-server) tools where possible — they present a stable interface across upgrades even when the underlying schema evolves.
+</Note>

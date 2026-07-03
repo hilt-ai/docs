@@ -1,0 +1,124 @@
+---
+title: "ClickHouse 表"
+sidebarTitle: "ClickHouse 表"
+description: "平台背后 ClickHouse 表的参考地图：每张表存放什么内容、由谁写入、由谁读取，以及默认保留期限。"
+---
+
+Hilt 的[分析数据库](/zh/trust-security/architecture)是运行在你自己云账户内的 ClickHouse。仪表盘的每个页面、[Query](/zh/dashboard/query) 智能助手，以及 [MCP 服务器](/zh/dashboard/mcp-server)，最终都会转化为针对本页所列表的 SQL 查询。本页与另外一份参考文档互补：[数据目录](/zh/on-prem/data-catalog)按*类别*描述数据，不涉及内部表名；本页则为需要直接编写 SQL 的场景——例如分析人员对照原始行验证某个发现项，或拥有 ClickHouse 直连权限的本地部署管理员——列出实际的表名。
+
+<Note>
+如果你更倾向于用自然语言获得同样的结果而非手写 SQL，可以直接在 [Query](/zh/dashboard/query) 页面或通过 [MCP 服务器](/zh/dashboard/mcp-server) 的工具提问；两者最终都会查询本页列出的这些表。
+</Note>
+
+---
+
+## 如何阅读本页
+
+每个表条目包含：
+
+- **写入方** — 向该表插入数据的处理阶段
+- **读取方** — 查询该表的仪表盘页面、智能助手或 API
+- **保留期限** — 默认 TTL；所有默认值均可在[存储](/zh/administration/storage)页面按部署单独配置
+
+表名和列名与你直接连接 ClickHouse 时看到的完全一致，因此当存储页面的按表细分视图或某次原始查询结果中出现一个陌生的名字时，也可以用本页来查找。
+
+---
+
+## 事件遥测
+
+两条原始内核事件流。本页其余所有表都是从这两条流派生出来的。
+
+### `dag_events` — Linux 与云端工作负载
+
+Linux 主机和容器化工作负载的主要事件流：每观测到一次内核事件（`exec`、`fork`、文件操作、网络流）即产生一行。列内容覆盖[事件数据模型](/zh/linux-collector/event-data-model)中描述的各个类别——进程与用户标识符、命令行、文件路径、网络五元组和字节计数、容器/cgroup/Kubernetes 上下文，以及已解析的工作负载与应用标识。
+
+| | |
+| :-- | :-- |
+| **写入方** | 消费流式缓冲区（Kafka / Pub-Sub / Event Hubs）的富化（enrichment）服务 |
+| **读取方** | [调查](/zh/dashboard/investigate)、[数据血缘](/zh/dashboard/data-lineage)、[网络](/zh/dashboard/networks)、[文件](/zh/dashboard/files)、Query 智能助手、MCP 工具（`search_events`、`get_process_events`、`get_network_flows`、`get_file_activity`） |
+| **保留期限** | 365 天 |
+
+### `endpoint_events` — macOS 设备
+
+macOS 原生事件流，每条 Apple Endpoint Security 消息对应一行，每一行都带有代码签名信任信息（`signing_id`、`code_signature`、`team_id`、`cdhash`）和应用归属信息（`application_id`、`application_display_name`、`responsible_pid`、`session_id`）。当前面向 macOS 终端的详细页面参见 [EDR](/zh/dashboard/edr) 和 [macOS 采集器](/zh/macos-collector)。
+
+| | |
+| :-- | :-- |
+| **写入方** | 以 macOS 模式运行、消费 `dag.endpoint.*` 主题的富化服务 |
+| **读取方** | [EDR](/zh/dashboard/edr) 页面的每个标签页、Query 智能助手、MCP 工具 |
+| **保留期限** | 默认 90 天（不少部署会将其提高到 365 天） |
+
+### `dag_edr_events` — macOS EDR 发现项
+
+来自 macOS EDR 转发器的精选安全发现项——每条检测结果（持久化、防篡改、凭据访问、可移动介质、网络外传）对应一行，包含严重性、对应的 MITRE ATT&CK 技术、发起进程，以及 agent 的响应方式（`blocked` / `alerted` / `logged`）。`incident_id` 列会将相关发现项归组为同一条攻击链。
+
+| | |
+| :-- | :-- |
+| **写入方** | macOS EDR 转发器 |
+| **读取方** | [EDR](/zh/dashboard/edr) 的持久化、防篡改、凭据与隐私、数据流动等标签页 |
+| **保留期限** | 90 天 |
+
+---
+
+## 进程与身份
+
+用于重建进程谱系、并将原始内核标识符解析为稳定的工作负载与应用身份的表。
+
+| 表 | 存放内容 | 支撑功能 |
+| :-- | :-- | :-- |
+| `dag_process_tree` | 每观测到一个进程对应一行，并附带已解析的工作负载、应用与作业身份 | [数据血缘](/zh/dashboard/data-lineage)的进程详情、进程谱系可视化 |
+| `dag_fork_edges` | 父 → 子进程的派生边（`fork`），两端均带有进程标识符 | 数据血缘的派生图谱、MCP 的 `get_process_tree` |
+| `dag_workload_inventory` | 已解析工作负载的目录（一组进程所归属的逻辑服务） | 各 Cloud 页面上的工作负载身份徽章 |
+| `dag_application_inventory` | 已解析应用的目录（二进制与解释器身份，独立于具体工作负载） | 调查与文件页面中的应用归属 |
+
+---
+
+## 网络
+
+| 表 | 存放内容 | 支撑功能 |
+| :-- | :-- | :-- |
+| `dag_network_flow_halves` | 已归并的网络流记录——每条流一行，由连接双方内核侧的两个半流拼接而成，并附带字节计数与已解析的应用 | [网络](/zh/dashboard/networks)的时间线、图谱与地图视图 |
+
+macOS 的网络流直接存放在 `endpoint_events` 中（`event_type = 'net_flow'`）——由于 NetFilter 会在捕获时就解析出负责该连接的应用，因此 Endpoint 侧不需要单独的流表。
+
+---
+
+## 检测与异常
+
+评分管道的输出。评分以每主机每 5 分钟一个 epoch 的节奏运行。
+
+| 表 | 存放内容 | 支撑功能 |
+| :-- | :-- | :-- |
+| `dag_anomaly_scores` | 每主机每个 5 分钟 epoch 一行：各检测通道的 z 分数、汇总异常标记，以及评分阶段（`cold_start`、`baseline`、`scoring`） | [异常](/zh/dashboard/anomalies)页面的数据来源、MCP 的 `get_anomaly_scores` |
+| `dag_anomaly_alerts` | 超过告警阈值的那部分 epoch——即发现项队列背后的工作集 | [异常](/zh/dashboard/anomalies)队列、MCP 的 `get_anomaly_alerts` / `investigate_alert` |
+| `dag_alert_narratives` | 每条告警缓存的 AI 生成叙述文本：标题、发生了什么、为何异常，以及聚类标签 | 异常页面的发现项详情面板 |
+| `dag_behavior_clusters` | 相似主机行为的命名聚类，包含规模、持续性与代表性特征 | 发现项上"对该主机而言不典型"的聚类徽章 |
+
+<Note>
+驱动检测的完整特征与评分向量（单个 z 分数、统计基线、GNN 溯源图，以及 TRACE 模型的内部状态）存放在本页未列出的其他 ClickHouse 表中。它们属于检测引擎的实现细节，不供直接查询，出于与检测规则逻辑相同的原因（它们描述了你的安全态势），本页以及[匿名数据导出](/zh/on-prem/data-export-overview)都刻意将其排除在外。
+</Note>
+
+---
+
+## 每小时汇总
+
+预聚合的计数器，用于让[概览](/zh/dashboard/overview)等全舰队仪表盘控件保持快速响应，而无需扫描原始事件。每一行都是某主机某小时的聚合结果——只有计数和字节总和，不含单条事件详情。
+
+| 表 | 聚合内容 |
+| :-- | :-- |
+| `dag_events_hourly` | 按主机、按事件类型、按小时的事件计数与唯一身份计数 |
+| `dag_network_hourly` | 按主机、按小时的网络流与字节计数汇总 |
+| `dag_file_hourly` | 按主机、按小时的文件操作与敏感路径命中汇总 |
+| `dag_host_last_seen` | 每台主机最近一次活动的时间戳——支撑仪表盘各处的"活跃 / 陈旧 / 离线"状态 |
+
+每小时汇总表的保留期限通常长于它们所汇总的原始表（一般为 730 天），因为其体积只是原始表的一小部分。
+
+---
+
+## 保留期限与存储层
+
+上述每张表在可查询期间都位于**热层**（ClickHouse），达到其 TTL 后会根据[存储](/zh/administration/storage)页面上配置的分层策略迁移到**冷层**（对象存储）。PostgreSQL 则存放另一套运维性质的表——用户账户、团队、检测规则、人工反馈——不在本页范围内；完整的分层细分（包括 PostgreSQL）参见[存储](/zh/administration/storage)。
+
+<Note>
+表名和列名在同一大版本内保持稳定，但属于当前版本的实现细节。如果你要基于直连 SQL 构建工具，请优先使用 [MCP 服务器](/zh/dashboard/mcp-server)的工具——即使底层模式发生演进，它们也能在版本升级之间保持稳定的接口。
+</Note>
