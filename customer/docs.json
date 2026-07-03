@@ -130,6 +130,7 @@
                     ]
                   },
                   "administration/storage",
+                  "administration/clickhouse-tables",
                   "administration/audit-log",
                   "dashboard/mcp-server"
                 ]
@@ -281,6 +282,7 @@
                     ]
                   },
                   "zh/administration/storage",
+                  "zh/administration/clickhouse-tables",
                   "zh/administration/audit-log",
                   "zh/dashboard/mcp-server"
                 ]
