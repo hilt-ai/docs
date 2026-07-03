@@ -1,0 +1,30 @@
+---
+title: "Endpoint Security"
+description: "How Hilt extends detection and response to employee Macs with kernel-level visibility and on-device protection."
+---
+
+Hilt extends the same behavioral detection that watches your cloud workloads to the machines your data actually touches: employee Macs. One platform, one dashboard, one investigation surface — from a Linux server in production to the laptop that downloaded the file.
+
+## Kernel-level visibility, built the Apple way
+
+The Hilt macOS collector is a notarized application built on Apple's modern Endpoint Security framework — no kernel extensions, nothing that fights the operating system. It observes process execution, file activity, network flows, persistence changes, and removable-media use as they happen.
+
+What sets macOS telemetry apart is attribution: every event arrives already stamped with the application responsible and its **code-signing identity** — who signed the binary, and whether that signature is trusted. Questions that take forensic reconstruction elsewhere become a single filter: *which unsigned application read the SSH keys? Which app, signed by which vendor, opened that connection?*
+
+{/* TODO: add Endpoint dashboard screenshot */}
+
+## Protection, not just observation
+
+The collector doesn't only watch — it defends. An on-device detection engine evaluates every event in real time and **blocks tampering in-kernel**: attempts to strip Gatekeeper protections, disable security controls, or interfere with the agent itself are denied before they take effect and surfaced as findings. Persistence footholds, credential access, and data-staging patterns are detected and graded by the trustworthiness of the code performing them.
+
+## One story across cloud and endpoint
+
+Endpoint findings land in the same dashboard as your cloud telemetry, with the same investigation tooling: process lineage, an ATT&CK-aligned view of endpoint activity, network egress mapping, and full event history. When data moves from a server to a laptop to a USB drive, you follow it in one place.
+
+## Private by design
+
+Like every Hilt collector, the macOS agent ships metadata, not content — no file contents, no screen capture, no keystrokes. Telemetry streams to the private ingest endpoint inside **your** deployment; nothing is shared with Hilt or any third party.
+
+<Card title="See the platform" icon="arrow-right" href="/how-it-works">
+  How Hilt works from deployment through detection and response.
+</Card>

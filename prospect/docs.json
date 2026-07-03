@@ -30,6 +30,7 @@
         "pages": [
           "introduction",
           "how-it-works",
+          "endpoint-security",
           "why-hilt"
         ]
       }

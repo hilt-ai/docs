@@ -44,6 +44,16 @@
               "detection-ml/training-batch",
               "detection-ml/on-prem-training"
             ]
+          },
+          {
+            "group": "EDR",
+            "pages": [
+              "edr/overview",
+              "edr/agent",
+              "edr/pipeline",
+              "edr/data-model",
+              "edr/local-development"
+            ]
           }
         ]
       }

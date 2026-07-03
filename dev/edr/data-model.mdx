@@ -1,0 +1,35 @@
+---
+title: "EDR Data Model"
+description: "The endpoint_events schema: event classes, the actor block, process identity and its pid-reuse caveat, attrs map, and table layout."
+sidebarTitle: "Data Model"
+---
+
+`endpoint_events` (migration `000051`) is one wide MergeTree table typed by `event_class`/`event_type` — purpose-built for macOS, replacing the earlier Linux-shaped `dag_events_endpoint` clone.
+
+## Shape
+
+| Block | Columns | Notes |
+| --- | --- | --- |
+| Common | `wall_time_ns`, `kernel_ts_ns`, `event_class`, `event_type`, `host_id`, `boot_id`, `device_name`, `host_type` | `event_class`: process, file, network, persistence, device, auth, code, privacy, malware |
+| Actor | `pid`, `ppid`, `tgid`, `uid`, `euid`, `username`, `comm`, `exe_path`, `parent_comm`, `argv` | pid derived from the ES `audit_token` |
+| Code signing | `signing_id`, `team_id`, `cdhash`, `is_platform_binary`, `code_signature` | `code_signature` is the four-tier trust verdict on every row |
+| File / network | `filename`, `dest_path`, `mode`, `flags`, `xattr_name` / `direction`, `protocol`, `src_*`, `dst_*`, `bytes_*`, `bundle_id` | |
+| Extensible | `attrs Map(String, String)` | Long tail per event family; new ES hooks need no migration |
+| Bookkeeping | `ingest_time`, `event_id` (`generateUUIDv4()`), `event_time` (materialized) | `event_id` is row identity only, not process identity |
+
+Layout: `PARTITION BY toYYYYMM(event_time)`, `ORDER BY (host_id, event_class, wall_time_ns)`, TTL 90 days, bloom-filter indexes on `event_type`, `signing_id`, `dst_domain`. The table is high-volume (~800M rows; `file_open` alone is ~94%) — **always window queries on `event_time`** so partitions prune; `endpointWindowSQL` in `dag-backend/endpoint_handlers.go` is the canonical helper (default 1 day, `?days=` up to 90).
+
+## Process identity
+
+There is **no dedicated process key**. A process instance is effectively `(host_id, boot_id, pid)`, and it is pid-reuse-unsafe: macOS audit tokens carry `pidversion` and ES provides `start_time`, but the shipping sensor emits `child_proc_start_time_ns: 0` and neither field made it into the schema. Two processes sharing a recycled pid within one boot are indistinguishable by key alone — split heuristically on `comm`/`exe_path`/`exec` boundaries.
+
+The dashboard sidesteps this by aggregating on `comm` (with helper processes folded to the owning app); pid is used for drill-down display and for cross-references like `attrs['target_pid']` on signal/injection events. If per-instance provenance is ever needed, ship `pidversion` or `proc_start_time_ns` from the sensor — `attrs` would take it without a migration, an actor column is the better long-term home.
+
+## Related tables
+
+| Table | Identity | Purpose |
+| --- | --- | --- |
+| `dag_edr_events` | `incident_id` | Detection findings (severity, status, six-part narrative fields) |
+| `dag_edr_raw` | `incident_id` | ES/NE raw evidence behind the "Show raw evidence" drawer |
+| `dag_edr_agent` | `host_id` (ReplacingMergeTree) | Latest heartbeat: run state, versions, `device_name` |
+| `dag_host_last_seen` | `host_id` (ReplacingMergeTree) | Cross-platform liveness; fed by MVs over both `dag_events` and `endpoint_events` |

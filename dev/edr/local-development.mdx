@@ -1,0 +1,35 @@
+---
+title: "EDR Local Development"
+description: "Working on the EDR stack locally: building the agent, running the pipeline against dev, and verifying end to end."
+sidebarTitle: "Local Development"
+---
+
+## Agent
+
+The agent builds from [macos-edr-agent](https://github.com/hilt-ai/macos-edr-agent) in Xcode. The restricted ES entitlement (`com.apple.developer.endpoint-security.client`) requires the Cybe Corporation provisioning profile; for engine-only work you don't need it — `edr_engine.c` is pure C and unit-tests off-device (`edr_test/`, runs on Linux CI).
+
+- `es_logger.c` is a minimal standalone ES client for poking at raw ES output without the full agent.
+- The forwarder is plain Go: `cd forwarder && go run . --help`.
+- Deploy artifacts (launchd plists, install scripts) live under `deploy/`.
+
+## Pipeline against dev
+
+The dev deployment (ClickHouse `rukmus3eag`, dev VPN required for Postgres auth) already receives real EDR traffic from team Macs, so most backend/frontend work needs no local agent:
+
+1. `dag-backend`: `go run .` — loads `.env`, connects to dev ClickHouse. Without VPN, use `AUTH_STATIC_AUTH=true AUTH_PASS_ADMIN=... AUTH_SESSION_SECRET=...` (and unset `AUTH_DATABASE_URL`) for a static admin login.
+2. `dag-frontend`: `npm run dev` — Vite on `:5173`, proxies `/api` to `:8080`.
+3. Endpoint pages live under **Platform → Endpoint**; the raw table is one query away:
+
+```sql
+SELECT event_time, device_name, event_class, event_type, comm, code_signature
+FROM endpoint_events
+WHERE event_time >= now() - INTERVAL 1 DAY
+ORDER BY event_time DESC LIMIT 100
+```
+
+## Verifying end to end
+
+- **Agent up?** `dag_edr_agent` has the latest heartbeat per host (`es_running`, `ne_running`); the dashboard agent header reads it.
+- **Events flowing?** `endpoint_events` count for your `host_id` over the last hour.
+- **Collectors page liveness** comes from `dag_host_last_seen` (fed by `endpoint_host_last_seen_mv`) — if a host shows stale there but events are flowing, check the MV exists in that environment (migration `000054`).
+- Collector-side rejects are visible in edr-collector logs: missing `X-DAG-Agent-Version`/batch fields, or ed25519 auth failures (`EDR_AUTH=off` disables auth for local testing only).

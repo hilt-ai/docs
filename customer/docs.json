@@ -167,6 +167,7 @@
               "macos-collector/networking-security",
               "macos-collector/event-data-model",
               "macos-collector/event-coverage",
+              "macos-collector/detections",
               "macos-collector/sizing-capacity",
               "macos-collector/data-flow",
               "macos-collector/troubleshooting"
