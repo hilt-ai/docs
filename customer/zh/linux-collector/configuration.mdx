@@ -16,3 +16,4 @@ description: "DMG 采集器的 CLI 标志、环境变量与配置文件键。"
 | n/a | n/a | `cpu_limit` | 无限制 | 在 systemd drop-in 中写入为 `CPUQuota=`。 |
 | n/a | n/a | `ram_limit` | 无限制 | 在 systemd drop-in 中写入为 `MemoryMax=`。 |
 | n/a | n/a | `ringbuf_size` | `1M` | 每 CPU 的 BPF 环形缓冲区大小。在繁忙主机上增大（`8M`、`16M`）。 |
+| n/a | n/a | `tag_refresh_interval_s` | `1800`（30 分钟） | 重新拉取云实例元数据标签的间隔，无需重启代理。设为 `0` 可禁用周期性拉取；执行 `systemctl reload` 始终会立即触发一次刷新。在 Kubernetes 环境下会跳过（改用节点标签）。 |

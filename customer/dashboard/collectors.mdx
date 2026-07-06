@@ -92,7 +92,7 @@ A card summarizing the host's current state:
 - Last seen timestamp
 - **Tags**: key/value metadata from the collector (e.g. `env`, `team`, cloud instance tags), with source and last-updated time when available
 
-Tags come from the collector's cloud metadata or configured tag sources. 
+Tags come from the collector's cloud metadata or configured tag sources. Cloud instance-metadata tags are refreshed automatically (default every 30 minutes) and on `systemctl reload dag-agent` — a restart is not required for tag changes to appear.
 
 ### Uptime timeline
 
