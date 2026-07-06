@@ -16,4 +16,4 @@ The agent accepts configuration via (in order of precedence) CLI flags, environm
 | n/a | n/a | `cpu_limit` | no limit | Written as `CPUQuota=` in the systemd drop-in. |
 | n/a | n/a | `ram_limit` | no limit | Written as `MemoryMax=` in the systemd drop-in. |
 | n/a | n/a | `ringbuf_size` | `1M` | Per-CPU BPF ring buffer size. Increase on busy hosts (`8M`, `16M`). |
-| n/a | n/a | `tag_refresh_interval_s` | `1800` (30 min) | How often to re-poll cloud instance-metadata tags without a restart. `0` disables periodic polling. `systemctl reload` always triggers one immediate refresh regardless. Skipped under Kubernetes (node labels used instead). |
+| n/a | n/a | `tag_refresh_interval_s` | `1800` (30 min) | How often to re-poll cloud instance-metadata tags without a restart. `0` disables periodic polling. `systemctl reload` always triggers one immediate refresh regardless. Works on both EC2 and EKS (requires `instance_metadata_tags` enabled on the instance/launch template). |
