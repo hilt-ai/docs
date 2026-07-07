@@ -1,0 +1,78 @@
+---
+title: "事件"
+sidebarTitle: "事件"
+description: "拉取指定主机和时间窗口内的原始进程、文件和网络活动。"
+---
+
+事件接口返回检测发现背后的原始活动流——Linux 采集器记录的每次进程执行、文件操作和网络流——供你在自己的工具中调查上下文。
+
+<Note>
+此接口提供 Linux 采集器的活动数据。macOS 采集器的遥测数据暂不支持通过 REST API 获取。
+</Note>
+
+---
+
+## 列出事件
+
+```text
+GET /v1/events
+```
+
+| 参数 | 说明 |
+|---|---|
+| `host` | 主机 ID（多台主机用英文逗号分隔） |
+| `since` / `until` | 时间窗口，RFC 3339 格式。默认：最近 24 小时；最大窗口 24 小时 |
+| `type` | `process`、`file` 或 `network` |
+| `limit` | 页大小（默认 50，最大 200） |
+| `cursor` | 上一次响应返回的续页游标 |
+| `order` | `desc`（默认，最新在前）或 `asc` |
+
+仅接受上表列出的参数；未知参数返回 `400`。
+
+```bash
+curl "https://<your-dashboard-host>/v1/events" \
+  -H "Authorization: Bearer $HILT_API_KEY" \
+  -G --data-urlencode "host=web-prod-01" \
+     --data-urlencode "type=network" \
+     --data-urlencode "since=2026-07-07T12:00:00Z" \
+     --data-urlencode "until=2026-07-07T13:00:00Z"
+```
+
+```json
+{
+  "events": [
+    {
+      "event_type": "net_flow",
+      "wall_time_ns": 1783428300123456789,
+      "host_id": "web-prod-01",
+      "pid": 48122,
+      "tgid": 48122,
+      "uid": 1000,
+      "comm": "xfer",
+      "parent_comm": "bash",
+      "dst_addr": "203.0.113.9",
+      "dst_port": 443,
+      "protocol": 6,
+      "bytes_sent": 48211230,
+      "bytes_recv": 3120
+    }
+  ],
+  "next_cursor": "eyJ3IjoxNzUxOD…"
+}
+```
+
+## 事件类别
+
+`type` 过滤器映射到以下底层事件类型（在每个事件的 `event_type` 字段中返回）：
+
+| `type` | 返回的事件类型 |
+|---|---|
+| `process` | `exec` |
+| `file` | `file_open`、`file_unlink`、`file_rename`、`file_chmod`、`xattr_set` |
+| `network` | `net_flow` |
+
+进程事件携带 `comm`、`argv`、`parent_comm` 和身份字段；文件事件另有 `filename`（重命名时还有 `old_name`/`new_name`）；网络事件携带连接五元组和字节计数。
+
+## 窗口与数据量
+
+事件量很大，因此单次请求限制在 24 小时窗口内——更长的范围请逐窗口遍历。不带 `host` 过滤时，每页每台主机最多返回 20 条事件，以免单台繁忙主机淹没整个集群的结果；如需完整提取，请过滤到单台主机。

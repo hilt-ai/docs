@@ -1,0 +1,98 @@
+---
+title: "Webhooks"
+sidebarTitle: "Webhooks"
+description: "在检测发现创建或被审核、以及检测规则触发时，接收带签名的 HTTP POST。"
+---
+
+Webhook 在事件发生时将其推送到你的端点，因此你无需轮询 `GET /v1/findings`。注册一个 URL，选择想要接收的事件类型，并验证每次投递的签名。
+
+---
+
+## 注册 Webhook
+
+Webhook 在仪表盘的**管理 → Webhooks**（需要管理员角色）中管理：
+
+1. 点击**添加 Webhook**，输入你的端点 URL（建议使用 `https://`；本地部署的内网地址也可以）。
+2. 选择要接收的事件类型。
+3. 复制注册后显示的**签名密钥**（`whsec_...`）——与 API 密钥一样，它只显示一次。
+
+同一页面还显示每个 Webhook 的**投递日志**：每条投递一行，包含尝试次数、当前状态（`delivered`、`retrying`、`failed`、`pending`）、最近一次尝试的 HTTP 状态码和错误详情，以及创建/下次重试/完成时间。
+
+## 事件类型
+
+| 事件 | 触发时机 |
+|---|---|
+| `finding.created` | 检测到新的行为异常发现 |
+| `finding.reviewed` | 检测发现被接受或拒绝——无论通过仪表盘还是 API |
+| `detection_rule.matched` | 你的某条自定义检测规则触发 |
+
+检测规则的匹配以 `detection_rule.matched` 投递，而不是 `finding.created`——
+要覆盖 [`GET /v1/findings`](/zh/api/findings) 中出现的全部内容，请同时订阅这两种事件类型。
+
+事件同样受权限范围约束：Webhook 只接收其注册用户可见主机的事件。
+
+## 负载
+
+每次投递是一个 JSON 请求体的 `POST`：
+
+```json
+{
+  "id": "evt_2f6a9c1d4b8e0a37",
+  "type": "finding.created",
+  "created_at": "2026-07-07T14:02:41Z",
+  "data": {
+    "finding_id": "web-prod-01-1000-1783058049000000000",
+    "finding": { "...": "same shape as GET /v1/findings/{id}" }
+  }
+}
+```
+
+- `finding.reviewed` 在 `data` 中另有 `status`（`accepted`/`denied`）、`reviewed_by` 和 `notes`。
+- `detection_rule.matched` 在 `data` 中另有 `rule`（`{id, name, label}`）。
+- `data.finding_id` 始终存在；之后如需完整对象，可配合 [`GET /v1/findings/{id}`](/zh/api/findings#获取单个检测发现) 使用。
+
+## 验证签名
+
+每次投递携带以下请求头：
+
+| 请求头 | 内容 |
+|---|---|
+| `X-Hilt-Event-Id` | 事件 ID（请求体中也有）——用它去重 |
+| `X-Hilt-Event-Type` | 事件类型 |
+| `X-Hilt-Timestamp` | 投递尝试时的 Unix 秒 |
+| `X-Hilt-Signature` | `sha256=` + 对 `"<timestamp>.<body>"` 的十六进制 HMAC-SHA256 |
+
+用你的签名密钥对时间戳、一个字面量 `.` 和**原始请求体**重新计算 HMAC，然后做恒定时间比较：
+
+```python
+import hashlib, hmac
+
+def verify(secret: str, timestamp: str, body: bytes, signature: str) -> bool:
+    expected = "sha256=" + hmac.new(
+        secret.encode(), f"{timestamp}.".encode() + body, hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(signature, expected)
+```
+
+```javascript
+const crypto = require("crypto");
+
+function verify(secret, timestamp, rawBody, signature) {
+  const expected = "sha256=" + crypto
+    .createHmac("sha256", secret)
+    .update(`${timestamp}.`)
+    .update(rawBody)
+    .digest("hex");
+  const a = Buffer.from(signature), b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+```
+
+请拒绝签名不匹配的投递，并考虑拒绝时间戳早于几分钟前的请求以防重放。
+
+## 投递与重试
+
+- 在 15 秒内返回任意 `2xx` 即确认收到投递。重定向不会被跟随，会计为失败。
+- 投递失败后按递增间隔重试——**1 分钟、5 分钟、30 分钟、然后 2 小时**——共 5 次尝试后标记为 `failed`。每条投递的尝试次数和最新结果都记录在投递日志中。
+- 投递语义为至少一次（at-least-once）：极少数情况下可能重复，如果你的处理器不是幂等的，请按 `X-Hilt-Event-Id` 去重。
+- 新注册的 Webhook 从注册时刻开始接收事件——不会重放历史检测发现。

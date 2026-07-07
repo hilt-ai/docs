@@ -1,0 +1,61 @@
+---
+title: "检测规则"
+sidebarTitle: "检测规则"
+description: "列出你的自定义检测规则及每条规则的触发次数。"
+---
+
+返回在[检测规则](/zh/dashboard/detection-rules)页面配置的自定义检测规则，并附带实时触发统计。
+
+---
+
+## 列出检测规则
+
+```text
+GET /v1/detection-rules
+```
+
+```bash
+curl "https://<your-dashboard-host>/v1/detection-rules" \
+  -H "Authorization: Bearer $HILT_API_KEY"
+```
+
+```json
+{
+  "detection_rules": [
+    {
+      "id": 12,
+      "name": "Curl to unknown destination",
+      "description": "Flags curl/wget launched by service accounts",
+      "enabled": true,
+      "severity": "high",
+      "label": "exfil-watch",
+      "expression": {
+        "type": "group",
+        "op": "and",
+        "children": [
+          { "type": "condition", "field": "comm", "op": "eq", "value": "curl" }
+        ]
+      },
+      "all_hosts": true,
+      "host_ids": [],
+      "workload_scopes": [],
+      "cooldown_seconds": 300,
+      "version": 4,
+      "created_by": "admin",
+      "created_at": "2026-06-12T09:30:00Z",
+      "updated_at": "2026-07-01T16:20:00Z",
+      "fires": 42,
+      "last_fired_ns": 1783426000123456789
+    }
+  ],
+  "total": 1
+}
+```
+
+`fires` 和 `last_fired_ns` 统计的是你的密钥权限范围内主机上的匹配次数。规则触发时，匹配还会作为检测发现出现在 [`GET /v1/findings`](/zh/api/findings) 中（带 `source: "detection_rule"`），并触发 `detection_rule.matched` [Webhook 事件](/zh/api/webhooks#事件类型)。
+
+## 权限范围行为
+
+当规则适用于你的密钥可见的主机时才会返回——即全主机规则，或至少限定到一台你权限范围内主机的规则。若规则还覆盖了权限范围之外的其他主机，`host_ids` 和 `workload_scopes` 只列出你有权访问的主机。
+
+规则的创建、编辑和删除请在仪表盘中进行。

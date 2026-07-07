@@ -137,6 +137,18 @@
             ]
           },
           {
+            "tab": "API Reference",
+            "pages": [
+              "api/overview",
+              "api/findings",
+              "api/events",
+              "api/hosts",
+              "api/detection-rules",
+              "api/webhooks",
+              "api/worked-example"
+            ]
+          },
+          {
             "tab": "Linux Collector",
             "pages": [
               "linux-collector/layout",
@@ -286,6 +298,18 @@
                   "zh/dashboard/mcp-server"
                 ]
               }
+            ]
+          },
+          {
+            "tab": "API 参考",
+            "pages": [
+              "zh/api/overview",
+              "zh/api/findings",
+              "zh/api/events",
+              "zh/api/hosts",
+              "zh/api/detection-rules",
+              "zh/api/webhooks",
+              "zh/api/worked-example"
             ]
           },
           {

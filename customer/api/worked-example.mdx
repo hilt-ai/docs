@@ -1,0 +1,105 @@
+---
+title: "Worked Example: Triage from Your Terminal"
+sidebarTitle: "Worked Example"
+description: "Pull today's critical findings, inspect one, and push a review decision back — end to end."
+---
+
+This walkthrough goes from zero to a completed triage loop using only `curl`
+and `jq`. It mirrors what a SIEM or SOAR integration would automate.
+
+## 1. Create a key
+
+In the dashboard: **Settings → API keys → Create API key**, scope
+**Read & write** (we'll push a review decision in step 4). Export it:
+
+```bash
+export HILT="https://<your-dashboard-host>"
+export HILT_API_KEY="hilt_live_a1b2c3d4e5f6..."
+```
+
+## 2. Pull today's critical findings
+
+```bash
+curl "$HILT/v1/findings" \
+  -H "Authorization: Bearer $HILT_API_KEY" \
+  -G --data-urlencode "severity=critical" \
+     --data-urlencode "since=$(date -u +%Y-%m-%dT00:00:00Z)" \
+  | jq -r '.findings[] | [.id, .classification.severity, .narrative.summary] | @tsv'
+```
+
+```text
+web-prod-01-1000-1783058049000000000  critical  Unusual process activity followed by outbound transfer…
+```
+
+To page through large result sets, repeat with
+`--data-urlencode "cursor=$NEXT"` while `.next_cursor` is non-null.
+
+## 3. Inspect the interesting one
+
+```bash
+FINDING="web-prod-01-1000-1783058049000000000"
+
+curl "$HILT/v1/findings/$FINDING" \
+  -H "Authorization: Bearer $HILT_API_KEY" \
+  | jq '{headline: .fusion_narrative.headline,
+         what: .fusion_narrative.what_happened,
+         evidence: .evidence}'
+```
+
+Want the raw activity around it? The finding's ID embeds its host and
+nanosecond timestamp — pull the surrounding network events:
+
+```bash
+curl "$HILT/v1/events" \
+  -H "Authorization: Bearer $HILT_API_KEY" \
+  -G --data-urlencode "host=web-prod-01" \
+     --data-urlencode "type=network" \
+     --data-urlencode "since=2026-07-03T05:50:00Z" \
+     --data-urlencode "until=2026-07-03T06:10:00Z" \
+  | jq '.events[] | {comm, dst_addr, dst_port, bytes_sent}'
+```
+
+## 4. Push the decision back
+
+```bash
+curl -X POST "$HILT/v1/findings/$FINDING/review" \
+  -H "Authorization: Bearer $HILT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "accepted", "notes": "Confirmed. Host isolated, ticket SEC-142."}'
+```
+
+The finding now shows **accepted** in the dashboard with your key owner's username as
+the reviewer, and any webhook subscribed to `finding.reviewed` receives the
+decision within seconds.
+
+## 5. Close the loop with webhooks
+
+Instead of polling step 2 on a schedule, register a webhook
+(**Admin → Webhooks**) for `finding.created` and let Hilt call you. A
+minimal receiver:
+
+```python
+from flask import Flask, request, abort
+import hashlib, hmac, os
+
+app = Flask(__name__)
+SECRET = os.environ["HILT_WEBHOOK_SECRET"]  # whsec_... from registration
+
+@app.post("/hilt-webhook")
+def hook():
+    ts = request.headers["X-Hilt-Timestamp"]
+    sig = request.headers["X-Hilt-Signature"]
+    expected = "sha256=" + hmac.new(
+        SECRET.encode(), f"{ts}.".encode() + request.get_data(), hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        abort(401)
+    event = request.get_json()
+    if event["type"] == "finding.created":
+        print("new finding:", event["data"]["finding_id"])
+    return "", 200
+```
+
+From here, the pieces compose: enrich new findings with
+[`/v1/events`](/api/events) context, auto-file tickets, and push analyst
+verdicts back with the [review endpoint](/api/findings#review-a-finding).

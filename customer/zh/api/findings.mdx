@@ -1,0 +1,110 @@
+---
+title: "检测发现"
+sidebarTitle: "检测发现"
+description: "通过 REST API 列出、查看和审核（接受或拒绝）检测发现。"
+---
+
+**检测发现（finding）**是一次被检测到的异常或检测规则匹配——与仪表盘异常页面显示的对象相同，包含叙述、证据、严重程度和审核状态。
+
+检测发现 ID 的格式为 `{host_id}-{uid}-{timestamp_ns}`，且保持稳定——同一检测发现在列表、详情查询、审核和 Webhook 负载中的 ID 始终一致。
+
+---
+
+## 列出检测发现
+
+```text
+GET /v1/findings
+```
+
+| 参数 | 说明 |
+|---|---|
+| `host` | 仅返回该主机 ID 的检测发现 |
+| `since` / `until` | 时间窗口，RFC 3339 格式。默认：最近 24 小时 |
+| `severity` | `critical`、`high`、`medium` 或 `low` |
+| `status` | `new`、`accepted` 或 `denied` |
+| `limit` | 页大小（默认 50，最大 200） |
+| `cursor` | 上一次响应返回的续页游标 |
+
+```bash
+curl "https://<your-dashboard-host>/v1/findings" \
+  -H "Authorization: Bearer $HILT_API_KEY" \
+  -G --data-urlencode "severity=critical" \
+     --data-urlencode "since=2026-07-03T00:00:00Z"
+```
+
+```json
+{
+  "findings": [
+    {
+      "id": "web-prod-01-1000-1783058049000000000",
+      "time": 1783058049000000000,
+      "entity": { "host_id": "web-prod-01", "uid": 1000, "owner": "deploy" },
+      "classification": {
+        "group": "TRACE",
+        "finding_type": "anomaly",
+        "severity": "critical",
+        "confidence": "high",
+        "urgency": "high"
+      },
+      "narrative": {
+        "summary": "Unusual process activity followed by outbound transfer…",
+        "reason_chips": ["novel binary", "new destination"]
+      },
+      "evidence": {
+        "binaries": ["/tmp/xfer"],
+        "dest_ips": ["203.0.113.9"],
+        "bytes_sent": 48211230
+      },
+      "workflow": { "status": "new" },
+      "fusion_narrative": {
+        "headline": "Data staged and exfiltrated from web-prod-01",
+        "what_happened": "…",
+        "why_its_unusual": "…"
+      }
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+每个时间窗口内每台主机最多返回 200 条检测发现（与仪表盘视图一致）。检测规则产生的发现会出现在同一列表中，带有 `"source": "detection_rule"` 以及 `rule_id`、`rule_name` 和 `matched_conditions` 字段。
+
+## 获取单个检测发现
+
+```text
+GET /v1/findings/{id}
+```
+
+返回上文所示的完整检测发现对象。未知 ID（包括超出密钥权限范围的主机的 ID）返回 `404`。
+
+```bash
+curl "https://<your-dashboard-host>/v1/findings/web-prod-01-1000-1783058049000000000" \
+  -H "Authorization: Bearer $HILT_API_KEY"
+```
+
+## 审核检测发现
+
+```text
+POST /v1/findings/{id}/review
+```
+
+从你自己的工具将检测发现标记为**已接受**（真实问题）或**已拒绝**（误报），效果与仪表盘的审核按钮完全相同。需要**读写**密钥——只读密钥会收到 `403`。
+
+```bash
+curl -X POST \
+  "https://<your-dashboard-host>/v1/findings/web-prod-01-1000-1783058049000000000/review" \
+  -H "Authorization: Bearer $HILT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "accepted", "notes": "Confirmed exfil attempt, ticket SEC-142"}'
+```
+
+```json
+{
+  "id": "web-prod-01-1000-1783058049000000000",
+  "status": "accepted",
+  "reviewed_by": "svc-soar",
+  "reviewed_at": "2026-07-07T14:03:22Z"
+}
+```
+
+审核决定会立即反映在仪表盘和后续的 `GET /v1/findings?status=...` 过滤中，并触发 `finding.reviewed` [Webhook 事件](/zh/api/webhooks#事件类型)。审核还会进入检测模型的反馈循环，提升未来的准确率。

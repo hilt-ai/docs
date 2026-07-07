@@ -1,0 +1,123 @@
+---
+title: "Findings"
+sidebarTitle: "Findings"
+description: "List, inspect, and review (accept or deny) findings via the REST API."
+---
+
+A **finding** is one detected anomaly or detection-rule match — the same
+object the dashboard's Anomalies page shows, including its narrative,
+evidence, severity, and review status.
+
+Finding IDs have the form `{host_id}-{uid}-{timestamp_ns}` and are stable —
+the same finding always has the same ID in lists, detail lookups, reviews,
+and webhook payloads.
+
+---
+
+## List findings
+
+```text
+GET /v1/findings
+```
+
+| Parameter | Description |
+|---|---|
+| `host` | Only findings for this host ID |
+| `since` / `until` | Time window, RFC 3339. Default: the last 24 hours |
+| `severity` | `critical`, `high`, `medium`, or `low` |
+| `status` | `new`, `accepted`, or `denied` |
+| `limit` | Page size (default 50, max 200) |
+| `cursor` | Continuation cursor from a previous response |
+
+```bash
+curl "https://<your-dashboard-host>/v1/findings" \
+  -H "Authorization: Bearer $HILT_API_KEY" \
+  -G --data-urlencode "severity=critical" \
+     --data-urlencode "since=2026-07-03T00:00:00Z"
+```
+
+```json
+{
+  "findings": [
+    {
+      "id": "web-prod-01-1000-1783058049000000000",
+      "time": 1783058049000000000,
+      "entity": { "host_id": "web-prod-01", "uid": 1000, "owner": "deploy" },
+      "classification": {
+        "group": "TRACE",
+        "finding_type": "anomaly",
+        "severity": "critical",
+        "confidence": "high",
+        "urgency": "high"
+      },
+      "narrative": {
+        "summary": "Unusual process activity followed by outbound transfer…",
+        "reason_chips": ["novel binary", "new destination"]
+      },
+      "evidence": {
+        "binaries": ["/tmp/xfer"],
+        "dest_ips": ["203.0.113.9"],
+        "bytes_sent": 48211230
+      },
+      "workflow": { "status": "new" },
+      "fusion_narrative": {
+        "headline": "Data staged and exfiltrated from web-prod-01",
+        "what_happened": "…",
+        "why_its_unusual": "…"
+      }
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+Responses include up to 200 findings per host per time window (matching the
+dashboard's view). Detection-rule findings appear in the same list with
+`"source": "detection_rule"` plus `rule_id`, `rule_name`, and
+`matched_conditions` fields.
+
+## Get one finding
+
+```text
+GET /v1/findings/{id}
+```
+
+Returns the full finding object shown above. Unknown IDs — including IDs for
+hosts outside your key's scope — return `404`.
+
+```bash
+curl "https://<your-dashboard-host>/v1/findings/web-prod-01-1000-1783058049000000000" \
+  -H "Authorization: Bearer $HILT_API_KEY"
+```
+
+## Review a finding
+
+```text
+POST /v1/findings/{id}/review
+```
+
+Marks a finding **accepted** (a real issue) or **denied** (a false positive)
+from your own tooling, exactly like the dashboard's review buttons. Requires
+a **read & write** key — read-only keys receive `403`.
+
+```bash
+curl -X POST \
+  "https://<your-dashboard-host>/v1/findings/web-prod-01-1000-1783058049000000000/review" \
+  -H "Authorization: Bearer $HILT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "accepted", "notes": "Confirmed exfil attempt, ticket SEC-142"}'
+```
+
+```json
+{
+  "id": "web-prod-01-1000-1783058049000000000",
+  "status": "accepted",
+  "reviewed_by": "svc-soar",
+  "reviewed_at": "2026-07-07T14:03:22Z"
+}
+```
+
+The decision is immediately reflected in the dashboard, in subsequent
+`GET /v1/findings?status=...` filters, and fires the `finding.reviewed`
+[webhook event](/api/webhooks#event-types). Reviews also feed the detection
+model's feedback loop, improving future accuracy.

@@ -1,0 +1,54 @@
+---
+title: "主机"
+sidebarTitle: "主机"
+description: "列出受监控的主机及其实时状态。"
+---
+
+返回你的密钥可见的所有主机——包括 Linux 和 macOS 采集器——及其当前存活状态。
+
+---
+
+## 列出主机
+
+```text
+GET /v1/hosts
+```
+
+| 参数 | 说明 |
+|---|---|
+| `status` | `alive`、`stale` 或 `dead` |
+| `host_type` | 按主机类型过滤（例如 `production`、`staging`） |
+
+```bash
+curl "https://<your-dashboard-host>/v1/hosts" \
+  -H "Authorization: Bearer $HILT_API_KEY" \
+  -G --data-urlencode "status=dead"
+```
+
+```json
+{
+  "hosts": [
+    {
+      "host_id": "web-prod-01",
+      "node": "web-prod-01.internal",
+      "host_type": "production",
+      "status": "dead",
+      "last_seen": 1783341900123456789,
+      "age_sec": 86400
+    }
+  ],
+  "total": 1
+}
+```
+
+## 状态语义
+
+状态反映主机采集器最近一次上报的时间，与仪表盘使用相同的阈值：
+
+| 状态 | 含义 |
+|---|---|
+| `alive` | 最近 60 秒内有上报 |
+| `stale` | 最近一次上报在 1 到 5 分钟之前 |
+| `dead` | 超过 5 分钟没有上报 |
+
+`last_seen` 为 Unix 纳秒；`age_sec` 是请求时已经过的秒数（由服务端计算，与 `status` 保持一致）。
