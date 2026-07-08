@@ -4,13 +4,10 @@ sidebarTitle: "Events"
 description: "Pull raw process, file, and network activity for a host and time window."
 ---
 
-The events endpoint returns the raw activity stream behind a finding — every
-process execution, file operation, and network flow the Linux Collector
-recorded — so you can investigate surrounding context in your own tooling.
+The events endpoint returns the raw activity stream behind a finding — every process execution, file operation, and network flow the Linux Collector recorded — so you can investigate surrounding context in your own tooling.
 
 <Note>
-This endpoint serves Linux Collector activity. macOS Collector telemetry is
-not yet available through the REST API.
+This endpoint serves Linux Collector activity. macOS Collector telemetry is not yet available through the REST API.
 </Note>
 
 ---
@@ -66,8 +63,7 @@ curl "https://<your-dashboard-host>/v1/events" \
 
 ## Event categories
 
-The `type` filter maps to these underlying event types (returned in each
-event's `event_type` field):
+The `type` filter maps to these underlying event types (returned in each event's `event_type` field):
 
 | `type` | Event types returned |
 |---|---|
@@ -75,13 +71,8 @@ event's `event_type` field):
 | `file` | `file_open`, `file_unlink`, `file_rename`, `file_chmod`, `xattr_set` |
 | `network` | `net_flow` |
 
-Process events carry `comm`, `argv`, `parent_comm`, and identity fields; file
-events add `filename` (and `old_name`/`new_name` for renames); network events
-carry the connection 5-tuple and byte counters.
+Process events carry `comm`, `argv`, `parent_comm`, and identity fields; file events add `filename` (and `old_name`/`new_name` for renames); network events carry the connection 5-tuple and byte counters.
 
 ## Windows and volume
 
-Event volume is high, so requests are bounded to a 24-hour window — walk
-longer ranges window by window. Without a `host` filter, results are capped
-at 20 events per host per page so a single busy host can't drown out the
-fleet; filter to one host for exhaustive extraction.
+Event volume is high, so requests are bounded to a 24-hour window — walk longer ranges window by window. Without a `host` filter, results are capped at 20 events per host per page so a single busy host can't drown out the fleet; filter to one host for exhaustive extraction.

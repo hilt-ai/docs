@@ -4,13 +4,9 @@ sidebarTitle: "Findings"
 description: "List, inspect, and review (accept or deny) findings via the REST API."
 ---
 
-A **finding** is one detected anomaly or detection-rule match — the same
-object the dashboard's Anomalies page shows, including its narrative,
-evidence, severity, and review status.
+A **finding** is one detected anomaly or detection-rule match — the same object the dashboard's Anomalies page shows, including its narrative, evidence, severity, and review status.
 
-Finding IDs have the form `{host_id}-{uid}-{timestamp_ns}` and are stable —
-the same finding always has the same ID in lists, detail lookups, reviews,
-and webhook payloads.
+Finding IDs have the form `{host_id}-{uid}-{timestamp_ns}` and are stable — the same finding always has the same ID in lists, detail lookups, reviews, and webhook payloads.
 
 ---
 
@@ -71,10 +67,7 @@ curl "https://<your-dashboard-host>/v1/findings" \
 }
 ```
 
-Responses include up to 200 findings per host per time window (matching the
-dashboard's view). Detection-rule findings appear in the same list with
-`"source": "detection_rule"` plus `rule_id`, `rule_name`, and
-`matched_conditions` fields.
+Responses include up to 200 findings per host per time window (matching the dashboard's view). Detection-rule findings appear in the same list with `"source": "detection_rule"` plus `rule_id`, `rule_name`, and `matched_conditions` fields.
 
 ## Get one finding
 
@@ -82,8 +75,7 @@ dashboard's view). Detection-rule findings appear in the same list with
 GET /v1/findings/{id}
 ```
 
-Returns the full finding object shown above. Unknown IDs — including IDs for
-hosts outside your key's scope — return `404`.
+Returns the full finding object shown above. Unknown IDs — including IDs for hosts outside your key's scope — return `404`.
 
 ```bash
 curl "https://<your-dashboard-host>/v1/findings/web-prod-01-1000-1783058049000000000" \
@@ -96,9 +88,7 @@ curl "https://<your-dashboard-host>/v1/findings/web-prod-01-1000-178305804900000
 POST /v1/findings/{id}/review
 ```
 
-Marks a finding **accepted** (a real issue) or **denied** (a false positive)
-from your own tooling, exactly like the dashboard's review buttons. Requires
-a **read & write** key — read-only keys receive `403`.
+Marks a finding **accepted** (a real issue) or **denied** (a false positive) from your own tooling, exactly like the dashboard's review buttons. Requires a **read & write** key — read-only keys receive `403`.
 
 ```bash
 curl -X POST \
@@ -117,7 +107,4 @@ curl -X POST \
 }
 ```
 
-The decision is immediately reflected in the dashboard, in subsequent
-`GET /v1/findings?status=...` filters, and fires the `finding.reviewed`
-[webhook event](/api/webhooks#event-types). Reviews also feed the detection
-model's feedback loop, improving future accuracy.
+The decision is immediately reflected in the dashboard, in subsequent `GET /v1/findings?status=...` filters, and fires the `finding.reviewed` [webhook event](/api/webhooks#event-types). Reviews also feed the detection model's feedback loop, improving future accuracy.

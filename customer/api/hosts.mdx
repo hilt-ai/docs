@@ -4,8 +4,7 @@ sidebarTitle: "Hosts"
 description: "List monitored hosts and their live status."
 ---
 
-Returns every host your key can see — Linux and macOS Collectors alike — with
-its current liveness status.
+Returns every host your key can see — Linux and macOS Collectors alike — with its current liveness status.
 
 ---
 
@@ -44,8 +43,7 @@ curl "https://<your-dashboard-host>/v1/hosts" \
 
 ## Status semantics
 
-Status reflects how recently the host's collector reported, using the same
-thresholds as the dashboard:
+Status reflects how recently the host's collector reported, using the same thresholds as the dashboard:
 
 | Status | Meaning |
 |---|---|
@@ -53,5 +51,4 @@ thresholds as the dashboard:
 | `stale` | Last report between 1 and 5 minutes ago |
 | `dead` | No report for more than 5 minutes |
 
-`last_seen` is Unix nanoseconds; `age_sec` is the seconds elapsed at the time
-of the request (computed on the server, so it's consistent with `status`).
+`last_seen` is Unix nanoseconds; `age_sec` is the seconds elapsed at the time of the request (computed on the server, so it's consistent with `status`).

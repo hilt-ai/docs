@@ -31,7 +31,8 @@
           "introduction",
           "how-it-works",
           "endpoint-security",
-          "why-hilt"
+          "why-hilt",
+          "integrations"
         ]
       }
     ]

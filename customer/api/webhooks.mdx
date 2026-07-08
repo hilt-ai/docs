@@ -4,27 +4,19 @@ sidebarTitle: "Webhooks"
 description: "Receive signed HTTP POSTs when findings are created or reviewed and when detection rules fire."
 ---
 
-Webhooks push events to your endpoint as they happen, so you don't have to
-poll `GET /v1/findings`. Register a URL, pick the event types you want, and
-verify each delivery's signature.
+Webhooks push events to your endpoint as they happen, so you don't have to poll `GET /v1/findings`. Register a URL, pick the event types you want, and verify each delivery's signature.
 
 ---
 
 ## Registering a webhook
 
-Webhooks are managed in the dashboard under **Admin → Webhooks** (admin
-role required):
+Webhooks are managed in the dashboard under **Admin → Webhooks** (admin role required):
 
-1. Click **Add webhook** and enter your endpoint URL (`https://` recommended;
-   internal addresses are fine for on-prem receivers).
+1. Click **Add webhook** and enter your endpoint URL (`https://` recommended; internal addresses are fine for on-prem receivers).
 2. Choose the event types to receive.
-3. Copy the **signing secret** (`whsec_...`) shown after registration — like
-   API keys, it is displayed exactly once.
+3. Copy the **signing secret** (`whsec_...`) shown after registration — like API keys, it is displayed exactly once.
 
-The same page shows each webhook's **delivery log**: one row per delivery
-with its attempt count, current status (`delivered`, `retrying`, `failed`,
-`pending`), the most recent attempt's HTTP status code and error detail, and
-its created / next-retry / completed timestamps.
+The same page shows each webhook's **delivery log**: one row per delivery with its attempt count, current status (`delivered`, `retrying`, `failed`, `pending`), the most recent attempt's HTTP status code and error detail, and its created / next-retry / completed timestamps.
 
 ## Event types
 
@@ -34,12 +26,9 @@ its created / next-retry / completed timestamps.
 | `finding.reviewed` | A finding is accepted or denied — via the dashboard or the API |
 | `detection_rule.matched` | One of your custom detection rules fires |
 
-Detection-rule matches are delivered as `detection_rule.matched`, not
-`finding.created` — subscribe to both event types to cover everything that
-appears in [`GET /v1/findings`](/api/findings).
+Detection-rule matches are delivered as `detection_rule.matched`, not `finding.created` — subscribe to both event types to cover everything that appears in [`GET /v1/findings`](/api/findings).
 
-Events are scoped like everything else: a webhook only receives events for
-hosts its registering user can see.
+Events are scoped like everything else: a webhook only receives events for hosts its registering user can see.
 
 ## Payload
 
@@ -57,12 +46,9 @@ Every delivery is a `POST` with a JSON body:
 }
 ```
 
-- `finding.reviewed` adds `status` (`accepted`/`denied`), `reviewed_by`, and
-  `notes` to `data`.
+- `finding.reviewed` adds `status` (`accepted`/`denied`), `reviewed_by`, and `notes` to `data`.
 - `detection_rule.matched` adds `rule` (`{id, name, label}`) to `data`.
-- `data.finding_id` is always present; use it with
-  [`GET /v1/findings/{id}`](/api/findings#get-one-finding) if you need the
-  full object later.
+- `data.finding_id` is always present; use it with [`GET /v1/findings/{id}`](/api/findings#get-one-finding) if you need the full object later.
 
 ## Verifying signatures
 
@@ -75,8 +61,7 @@ Each delivery carries these headers:
 | `X-Hilt-Timestamp` | Unix seconds when the delivery was attempted |
 | `X-Hilt-Signature` | `sha256=` + hex HMAC-SHA256 over `"<timestamp>.<body>"` |
 
-Recompute the HMAC with your signing secret over the timestamp, a literal
-`.`, and the **raw request body**, then compare in constant time:
+Recompute the HMAC with your signing secret over the timestamp, a literal `.`, and the **raw request body**, then compare in constant time:
 
 ```python
 import hashlib, hmac
@@ -102,18 +87,11 @@ function verify(secret, timestamp, rawBody, signature) {
 }
 ```
 
-Reject deliveries whose signature doesn't match, and consider rejecting
-timestamps older than a few minutes to guard against replays.
+Reject deliveries whose signature doesn't match, and consider rejecting timestamps older than a few minutes to guard against replays.
 
 ## Delivery and retries
 
-- Respond with any `2xx` within 15 seconds to acknowledge a delivery.
-  Redirects are not followed and count as failures.
-- On failure, delivery retries with increasing delays — **1 minute,
-  5 minutes, 30 minutes, then 2 hours** — and is marked `failed` after
-  5 total attempts. Each delivery's attempt count and latest outcome are
-  recorded in the delivery log.
-- Delivery is at-least-once: rare duplicates are possible, so dedup on
-  `X-Hilt-Event-Id` if your handler isn't idempotent.
-- A newly registered webhook receives events from that moment on — the
-  existing backlog of historical findings is not replayed.
+- Respond with any `2xx` within 15 seconds to acknowledge a delivery. Redirects are not followed and count as failures.
+- On failure, delivery retries with increasing delays — **1 minute, 5 minutes, 30 minutes, then 2 hours** — and is marked `failed` after 5 total attempts. Each delivery's attempt count and latest outcome are recorded in the delivery log.
+- Delivery is at-least-once: rare duplicates are possible, so dedup on `X-Hilt-Event-Id` if your handler isn't idempotent.
+- A newly registered webhook receives events from that moment on — the existing backlog of historical findings is not replayed.

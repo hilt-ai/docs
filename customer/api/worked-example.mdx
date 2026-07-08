@@ -4,13 +4,11 @@ sidebarTitle: "Worked Example"
 description: "Pull today's critical findings, inspect one, and push a review decision back — end to end."
 ---
 
-This walkthrough goes from zero to a completed triage loop using only `curl`
-and `jq`. It mirrors what a SIEM or SOAR integration would automate.
+This walkthrough goes from zero to a completed triage loop using only `curl` and `jq`. It mirrors what a SIEM or SOAR integration would automate.
 
 ## 1. Create a key
 
-In the dashboard: **Settings → API keys → Create API key**, scope
-**Read & write** (we'll push a review decision in step 4). Export it:
+In the dashboard: **Settings → API keys → Create API key**, scope **Read & write** (we'll push a review decision in step 4). Export it:
 
 ```bash
 export HILT="https://<your-dashboard-host>"
@@ -31,8 +29,7 @@ curl "$HILT/v1/findings" \
 web-prod-01-1000-1783058049000000000  critical  Unusual process activity followed by outbound transfer…
 ```
 
-To page through large result sets, repeat with
-`--data-urlencode "cursor=$NEXT"` while `.next_cursor` is non-null.
+To page through large result sets, repeat with `--data-urlencode "cursor=$NEXT"` while `.next_cursor` is non-null.
 
 ## 3. Inspect the interesting one
 
@@ -46,8 +43,7 @@ curl "$HILT/v1/findings/$FINDING" \
          evidence: .evidence}'
 ```
 
-Want the raw activity around it? The finding's ID embeds its host and
-nanosecond timestamp — pull the surrounding network events:
+Want the raw activity around it? The finding's ID embeds its host and nanosecond timestamp — pull the surrounding network events:
 
 ```bash
 curl "$HILT/v1/events" \
@@ -68,15 +64,11 @@ curl -X POST "$HILT/v1/findings/$FINDING/review" \
   -d '{"status": "accepted", "notes": "Confirmed. Host isolated, ticket SEC-142."}'
 ```
 
-The finding now shows **accepted** in the dashboard with your key owner's username as
-the reviewer, and any webhook subscribed to `finding.reviewed` receives the
-decision within seconds.
+The finding now shows **accepted** in the dashboard with your key owner's username as the reviewer, and any webhook subscribed to `finding.reviewed` receives the decision within seconds.
 
 ## 5. Close the loop with webhooks
 
-Instead of polling step 2 on a schedule, register a webhook
-(**Admin → Webhooks**) for `finding.created` and let Hilt call you. A
-minimal receiver:
+Instead of polling step 2 on a schedule, register a webhook (**Admin → Webhooks**) for `finding.created` and let Hilt call you. A minimal receiver:
 
 ```python
 from flask import Flask, request, abort
@@ -100,6 +92,4 @@ def hook():
     return "", 200
 ```
 
-From here, the pieces compose: enrich new findings with
-[`/v1/events`](/api/events) context, auto-file tickets, and push analyst
-verdicts back with the [review endpoint](/api/findings#review-a-finding).
+From here, the pieces compose: enrich new findings with [`/v1/events`](/api/events) context, auto-file tickets, and push analyst verdicts back with the [review endpoint](/api/findings#review-a-finding).

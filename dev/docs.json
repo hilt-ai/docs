@@ -30,6 +30,7 @@
         "pages": [
           "getting-started",
           "architecture",
+          "rest-api",
           "dev-environment",
           {
             "group": "Detection ML",

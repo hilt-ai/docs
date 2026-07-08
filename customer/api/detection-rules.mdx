@@ -4,9 +4,7 @@ sidebarTitle: "Detection Rules"
 description: "List your custom detection rules and how often each has fired."
 ---
 
-Returns the custom detection rules configured on the
-[Detection Rules](/dashboard/detection-rules) page, each with live fire
-statistics.
+Returns the custom detection rules configured on the [Detection Rules](/dashboard/detection-rules) page, each with live fire statistics.
 
 ---
 
@@ -54,16 +52,10 @@ curl "https://<your-dashboard-host>/v1/detection-rules" \
 }
 ```
 
-`fires` and `last_fired_ns` count matches on hosts within your key's scope.
-When a rule fires, the match also appears as a finding in
-[`GET /v1/findings`](/api/findings) (with `source: "detection_rule"`) and
-triggers the `detection_rule.matched` [webhook event](/api/webhooks).
+`fires` and `last_fired_ns` count matches on hosts within your key's scope. When a rule fires, the match also appears as a finding in [`GET /v1/findings`](/api/findings) (with `source: "detection_rule"`) and triggers the `detection_rule.matched` [webhook event](/api/webhooks).
 
 ## Scope behavior
 
-Rules are returned when they apply to hosts your key can see — either
-all-hosts rules or rules scoped to at least one host in your scope. For rules
-that span additional hosts outside your scope, `host_ids` and
-`workload_scopes` list only the hosts you have access to.
+Rules are returned when they apply to hosts your key can see — either all-hosts rules or rules scoped to at least one host in your scope. For rules that span additional hosts outside your scope, `host_ids` and `workload_scopes` list only the hosts you have access to.
 
 Rule management (create, edit, delete) is available in the dashboard.
