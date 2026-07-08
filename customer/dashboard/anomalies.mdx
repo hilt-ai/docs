@@ -23,9 +23,8 @@ Filtering is structured through the **Filters** popover:
 | Section | Options |
 | --- | --- |
 | **Type** | All · Activity spike · Network · Sensitive file · Lateral movement · Detection rule |
-| **Severity** | All · Critical · High · Medium · Low |
 | **Source** | All · Detection rules · ML anomalies |
-| **Sort by** | Time · Severity · Confidence · Urgency |
+| **Sort by** | Risk (default) · Time · Confidence · Urgency |
 | **Visibility** | A **Suppressed** toggle to reveal findings hidden by prior feedback |
 
 Active filters appear as removable chips beneath the header. When you arrive scoped to a detection rule, a **Rule:** {name} chip shows the active scope.
@@ -44,61 +43,72 @@ The queue is split into three tabs by review state:
 
 ### Finding cards
 
-Each finding is a card showing:
+Each row shows a **criticality dot**, the finding's headline, host, and how long ago it fired:
 
-- **Headline**: the finding's narrative headline (or its behavior label).
+- **Criticality dot**: filled red (critical), filled amber (elevated), or a hollow outline (routine). The underlying statistical score is never shown, only this three-tier read.
 - **Relative time** and short **hostname**.
-- **Type**: e.g. _Type: Activity spike_ (when classified).
-- **Verdict**: an **Accepted** or **Denied** badge once reviewed.
-- A one-line **summary** of what happened, with inline event chips.
-- A **cluster** badge when the behavior is atypical for the host.
-- **User / Reviewer** and **Confidence** (High / Medium / Low).
-- A **Host quarantined · View** link when the host has been isolated.
+- **TTD** (Time to Detect), when available, for example "TTD ~5m".
+- A one-line **summary** with the flagged actor emphasized inline.
 
-The selected card is highlighted with a green accent. A **severity badge** (Critical, High, Medium, Low) is shown on each card. When available, **Time to Detect (TTD)** is also displayed (e.g. "detected ~30s after it began").
+The selected card is highlighted with a green accent.
+
+### Similar findings (clusters)
+
+When a finding is one of several with the same underlying pattern, the row shows **"N similar"** (plus a host count, for example "4 similar · 3 hosts"). Clicking it expands the cluster. Each member gets its own row with its own title and own criticality dot. Members are related, not identical, so they are never merged under one heading. The representative row's dot always shows the worst tier present in the cluster.
 
 ---
 
 ## Finding detail
 
-Selecting a finding opens its report in the right panel. (If nothing is selected, the panel prompts you to _"Select a finding from the queue to view details."_) The report has two parts.
+Selecting a finding opens the investigation surface: a chaptered story panel on the left, a provenance graph in the center, and an Inspector panel on the right.
 
-### Narrative
+### Header
 
-The top band explains the finding:
+- **Title**, **host** (hover for the full name), and **flagged** time.
+- **TTD**, when available.
+- No confidence score is shown here. See Criticality dot, above.
 
-- **Headline**, with the **host** and finding **time**.
-- A **type** badge and a **confidence** badge (hover for "Model Confidence").
-- A **Quarantined** link when applicable.
-- The narrative itself — _what happened_ and _why it's unusual_ — plus context chips.
-- **Identity** badges for the job, application, or workload involved.
-- A **Time to detection** line, when available, showing how quickly Hilt caught the finding, for example _"Detected ~5 min after the first sign of unusual activity."_
+### Reviewing a finding
 
-The "first sign of unusual activity" is the earliest point the model saw the host's behavior start to drift from normal, and the time is how long from there until Hilt raised the finding. Detection is measured in five-minute windows, so the figure is approximate (shown with a ~).
+- **Accept**: confirm it as a real anomaly.
+- **Deny**: mark it as benign or a false positive.
+- **Suppress**: deny it and auto-suppress future findings matching the same pattern, fleet-wide.
 
-Two context banners may appear: a **workload phase change** note (explaining that volume-only signals were de-emphasized), and a **feedback-suppression** note when the pattern matches a prior finding a reviewer denied, including the pattern similarity (an exact match or a percentage).
-
-### Reviewing a finding (Confirm / Dismiss)
-
-In the narrative band you act on the finding:
-
-- **Confirm**: mark it as a real anomaly (moves it to **Accepted**).
-- **Dismiss**: mark it as benign or a false positive (moves it to **Denied**).
-- A notes field (_"Add review notes..."_) lets you record context.
+Verdicts apply immediately with a 5-second **Undo** (toast, or press `Z`), then auto-advance to the next finding. Keyboard: `a` accept, `d` deny, `s` suppress.
 
 <Note>
-**Read-only users** (Viewer role) do not see the Confirm/Dismiss buttons or the notes field. These HITL controls are only available to users with review permissions.
+**Read-only users** (Viewer role) do not see verdict controls.
 </Note>
 
-### Action buttons
+### The story
 
-Two buttons in the detail panel provide quick next steps:
+The narrative is broken into **chapters**. Clicking a chapter moves the graph's camera to that step and highlights its nodes. The vertical spine tracks the selected chapter; the dot next to each chapter is colored when it has detection-relevant activity.
 
-- **Explain**: launches a guided walkthrough of the finding, stepping through the narrative, evidence, and context to help you understand what happened.
-- **Investigate**: opens a scoped event timeline on the [Investigate](/dashboard/investigate) page, pre-filtered to the finding's host and time window.
+### The graph
 
-### Causal Graph
+Below the story, the graph shows the finding's evidence:
 
-Below the narrative, the **Causal Graph** visualizes the chain of events that led to the anomaly. It is a vertical causal story graph with expandable process steps — each node shows what a process did and its downstream branch effects. Expanding a step reveals the specific actions (file accesses, network connections, child processes) that occurred at that point in the chain.
+- **The story (causal path)**, the verified chain of cause and effect, is drawn in crimson. Activity the process touched concurrently but that is not part of the causal chain renders in a neutral color.
+- **Story / Model** lens toggle. Story shows the verified causal path. Model shows what the detection engine's own attention weighted most heavily, for comparing the model's focus against the narrative.
+- **Scope chips** widen the graph from the story-only subgraph to the full host graph for that window, or filter to first-seen-only entities.
+- A **replay scrubber** steps through the window's events in order. Pinning a node opens its details in the Inspector.
+
+### Ask
+
+The **Ask** dock on the right answers questions about the finding, grounded in its evidence. Type `@` to mention a specific entity (a process, file, or network destination) and the answer will focus on it. Cited entities render as clickable chips in the response.
+
+### Keyboard shortcuts
+
+Press `?` to open the full shortcut reference. Highlights:
+
+| Key | Action |
+| --- | --- |
+| `j` / `k` | Next / previous finding |
+| `f` | Investigate: collapse the queue, expand the story rail |
+| `t` | Theater: fullscreen investigation |
+| `[` / `]` | Previous / next chapter |
+| `v` | Cycle lens (Story / Model) |
+| `Space` | Replay the story |
+| `l` | Toggle the Ask dock |
 
 ---
