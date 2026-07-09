@@ -32,6 +32,12 @@
           "architecture",
           "dev-environment",
           {
+            "group": "Agents",
+            "pages": [
+              "agents/fargate"
+            ]
+          },
+          {
             "group": "Detection ML",
             "pages": [
               "detection-ml/overview",

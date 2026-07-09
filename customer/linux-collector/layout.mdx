@@ -4,7 +4,7 @@ sidebarTitle: "Layout"
 description: "What the Hilt DMG Collector is, what it observes, and how to navigate this guide."
 ---
 
-This guide describes the Hilt Data Movement Governance Collector: what it is, what it observes, how it's deployed on Kubernetes nodes and on plain Linux VMs, and how it integrates with the Hilt data-plane you received separately.
+This guide describes the Hilt Data Movement Governance Collector: what it is, what it observes, how it's deployed on Kubernetes nodes, plain Linux VMs, and AWS ECS Fargate tasks, and how it integrates with the Hilt data-plane you received separately.
 
 <Note>
 In file paths, service names, and environment variables you may see the prefix `dag` (e.g. `dag-agent`, `DAG_SHIP_URL`). This is the internal codename of Hilt's telemetry engine and is functionally equivalent to "Hilt Collector" throughout this documentation.
@@ -32,6 +32,7 @@ The DMG Collector is strictly observational. It does **not**:
 - [Release artifacts](/linux-collector/release-artifacts)
 - [Deploy on Kubernetes](/linux-collector/deploy-kubernetes)
 - [Deploy on VMs](/linux-collector/deploy-vms)
+- [Deploy on ECS Fargate](/linux-collector/deploy-fargate)
 - [Configuration reference](/linux-collector/configuration)
 - [Networking and security](/linux-collector/networking-security)
 - [Event data model](/linux-collector/event-data-model)
