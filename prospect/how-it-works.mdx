@@ -11,7 +11,7 @@ Hilt runs as a single-tenant deployment in your cloud account—AWS, GCP, Azure,
 
 ## Lightweight Collectors
 
-Collectors run on your Linux hosts and macOS endpoints. The Linux agent is a static eBPF-based binary with no kernel modules. The macOS agent uses Endpoint Security and optional browser telemetry. Both stream metadata to your private ingest endpoint—no file content leaves your environment.
+Collectors run on your Linux hosts, macOS endpoints, and containerized workloads. The Linux agent is a static eBPF-based binary with no kernel modules. The macOS agent uses Endpoint Security and optional browser telemetry. On AWS ECS Fargate, where kernel-level access isn't available, a lightweight sidecar delivers the same behavioral coverage without requiring any changes to your application image. Every collector streams metadata to your private ingest endpoint—no file content leaves your environment.
 
 {/* TODO: expand */}
 

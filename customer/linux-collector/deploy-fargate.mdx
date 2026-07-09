@@ -1,0 +1,221 @@
+---
+title: "Deploy on ECS Fargate"
+description: "Deploy the Hilt Collector into AWS ECS Fargate tasks via an installer sidecar and entrypoint wrapper — no image rebuild required."
+---
+
+Fargate does not allow privileged containers or kernel module / eBPF access, so the collector uses a different mechanism here than on Kubernetes or VMs. This page covers what that mechanism is, what it costs you in setup, and what it costs you in coverage.
+
+## How it works
+
+The Fargate collector (`dag-fargate-agent`) runs as **PID 1 inside your application container** instead of as a separate host-level process. On startup it installs a seccomp-BPF filter that traps only the ~20 syscalls Hilt cares about (`execve`, `open`, `unlink`, `rename`, `chmod`, `connect`, etc.), then `fork`+`exec`s your original application. Every descendant process inherits the filter. Everything else — `read`, `write`, `futex`, `epoll_wait`, and the rest of the hot path — runs at native speed, uninstrumented.
+
+You do **not** rebuild your application image. An **installer sidecar** container copies the agent binary into a shared, task-scoped volume before your app starts; your task definition's entrypoint is rewritten to launch the agent first, which then launches your original command. This is the same injection pattern used by APM/security sidecars like Datadog's or Aqua's.
+
+<Note>
+This mechanism is specific to ECS Fargate. On Kubernetes and plain Linux VMs, the collector uses eBPF and runs as its own process — see [Deploy on Kubernetes](/linux-collector/deploy-kubernetes) and [Deploy on VMs](/linux-collector/deploy-vms). Fargate simply doesn't permit the privileges eBPF needs.
+</Note>
+
+## Prerequisites
+
+- An ECS Fargate task (Linux, `x86_64` or `arm64`/Graviton)
+- A reachable Hilt ingest endpoint (`DAG_SHIP_URL`, provided during onboarding)
+- Access to pull `cybe/dag-fargate-installer` (Docker Hub), or mirror it into your own ECR
+
+## What gets injected into your task definition
+
+Whichever installation option you use below, the result is the same set of changes to your task definition:
+
+| Change | Detail |
+| :-- | :-- |
+| Shared volume | A task-scoped volume (`dag-volume`) mounted at `/dag` |
+| Installer container | `dag-fargate-installer`, `essential: false` — copies the agent binary into the shared volume, then exits |
+| App container entrypoint | Rewritten to `["/dag/dag-fargate-agent", "--", <your original entrypoint/command>]` |
+| App container volume mount | `/dag`, read-only |
+| App container capability | `SYS_PTRACE` added — the one extra capability Fargate permits, and the only one this mechanism needs |
+| App container `dependsOn` | Waits on the installer container reaching `COMPLETE` |
+| App container environment | `DAG_SHIP_URL`, `DAG_FARGATE_MODE` |
+
+If something fails to attach at runtime, the agent **fails open**: your application always starts and runs normally, with or without telemetry.
+
+## Installation
+
+Pick whichever surface matches how you manage task definitions today. All four produce the same injected shape shown above.
+
+### Option 1: CLI (recommended for CI/CD)
+
+<Steps>
+  <Step title="Install the injection CLI">
+    ```bash
+    go install github.com/hilt-ai/data-access-governance/tools/dag-taskdef-inject@latest
+    ```
+  </Step>
+  <Step title="Inject your existing task definition">
+    ```bash
+    dag-taskdef-inject \
+      --in taskdef.json \
+      --out taskdef-injected.json \
+      --ship-url https://<name>-ingest.hilt.ai/v1/events
+    ```
+
+    The tool is idempotent — running it again on an already-injected task definition is a no-op.
+  </Step>
+  <Step title="Register and roll out">
+    ```bash
+    aws ecs register-task-definition --cli-input-json file://taskdef-injected.json
+
+    aws ecs update-service --cluster my-cluster --service my-service \
+      --task-definition my-app-with-dag
+    ```
+  </Step>
+</Steps>
+
+You can also point the CLI at a live task definition family with `--from-aws <family>` if you'd rather not check a JSON file into your pipeline.
+
+### Option 2: Terraform
+
+```hcl
+module "dag_fargate" {
+  source                = "github.com/hilt-ai/data-access-governance//deploy/fargate/terraform"
+  container_definitions = jsonencode(local.my_containers)
+  ship_url              = "https://<name>-ingest.hilt.ai/v1/events"
+}
+
+resource "aws_ecs_task_definition" "app" {
+  family                   = "my-app"
+  requires_compatibilities = ["FARGATE"]
+  network_mode              = "awsvpc"
+  cpu                        = 512
+  memory                     = 1024
+
+  container_definitions = module.dag_fargate.container_definitions
+
+  dynamic "volume" {
+    for_each = module.dag_fargate.volumes
+    content { name = volume.value.name }
+  }
+}
+```
+
+| Input | Description | Default |
+| :-- | :-- | :-- |
+| `container_definitions` | Your original container definitions JSON | required |
+| `ship_url` | Hilt ingest endpoint URL | required |
+| `mode` | `full` or `metadata` (see [Modes](#modes)) | `"full"` |
+| `installer_image` | Installer sidecar image | `"cybe/dag-fargate-installer:latest"` |
+| `target_containers` | Container names to inject (empty = all `essential` containers) | `[]` |
+| `pid_mode_task` | Set the task's `pidMode` to `"task"` for sibling-container net visibility | `false` |
+
+### Option 3: AWS Copilot
+
+Copilot generates the task definition from `manifest.yml`, so this path is manifest edits plus a documented override — no code:
+
+<Steps>
+  <Step title="Add the sidecar, volume, entrypoint, and env vars">
+    Merge the `sidecars`, `storage.volumes`, and `entrypoint` blocks from the [Copilot manifest snippet](https://github.com/hilt-ai/data-access-governance/blob/main/deploy/fargate/copilot/manifest.snippet.yml) into your service's `copilot/<service>/manifest.yml`, replacing `<original-command>` with your app's real entrypoint.
+  </Step>
+  <Step title="Add the SYS_PTRACE capability and dependsOn">
+    These two settings aren't first-class manifest fields, so they go through Copilot's task-definition override mechanism:
+
+    ```bash
+    copilot svc override --name <service>
+    ```
+
+    Then copy the [override rules](https://github.com/hilt-ai/data-access-governance/blob/main/deploy/fargate/copilot/taskdef_overrides.yml) into `copilot/<service>/overrides/cfn.patches.yml`.
+  </Step>
+  <Step title="Deploy">
+    ```bash
+    copilot svc deploy --name <service>
+    ```
+  </Step>
+</Steps>
+
+### Option 4: CloudFormation
+
+If your task definition is authored as raw CloudFormation, the CLI can emit a paste-ready `ContainerDefinitions` block instead of a full task-definition JSON (CFN uses PascalCase keys and may contain intrinsics like `!Ref`, which are passed through untouched rather than evaluated):
+
+```bash
+dag-taskdef-inject \
+  --in taskdef.cfn.yaml \
+  --format cloudformation \
+  --ship-url https://<name>-ingest.hilt.ai/v1/events \
+  --out taskdef-injected.cfn.yaml
+```
+
+## Configuration
+
+All configuration is via environment variables set on the app container in the task definition:
+
+| Variable | Description | Default |
+| :-- | :-- | :-- |
+| `DAG_SHIP_URL` | Hilt ingest endpoint URL | (required) |
+| `DAG_FARGATE_MODE` | `full` or `metadata` — see [Modes](#modes) | `full` |
+| `DAG_CLUSTER_ID` | Override cluster grouping | auto-detected from ECS task metadata |
+| `DAG_FLUSH_INTERVAL_MS` | Shipper flush interval | `50` |
+| `DAG_BATCH_THRESHOLD` | Events per batch before flush | `200` |
+| `DAG_MAX_BATCH` | Maximum batch size | `1000` |
+
+## Modes
+
+### Full mode (default)
+
+- **Exec and file events** (open, unlink, rename, chmod, exec): captured precisely via the seccomp+ptrace engine — no short-lived process misses.
+- **Network flow**: connection lifecycle (connect/close) via ptrace, byte counters via periodic `sock_diag` polling rather than trapping `read`/`write` directly.
+- **Overhead**: low single-digit % CPU on syscall-heavy workloads, since only the trapped syscalls ever leave the fast path.
+
+### Metadata mode (kill switch)
+
+Set `DAG_FARGATE_MODE=metadata` to disable the ptrace engine entirely, without redeploying a new image — flip the environment variable in the task definition and roll the service.
+
+- **Exec events**: `/proc` scan every 250ms (may miss very short-lived processes)
+- **Network flow**: `sock_diag` polling every 2s
+- **File events**: none
+- **Overhead**: negligible
+
+If the ptrace engine ever fails to attach for any reason (unsupported kernel config, permission issue, etc.), the agent automatically falls back to this behavior on its own. Your application is never blocked or delayed waiting on the agent.
+
+## Coverage compared to the eBPF collector
+
+The Fargate agent ships the **identical event wire format** as the Kubernetes/VM collector — the downstream pipeline and dashboard need no changes, and hosts of both types appear side by side. Coverage differs because Fargate doesn't allow kernel access:
+
+| Capability | Kubernetes / VM collector (eBPF) | ECS Fargate collector |
+| :-- | :-- | :-- |
+| Process exec | Yes | Yes (ptrace, full mode) |
+| File open / rename / unlink / chmod | Yes | Yes (ptrace, full mode) |
+| Network connect/accept lifecycle | Yes | Yes |
+| Network byte volume | Per-flow via eBPF hooks | Sampled via `sock_diag` (2s interval) |
+| Visibility scope | Whole host / node | Only the wrapped container's process subtree (or the whole task with optional `pidMode: task`) |
+| File events in metadata/kill-switch mode | N/A | None |
+
+## Identity mapping
+
+| Field | Value on Fargate | Dashboard behavior |
+| :-- | :-- | :-- |
+| Host ID | ECS task ID (from the task ARN) | Each task shows as its own host entity |
+| Host type | `ecs_fargate` | Distinguished from Kubernetes nodes and VM hosts in the fleet view |
+| Cluster grouping | ECS cluster name | Tasks group under their cluster the same way Kubernetes nodes group under their cluster |
+| Tags | `service`, `task_definition_family`, `task_arn`, `task_revision` | Visible on the host card |
+
+<Note>
+Fargate tasks are more ephemeral than Kubernetes nodes or VMs. Expect more turnover in the fleet view than you're used to elsewhere — this is expected, and the `task_definition_family` tag gives you a stable way to group tasks belonging to the same service over time.
+</Note>
+
+## Verification
+
+After deploying, confirm on the [Collectors](/dashboard/collectors) page that:
+
+- The task appears with `host_type` = `ecs_fargate`
+- It's grouped under the correct ECS cluster name
+- The `task_definition_family` tag is present
+- Exec and network events are arriving
+
+## Upgrade
+
+Update the installer image tag (via whichever surface you used to install) and re-register the task definition. Because the agent binary is copied fresh from the installer container on every task start, a new task launch always picks up the latest agent — no in-place binary swap is needed.
+
+## Uninstall
+
+Remove the injected pieces (installer container, shared volume, entrypoint rewrite, `SYS_PTRACE` capability, `dependsOn`, and `DAG_*` environment variables) and register a new task-definition revision. If you installed via the CLI or Terraform module, re-run against your **original**, pre-injection task definition to get a clean revision back.
+
+## Future: EKS on Fargate
+
+Kubernetes pods running on Fargate (EKS Fargate profiles) hit the same kernel constraints as ECS Fargate — no eBPF. Support for that path is planned to reuse the same collection engine with a different injection mechanism (a mutating admission webhook instead of a task-definition transform) and a different identity source (the Kubernetes downward API instead of the ECS Task Metadata endpoint). If you need this sooner, talk to your Hilt contact.

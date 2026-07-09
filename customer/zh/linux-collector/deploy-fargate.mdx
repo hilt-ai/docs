@@ -1,0 +1,221 @@
+---
+title: "在 ECS Fargate 上部署"
+description: "通过安装器 sidecar 和入口点包装（entrypoint wrapper）将 Hilt 采集器部署到 AWS ECS Fargate 任务中 — 无需重建镜像。"
+---
+
+Fargate 不允许特权容器或内核模块 / eBPF 访问，因此采集器在这里使用的机制与 Kubernetes 或 VM 上不同。本页介绍该机制是什么、在设置上需要付出什么代价，以及在覆盖范围上需要付出什么代价。
+
+## 工作原理
+
+Fargate 采集器（`dag-fargate-agent`）作为 **应用容器内的 PID 1** 运行，而不是作为独立的主机级进程运行。启动时，它会安装一个 seccomp-BPF 过滤器，仅拦截 Hilt 关心的约 20 个系统调用（`execve`、`open`、`unlink`、`rename`、`chmod`、`connect` 等），然后 `fork`+`exec` 你的原始应用程序。每个子进程都会继承该过滤器。其余部分——`read`、`write`、`futex`、`epoll_wait` 以及其余的高频路径——都以原生速度运行，不受任何插桩影响。
+
+你**不需要**重建应用镜像。一个**安装器 sidecar** 容器会在你的应用启动前，把代理二进制文件复制到一个任务范围（task-scoped）的共享卷中；你的任务定义的入口点会被重写为先启动该代理，再由代理启动你的原始命令。这与 Datadog 或 Aqua 等 APM/安全类 sidecar 所使用的注入模式相同。
+
+<Note>
+此机制专用于 ECS Fargate。在 Kubernetes 和普通 Linux VM 上，采集器使用 eBPF 并作为独立进程运行——参见[在 Kubernetes 上部署](/zh/linux-collector/deploy-kubernetes)和[在 VM 上部署](/zh/linux-collector/deploy-vms)。Fargate 单纯是不允许 eBPF 所需的那些特权。
+</Note>
+
+## 前提条件
+
+- 一个 ECS Fargate 任务（Linux，`x86_64` 或 `arm64`/Graviton）
+- 一个可访问的 Hilt 摄取端点（`DAG_SHIP_URL`，在入驻过程中提供）
+- 能够拉取 `cybe/dag-fargate-installer`（Docker Hub），或将其镜像到你自己的 ECR 中
+
+## 会对任务定义注入哪些内容
+
+无论你使用下面哪种安装方式，最终对任务定义所做的改动都是一样的：
+
+| 改动 | 详情 |
+| :-- | :-- |
+| 共享卷 | 一个任务范围的卷（`dag-volume`），挂载在 `/dag` |
+| 安装器容器 | `dag-fargate-installer`，`essential: false` —— 将代理二进制文件复制到共享卷后退出 |
+| 应用容器入口点 | 重写为 `["/dag/dag-fargate-agent", "--", <你的原始入口点/命令>]` |
+| 应用容器卷挂载 | `/dag`，只读 |
+| 应用容器能力（capability） | 新增 `SYS_PTRACE` —— Fargate 允许的唯一额外能力，也是此机制所需的唯一能力 |
+| 应用容器 `dependsOn` | 等待安装器容器达到 `COMPLETE` 状态 |
+| 应用容器环境变量 | `DAG_SHIP_URL`、`DAG_FARGATE_MODE` |
+
+如果运行时出现任何附加失败，代理会**故障开放（fail open）**：无论是否有遥测数据，你的应用始终会启动并正常运行。
+
+## 安装
+
+请根据你目前管理任务定义的方式选择对应的方式。以下四种方式最终产生的注入结果相同（见上文）。
+
+### 方式一：CLI（推荐用于 CI/CD）
+
+<Steps>
+  <Step title="安装注入 CLI">
+    ```bash
+    go install github.com/hilt-ai/data-access-governance/tools/dag-taskdef-inject@latest
+    ```
+  </Step>
+  <Step title="对现有任务定义进行注入">
+    ```bash
+    dag-taskdef-inject \
+      --in taskdef.json \
+      --out taskdef-injected.json \
+      --ship-url https://<name>-ingest.hilt.ai/v1/events
+    ```
+
+    该工具是幂等的——对已经注入过的任务定义再次运行不会产生任何效果。
+  </Step>
+  <Step title="注册并上线">
+    ```bash
+    aws ecs register-task-definition --cli-input-json file://taskdef-injected.json
+
+    aws ecs update-service --cluster my-cluster --service my-service \
+      --task-definition my-app-with-dag
+    ```
+  </Step>
+</Steps>
+
+如果你不想在流水线中维护一个 JSON 文件，也可以通过 `--from-aws <family>` 让 CLI 直接读取一个正在使用的任务定义家族（family）。
+
+### 方式二：Terraform
+
+```hcl
+module "dag_fargate" {
+  source                = "github.com/hilt-ai/data-access-governance//deploy/fargate/terraform"
+  container_definitions = jsonencode(local.my_containers)
+  ship_url              = "https://<name>-ingest.hilt.ai/v1/events"
+}
+
+resource "aws_ecs_task_definition" "app" {
+  family                   = "my-app"
+  requires_compatibilities = ["FARGATE"]
+  network_mode              = "awsvpc"
+  cpu                        = 512
+  memory                     = 1024
+
+  container_definitions = module.dag_fargate.container_definitions
+
+  dynamic "volume" {
+    for_each = module.dag_fargate.volumes
+    content { name = volume.value.name }
+  }
+}
+```
+
+| 输入 | 描述 | 默认值 |
+| :-- | :-- | :-- |
+| `container_definitions` | 你的原始容器定义 JSON | 必填 |
+| `ship_url` | Hilt 摄取端点 URL | 必填 |
+| `mode` | `full` 或 `metadata`（参见[模式](#模式)） | `"full"` |
+| `installer_image` | 安装器 sidecar 镜像 | `"cybe/dag-fargate-installer:latest"` |
+| `target_containers` | 要注入的容器名称（留空 = 所有 `essential` 容器） | `[]` |
+| `pid_mode_task` | 将任务的 `pidMode` 设为 `"task"`，以获得同任务内其他容器的网络可见性 | `false` |
+
+### 方式三：AWS Copilot
+
+Copilot 会从 `manifest.yml` 生成任务定义，因此这条路径只涉及清单编辑加一份文档化的覆盖配置 —— 无需编写代码：
+
+<Steps>
+  <Step title="添加 sidecar、共享卷、入口点和环境变量">
+    将 [Copilot manifest 片段](https://github.com/hilt-ai/data-access-governance/blob/main/deploy/fargate/copilot/manifest.snippet.yml) 中的 `sidecars`、`storage.volumes` 和 `entrypoint` 块合并到你的服务的 `copilot/<service>/manifest.yml` 中，并将 `<original-command>` 替换为你应用真正的入口点。
+  </Step>
+  <Step title="添加 SYS_PTRACE 能力和 dependsOn">
+    这两项设置并非 manifest 的一等字段，因此需要通过 Copilot 的任务定义覆盖机制来添加：
+
+    ```bash
+    copilot svc override --name <service>
+    ```
+
+    然后将[覆盖规则](https://github.com/hilt-ai/data-access-governance/blob/main/deploy/fargate/copilot/taskdef_overrides.yml)复制到 `copilot/<service>/overrides/cfn.patches.yml` 中。
+  </Step>
+  <Step title="部署">
+    ```bash
+    copilot svc deploy --name <service>
+    ```
+  </Step>
+</Steps>
+
+### 方式四：CloudFormation
+
+如果你的任务定义是以原生 CloudFormation 编写的，CLI 可以直接输出一段可粘贴的 `ContainerDefinitions` 代码块，而不是完整的任务定义 JSON（CFN 使用 PascalCase 键名，且可能包含如 `!Ref` 之类的内建函数，这些会被原样传递，而不会被求值）：
+
+```bash
+dag-taskdef-inject \
+  --in taskdef.cfn.yaml \
+  --format cloudformation \
+  --ship-url https://<name>-ingest.hilt.ai/v1/events \
+  --out taskdef-injected.cfn.yaml
+```
+
+## 配置
+
+所有配置都通过任务定义中应用容器上设置的环境变量进行：
+
+| 变量 | 描述 | 默认值 |
+| :-- | :-- | :-- |
+| `DAG_SHIP_URL` | Hilt 摄取端点 URL | （必填） |
+| `DAG_FARGATE_MODE` | `full` 或 `metadata` —— 参见[模式](#模式) | `full` |
+| `DAG_CLUSTER_ID` | 覆盖集群分组 | 从 ECS 任务元数据自动检测 |
+| `DAG_FLUSH_INTERVAL_MS` | 发送器（shipper）刷新间隔 | `50` |
+| `DAG_BATCH_THRESHOLD` | 刷新前每批的事件数 | `200` |
+| `DAG_MAX_BATCH` | 最大批大小 | `1000` |
+
+## 模式
+
+### 完整模式（默认）
+
+- **exec 和文件事件**（open、unlink、rename、chmod、exec）：通过 seccomp+ptrace 引擎精确捕获——不会遗漏短生命周期进程。
+- **网络流**：连接生命周期（connect/close）通过 ptrace 捕获，字节计数通过周期性的 `sock_diag` 轮询获得，而非直接拦截 `read`/`write`。
+- **开销**：在系统调用密集的工作负载上，CPU 开销为个位数百分比，因为只有被拦截的系统调用会离开快速路径。
+
+### 元数据模式（Kill Switch）
+
+将 `DAG_FARGATE_MODE` 设为 `metadata`，即可完全禁用 ptrace 引擎，且**不需要**重新部署镜像——只需在任务定义中翻转该环境变量并滚动更新服务即可。
+
+- **exec 事件**：每 250ms 扫描一次 `/proc`（可能遗漏极短生命周期的进程）
+- **网络流**：每 2s 轮询一次 `sock_diag`
+- **文件事件**：无
+- **开销**：可忽略不计
+
+如果 ptrace 引擎因任何原因（内核配置不支持、权限问题等）附加失败，代理会自动回退到上述行为。你的应用永远不会因等待代理而被阻塞或延迟。
+
+## 与 eBPF 采集器的覆盖范围对比
+
+Fargate 代理发送的事件线上格式与 Kubernetes/VM 采集器**完全相同**——下游流水线和仪表盘无需任何改动，两种类型的主机会一起出现在视图中。由于 Fargate 不允许内核访问，覆盖范围有所不同：
+
+| 能力 | Kubernetes / VM 采集器（eBPF） | ECS Fargate 采集器 |
+| :-- | :-- | :-- |
+| 进程 exec | 是 | 是（ptrace，完整模式） |
+| 文件 open / rename / unlink / chmod | 是 | 是（ptrace，完整模式） |
+| 网络 connect/accept 生命周期 | 是 | 是 |
+| 网络字节流量 | 通过 eBPF 钩子逐流统计 | 通过 `sock_diag` 采样（2s 间隔） |
+| 可见性范围 | 整个主机 / 节点 | 仅被包装的容器的进程子树（若启用可选的 `pidMode: task`，则为整个任务） |
+| 元数据 / kill-switch 模式下的文件事件 | 不适用 | 无 |
+
+## 身份映射
+
+| 字段 | Fargate 上的值 | 仪表盘行为 |
+| :-- | :-- | :-- |
+| 主机 ID | ECS 任务 ID（来自任务 ARN） | 每个任务在仪表盘上显示为独立的主机实体 |
+| 主机类型 | `ecs_fargate` | 在主机群视图中与 Kubernetes 节点、VM 主机区分开 |
+| 集群分组 | ECS 集群名称 | 任务按其集群分组，方式与 Kubernetes 节点按集群分组相同 |
+| 标签 | `service`、`task_definition_family`、`task_arn`、`task_revision` | 显示在主机卡片上 |
+
+<Note>
+Fargate 任务比 Kubernetes 节点或 VM 更为短暂（ephemeral）。相比你在其他环境中的经验，主机群视图中会有更多的更替，这是预期行为——`task_definition_family` 标签为你提供了一种随时间稳定地将属于同一服务的任务分组在一起的方式。
+</Note>
+
+## 验证
+
+部署后，在[采集器](/zh/dashboard/collectors)页面确认：
+
+- 任务显示 `host_type` 为 `ecs_fargate`
+- 已正确分组到相应的 ECS 集群名称下
+- `task_definition_family` 标签存在
+- exec 和网络事件正常到达
+
+## 升级
+
+（通过你安装时使用的方式）更新安装器镜像标签，并重新注册任务定义。由于代理二进制文件在每次任务启动时都会从安装器容器重新复制，因此每次新的任务启动都会自动获取最新的代理版本——无需原地替换二进制文件。
+
+## 卸载
+
+移除已注入的部分（安装器容器、共享卷、入口点重写、`SYS_PTRACE` 能力、`dependsOn`，以及 `DAG_*` 环境变量），并注册新的任务定义版本。如果你是通过 CLI 或 Terraform 模块安装的，针对你**原始的、未注入的**任务定义重新运行一次，即可得到一个干净的版本。
+
+## 未来：EKS on Fargate
+
+在 Fargate 上运行的 Kubernetes pod（EKS Fargate profile）会遇到与 ECS Fargate 相同的内核限制——没有 eBPF。计划中对该路径的支持将复用同一套采集引擎，但使用不同的注入机制（变更式准入 webhook，而非任务定义变换）和不同的身份来源（Kubernetes downward API，而非 ECS 任务元数据端点）。如果你需要更早获得此支持，请联系你的 Hilt 对接人。

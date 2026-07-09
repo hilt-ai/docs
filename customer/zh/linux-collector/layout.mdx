@@ -4,7 +4,7 @@ sidebarTitle: "结构"
 description: "Hilt DMG 采集器是什么、它观测哪些内容，以及如何使用本指南进行导航。"
 ---
 
-本指南介绍 Hilt 数据流转治理（Data Movement Governance）采集器：它是什么、观测哪些内容、如何部署到 Kubernetes 节点和普通 Linux VM 上，以及如何与单独交付给你的 Hilt 数据面（data-plane）集成。
+本指南介绍 Hilt 数据流转治理（Data Movement Governance）采集器：它是什么、观测哪些内容、如何部署到 Kubernetes 节点、普通 Linux VM 以及 AWS ECS Fargate 任务上，以及如何与单独交付给你的 Hilt 数据面（data-plane）集成。
 
 <Note>
 在文件路径、服务名和环境变量中，你可能会看到前缀 `dag`（例如 `dag-agent`、`DAG_SHIP_URL`）。这是 Hilt 遥测引擎的内部代号，在本文档中与"Hilt 采集器"功能等价。
@@ -32,6 +32,7 @@ DMG 采集器严格只做观测。它**不会**：
 - [发布制品](/zh/linux-collector/release-artifacts)
 - [在 Kubernetes 上部署](/zh/linux-collector/deploy-kubernetes)
 - [在 VM 上部署](/zh/linux-collector/deploy-vms)
+- [在 ECS Fargate 上部署](/zh/linux-collector/deploy-fargate)
 - [配置参考](/zh/linux-collector/configuration)
 - [网络与安全](/zh/linux-collector/networking-security)
 - [事件数据模型](/zh/linux-collector/event-data-model)
