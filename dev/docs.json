@@ -30,6 +30,7 @@
         "pages": [
           "getting-started",
           "architecture",
+          "infrav2",
           "rest-api",
           "dev-environment",
           {
