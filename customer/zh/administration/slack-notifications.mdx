@@ -1,0 +1,62 @@
+---
+title: "Slack 通知"
+sidebarTitle: "Slack"
+description: "配置 Slack Incoming Webhook，让 DAG 将异常告警发送到你的工作区。"
+---
+
+将 Slack 接入后，异常告警会发布到你工作区中的指定频道。整个过程大约两分钟，使用 Slack Incoming Webhook——无需安装机器人。
+
+在仪表盘打开 **设置 → 集成（Integrations）**，然后按下列步骤操作。同一套引导也可在应用内的 Slack 设置面板中查看。
+
+<Note>
+在保存有效的 webhook URL 之前，不会向 Slack 发送任何内容。仅将通知开关设为 **On** 不够——**Save（保存）** 才会真正启用投递。保存后请立即发送测试通知，确认频道与 URL 正确。
+</Note>
+
+---
+
+## 设置步骤
+
+<Steps>
+  <Step title="在 DAG 中打开通知">
+    从集成页面开始，将 Slack 通知开关拨到 **On**。这会打开设置面板，稍后你将在此粘贴 webhook URL。在保存有效链接之前，不会向 Slack 发送任何内容；我们建议保存后发送一次测试，确认消息到达正确的频道。
+  </Step>
+
+  <Step title="前往 Slack 并创建应用">
+    接下来的几步需要 Slack 工作区管理员权限，或请有权限的同事协助。在浏览器中打开 [api.slack.com/apps](https://api.slack.com/apps)。点击 **Create New App**，选择 **From scratch**，并为应用起一个团队在告警中能认出的名称，例如 "DAG Alerts"。选择团队所在的工作区，然后点击 **Create App**。如果公司已有用于内部工具的 Slack 应用，也可以复用，不必新建。
+  </Step>
+
+  <Step title="启用 Incoming Webhooks">
+    在新建的应用中，打开左侧边栏的 **Incoming Webhooks** 并打开开关。这样 DAG 会获得一条用于发帖的私有链接。无需安装机器人，除下一步选择频道外，团队也无需额外审批。
+  </Step>
+
+  <Step title="将 webhook 连接到频道">
+    点击 **Add New Webhook to Workspace**。Slack 会要求你选择频道，请选择希望接收异常告警的频道，例如 `#security-alerts`。如果该频道尚不存在，请先在 Slack 中创建，再回来选择。点击 **Allow**。Slack 会将这一条 URL 绑定到该频道，因此 DAG 不会要求你在此输入频道名称。
+  </Step>
+
+  <Step title="复制 Slack 给出的链接">
+    授权频道后，Slack 会显示 **Webhook URL**。它始终以 `https://hooks.slack.com/services/` 开头，后面是一长串随机路径。请完整复制，并像对待密码一样保管。任何持有该链接的人都可以向你的频道发帖，因此不要粘贴到邮件或公开聊天中。
+  </Step>
+
+  <Step title="回到 DAG 完成配置">
+    返回集成页面。将 URL 粘贴到 **Webhook URL** 字段，然后点击 **Save**。如果 URL 缺失或看起来不像 Slack webhook 链接，保存不会通过，我们会提示链接无效。保存成功后，点击 **Send test notification（发送测试通知）**，并检查你的 Slack 频道。测试消息出现后即配置完成。真实异常告警会在检测后大约三十秒内自动开始投递。
+  </Step>
+</Steps>
+
+---
+
+## 安全
+
+<Warning>
+请像对待密码一样保管 webhook URL。任何持有它的人都可以向你的频道发帖。DAG 会加密存储该 URL，且不会再次明文展示。之后若要更换，直接粘贴新的 URL 即可。
+</Warning>
+
+---
+
+## 故障排查
+
+| 现象 | 处理建议 |
+| :-- | :-- |
+| 保存时拒绝 URL | 确认以 `https://hooks.slack.com/services/` 开头，并已复制完整路径——无空格、无截断。 |
+| 通知已开启但收不到消息 | 必须 **Save** 有效的 webhook。仅打开开关不会启用投递。 |
+| 测试失败或告警中断 | 确认频道仍然存在；若旧 webhook 已撤销，在 Slack 中重新生成，然后粘贴并保存新 URL。 |
+| 已配置，想更换频道 | 在 Slack 为目标频道创建新的 webhook，然后在集成页面粘贴并保存新 URL。 |
