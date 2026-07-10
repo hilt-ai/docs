@@ -110,6 +110,7 @@
                   "administration/system-status",
                   "administration/prometheus",
                   "administration/teams",
+                  "administration/slack-notifications",
                   "on-prem/model-lifecycle",
                   {
                     "group": "Data Export",
@@ -276,6 +277,7 @@
                   "zh/administration/system-status",
                   "zh/administration/prometheus",
                   "zh/administration/teams",
+                  "zh/administration/slack-notifications",
                   "zh/on-prem/model-lifecycle",
                   {
                     "group": "数据导出",

@@ -1,0 +1,62 @@
+---
+title: "Slack notifications"
+sidebarTitle: "Slack"
+description: "Set up Slack incoming webhooks so DAG posts anomaly alerts to your workspace."
+---
+
+Connect Slack so anomaly alerts post to a channel in your workspace. Setup takes about two minutes and uses a Slack incoming webhook — there is no bot to install.
+
+Open **Settings → Integrations** in the dashboard, then follow the steps below. The same walkthrough is available in-app from the Slack setup panel.
+
+<Note>
+Nothing is sent to Slack until you save a valid webhook URL. Turning notifications **On** alone is not enough — **Save** is what makes delivery work. Send a test right after you save so you know the channel and URL are correct.
+</Note>
+
+---
+
+## Setup
+
+<Steps>
+  <Step title="Turn on notifications here in DAG">
+    Start on the Integrations page and flip Slack notifications to **On**. That opens the setup panel where you'll paste your webhook URL in a minute. Nothing is sent to Slack until you save a valid link, and we recommend sending a test afterwards to make sure it landed in the right place.
+  </Step>
+
+  <Step title="Go to Slack and create an app">
+    You'll need to be a Slack workspace admin for the next few steps, or ask someone who is. Open [api.slack.com/apps](https://api.slack.com/apps) in your browser. Click **Create New App**, choose **From scratch**, and give the app a name people will recognize on alerts, something like "DAG Alerts". Pick the workspace where your team lives and click **Create App**. If your company already has a Slack app for internal tools, you can reuse that one instead of making a new app.
+  </Step>
+
+  <Step title="Turn on incoming webhooks">
+    In your new app, open **Incoming Webhooks** in the left sidebar and switch it on. This gives DAG a private link it can use to post messages. There is no bot to install and nothing extra for your team to approve beyond the channel step coming next.
+  </Step>
+
+  <Step title="Connect the webhook to your channel">
+    Click **Add New Webhook to Workspace**. Slack will ask you to pick a channel, so choose where you want anomaly alerts to show up, for example `#security-alerts`. If that channel does not exist yet, create it in Slack first, then come back and pick it. Click **Allow**. Slack ties this one URL to that one channel, which is why DAG does not ask you to type a channel name here.
+  </Step>
+
+  <Step title="Copy the link Slack gives you">
+    After you allow the channel, Slack shows a **Webhook URL**. It always starts with `https://hooks.slack.com/services/` followed by a long random path. Copy the whole thing and treat it like a password. Anyone with this link can post to your channel, so do not paste it into email or a public chat.
+  </Step>
+
+  <Step title="Finish back here in DAG">
+    Come back to the Integrations page. Paste the URL into the **Webhook URL** field and click **Save**. If the URL is missing or does not look like a Slack webhook link, Save will not go through and we will tell you the link is not valid. Once Save succeeds, click **Send test notification** and check your Slack channel. When the test message shows up, you are done. Real anomaly alerts will start posting on their own within about thirty seconds of detection.
+  </Step>
+</Steps>
+
+---
+
+## Security
+
+<Warning>
+Treat the webhook URL like a password. Anyone who has it can post to your channel. DAG stores it encrypted and never shows it again. To change it later, just paste a new one.
+</Warning>
+
+---
+
+## Troubleshooting
+
+| Symptom | What to try |
+| :-- | :-- |
+| Save rejects the URL | Confirm it starts with `https://hooks.slack.com/services/` and that you copied the full path — no spaces or truncation. |
+| Notifications On but nothing arrives | You must **Save** a valid webhook. Toggle alone does not enable delivery. |
+| Test fails or alerts stop | Re-check the channel still exists, regenerate a webhook in Slack if the old one was revoked, then paste and save the new URL. |
+| Already configured, changing channel | Create a new webhook for the target channel in Slack, then paste and save the new URL in Integrations. |
