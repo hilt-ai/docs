@@ -1,0 +1,26 @@
+---
+title: "API & Integrations"
+description: "Bring Hilt findings, activity, and detection signals into the tools your security team already uses."
+---
+
+Hilt is built to fit your existing workflow, not replace it. Alongside the dashboard, every deployment exposes a REST API and webhooks so you can pull findings, raw activity, host status, and detection-rule signals into your SIEM, SOAR, or ticketing system—and push review decisions back.
+
+{/* TODO: add integrations diagram (SIEM / SOAR / ticketing) */}
+
+## Pull what you need
+
+A read or read-write API key—generated from the dashboard and scoped to exactly what its creator can see—lets your tooling query findings by host, time, severity, and status, retrieve the raw process, file, and network activity behind any finding, list monitored hosts, and see how often each custom detection rule has fired.
+
+## Get notified, don't poll
+
+Register a webhook URL and Hilt pushes an event the moment a finding is created, a finding is reviewed, or one of your detection rules fires. Every payload is signed so your receiver can verify it came from Hilt, and failed deliveries retry automatically with a visible delivery log.
+
+{/* TODO: expand */}
+
+## Runs entirely in your environment
+
+The API and webhooks live inside your single-tenant deployment. Requests hit your own dashboard host and read your own data—nothing is brokered through a shared Hilt service, and access never exceeds what the key's owner is granted in the dashboard.
+
+<Card title="Developer reference" icon="code" href="https://docs.hilt.ai/api/overview">
+  Full API and webhook documentation—authentication, endpoints, payloads, and a worked example.
+</Card>

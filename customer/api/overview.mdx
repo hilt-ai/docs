@@ -1,0 +1,77 @@
+---
+title: "API Overview & Authentication"
+sidebarTitle: "Overview & Auth"
+description: "Authenticate to the REST API with bearer API keys and understand scoping, errors, and pagination."
+---
+
+The REST API lets you pull findings, raw activity, host status, and detection rules into your own tooling — and push review decisions back — without using the dashboard. All endpoints live under `/v1/` on your deployment's dashboard host:
+
+```text
+https://<your-dashboard-host>/v1/...
+```
+
+<Note>
+Webhooks complement the API with push delivery — see [Webhooks](/api/webhooks) if you want to be notified of new findings instead of polling.
+</Note>
+
+---
+
+## Creating an API key
+
+API keys are created from the dashboard: **Settings → API keys → Create API key**.
+
+1. Give the key a descriptive name (for example `SIEM integration`).
+2. Choose its **scope**:
+   - **Read-only** — can list findings, events, hosts, and detection rules.
+   - **Read & write** — everything read-only can do, plus accepting or denying findings via the review endpoint.
+3. Optionally set an **expiry** (30 days, 90 days, 1 year, or never).
+
+The key is shown **exactly once** at creation — copy it immediately. Keys look like:
+
+```text
+hilt_live_a1b2c3d4e5f6...
+```
+
+You can hold up to 20 active keys, revoke any key instantly from the same page, and see when each key was last used. A revoked or expired key is rejected on its very next request.
+
+## Using a key
+
+Send the key as a bearer token on every request:
+
+```bash
+curl https://<your-dashboard-host>/v1/findings \
+  -H "Authorization: Bearer hilt_live_a1b2c3d4e5f6..."
+```
+
+Requests without a valid key receive `401 Unauthorized`.
+
+## Scoping
+
+A key inherits the host and team restrictions of the user who created it — it can never see or do more than that user's dashboard account. If your account is limited to specific teams' hosts, the API returns data for those hosts only, and requesting another host returns `403` (or `404` for finding lookups).
+
+## Errors
+
+All errors share one shape:
+
+```json
+{ "error": "human-readable message" }
+```
+
+| Status | Meaning |
+|---|---|
+| `400` | Invalid parameter, cursor, or request body |
+| `401` | Missing, invalid, revoked, or expired API key |
+| `403` | Key lacks write scope, or the host is outside your scope |
+| `404` | Resource not found (or outside your scope, for findings) |
+| `500` | Internal query failure — safe to retry |
+| `503` | A backing datastore is temporarily unavailable |
+
+## Pagination
+
+List endpoints that can return many rows (`/v1/findings`, `/v1/events`) use cursor pagination:
+
+- Pass `limit` (default 50, maximum 200) to size pages.
+- When more results exist, the response includes a `next_cursor` string; pass it back as `cursor=` to fetch the next page.
+- Keep following `next_cursor` until it is `null` — treat the cursor, not the page size, as the only end-of-results signal.
+
+Timestamps are RFC 3339 (`2026-07-03T00:00:00Z`) in query parameters; event and finding times in response bodies are Unix nanoseconds unless noted.

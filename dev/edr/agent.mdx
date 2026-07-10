@@ -1,0 +1,43 @@
+---
+title: "EDR Agent"
+description: "edr_sensor and edr_engine internals: ES subscription, the evt_t contract, detection rules, AUTH denials, self-protection, and the heartbeat."
+sidebarTitle: "Agent"
+---
+
+The agent is a notarized macOS app (`EDRApp.app`, team **Cybe Corporation / MVMB6LCP2A**) embedding two System Extensions. No kext; everything is user-space on Apple frameworks.
+
+## Sensor core
+
+`EDR/edr_sensor_core.c` owns the ES client. Every ES message is normalized to a source-agnostic `evt_t` before it reaches the engine — the engine never sees ES types, so detection rules stay testable off-device. Identity comes from the ES `audit_token` (`audit_token_to_pid/_ruid/_euid`), plus the `responsible_audit_token` for application attribution.
+
+Network flows arrive two ways: the NetFilter appex (per-flow process/bundle attribution) or, when the appex is not approved, a degraded log-stream fallback (`g_netflow_from_log`). The heartbeat reports which one is live.
+
+## Detection engine
+
+`EDR/edr_engine.c` is pure C — no Apple frameworks — so rules compile and unit-test on Linux CI. Rule families:
+
+| Family | Examples | Response |
+| --- | --- | --- |
+| **Tamper** | Gatekeeper quarantine-xattr removal, profile changes, kills/unlinks aimed at the agent | Deny in-kernel (AUTH events) + `blocked` finding |
+| **Data movement** | Staging + exfil patterns, removable-media writes, cloud-sync abuse | Finding (`alerted` / `logged`) |
+| **Credential / privacy** | `~/.ssh`, browser cookie stores, TCC-protected reads by untrusted code | Finding, severity scaled by `code_signature` verdict |
+
+Findings are emitted as NDJSON lines (event types: finding=20, netflow=21, heartbeat=22 — see `dag-collector/src/edr.go`) and routed to topic `dag.edr`.
+
+## Self-protection
+
+`protect_self()` registers the agent's artifacts as protected targets; the engine denies AUTH `UNLINK`/`RENAME` on them and `SIGKILL`/`SIGTERM`/`SIGSTOP` against the agent pid. Two deliberate carve-outs, both learned the hard way:
+
+- **Trusted-actor exemption** (`is_trusted_actor()`: sysextd, the PackageKit installer, our signed updater) is checked *up front* so self-update and authorized uninstall don't deadlock.
+- Only the updater **binary** and launch plists are protected — not the whole `/Library/Application Support/Hilt/Updater` directory. Protecting the dir broke config writes (`install(1)`'s rename of `effective.conf` was denied), which blocked the collector-URL write during onboarding.
+
+The legacy daemon tree `/Library/Application Support/Hilt/EDR` is intentionally **not** protected — it must stay removable.
+
+## Heartbeat
+
+`heartbeat_thread` (`edr_sensor_core.c`) emits an agent-status JSON line every **30s**: `host_id`, `device_name`, `es_running`, `ne_running`, `agent_version`, `policy_version`. It lands in `dag_edr_agent` and drives the dashboard agent header. Note it does **not** feed `endpoint_events` — Collectors-page liveness comes from actual endpoint activity via `endpoint_host_last_seen_mv`, so a fully idle Mac can legitimately dip to *stale* between events. If that ever needs fixing, feed `dag_host_last_seen` from the heartbeat stream too.
+
+## Known gaps
+
+- `child_proc_start_time_ns` is emitted as `0` (`edr_sensor_core.c:310`); neither audit-token `pidversion` nor `proc_start_time_ns` ships in events, so process identity is pid-reuse-unsafe — see [Data Model](/edr/data-model#process-identity).
+- macOS parity gaps vs Linux: no auto-update on some paths, no on-device quarantine response yet (tracked externally as early-access caveats).

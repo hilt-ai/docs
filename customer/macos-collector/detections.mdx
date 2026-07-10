@@ -1,0 +1,42 @@
+---
+title: "On-device detections & response"
+sidebarTitle: "Detections & Response"
+description: "The detection engine inside the macOS collector: the rule families it evaluates on-device, how findings are graded and delivered, and where the agent blocks rather than observes."
+---
+
+The macOS collector is not only a telemetry sensor — it embeds an on-device detection engine that evaluates every kernel event as it happens. This page describes what that engine looks for, how it responds, and how its findings reach the dashboard. For the pages where you triage those findings, see the [Endpoint section](/dashboard/endpoint/foundation); for the raw telemetry the engine evaluates, see [Event coverage](/macos-collector/event-coverage).
+
+## Where detection happens
+
+Detection runs **on the endpoint, inside ESensor**, before any event leaves the Mac. Because the engine sits on Apple's Endpoint Security AUTH path, it can do something a telemetry-only agent cannot: **deny an operation in-kernel** rather than report it after the fact. Every event the engine evaluates already carries [code-signing trust and application attribution](/dashboard/endpoint/foundation#why-endpoint-kernel-telemetry-is-different), so rules grade *who is acting* — a platform binary, a Developer ID app, or unsigned code — not just *what happened*.
+
+## Rule families
+
+| Family | What it watches | Dashboard page |
+| :-- | :-- | :-- |
+| **Tamper** | Attempts to weaken macOS defenses or the agent itself: Gatekeeper quarantine-flag removal, configuration-profile changes, kills or deletions aimed at the collector. | [Tamper](/dashboard/endpoint/tamper) |
+| **Persistence** | Launch items, login items, and background-task registrations that give code a foothold across reboots. | [Persistence](/dashboard/endpoint/persistence) |
+| **Credential & privacy** | Reads of `~/.ssh`, browser credential stores, and TCC-protected locations by code that has no business there. | [Credential & Privacy](/dashboard/endpoint/credential-privacy) |
+| **Data movement** | Staging and exfiltration patterns: bulk reads followed by removable-media writes or unusual egress. | [Removable Media](/dashboard/endpoint/removable-media), [Network Egress](/dashboard/endpoint/network-egress) |
+
+## How the agent responds
+
+Every finding carries a **status** that records what the agent did, and a **severity** from `critical` to `info`:
+
+| Status | Meaning |
+| :-- | :-- |
+| `blocked` | The engine denied the operation in-kernel. Used where the action is unambiguous — tampering with Gatekeeper quarantine or with the agent's own binaries and launch items. |
+| `alerted` | The operation completed, and the finding was raised for review at elevated severity. |
+| `logged` | The operation completed and was recorded for context and correlation. |
+
+Severity is scaled by the actor's code-signing verdict: the same file access scores differently coming from a notarized Developer ID application than from an unsigned binary.
+
+The agent also protects itself. Its application bundle, updater binary, and launch items are registered as protected targets — the engine denies attempts to delete, rename, or kill them, and each denial surfaces as a `blocked` tamper finding. Authorized paths (MDM management, Apple's installer, the signed Hilt updater) are exempt, so updates and administrator-initiated removal work normally; see [Uninstall](/macos-collector/uninstall).
+
+## From finding to dashboard
+
+Findings stream through the same [authenticated ingest path](/macos-collector/networking-security) as telemetry and land in your deployment alongside the raw kernel events that produced them. Each finding arrives with the six-part breakdown the Endpoint pages render — **What happened · Process responsible · What was touched · Why it matters · Evidence · Recommended action** — and links to its raw ES and network evidence, so the triage view and the forensic view are one click apart.
+
+<Note>
+Detection rules ship with the collector and are versioned: the **policy version** visible in the agent header on every Endpoint page records exactly which rule set a Mac is running.
+</Note>

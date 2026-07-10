@@ -138,6 +138,18 @@
             ]
           },
           {
+            "tab": "API Reference",
+            "pages": [
+              "api/overview",
+              "api/findings",
+              "api/events",
+              "api/hosts",
+              "api/detection-rules",
+              "api/webhooks",
+              "api/worked-example"
+            ]
+          },
+          {
             "tab": "Linux Collector",
             "pages": [
               "linux-collector/layout",
@@ -169,6 +181,7 @@
               "macos-collector/networking-security",
               "macos-collector/event-data-model",
               "macos-collector/event-coverage",
+              "macos-collector/detections",
               "macos-collector/sizing-capacity",
               "macos-collector/data-flow",
               "macos-collector/troubleshooting"
@@ -288,6 +301,18 @@
                   "zh/dashboard/mcp-server"
                 ]
               }
+            ]
+          },
+          {
+            "tab": "API 参考",
+            "pages": [
+              "zh/api/overview",
+              "zh/api/findings",
+              "zh/api/events",
+              "zh/api/hosts",
+              "zh/api/detection-rules",
+              "zh/api/webhooks",
+              "zh/api/worked-example"
             ]
           },
           {

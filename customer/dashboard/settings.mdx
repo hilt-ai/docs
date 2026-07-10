@@ -54,3 +54,20 @@ The **Sign out everywhere** button terminates all your active sessions across al
 ## Recent sign-ins
 
 A chronological list of your recent login events, showing the sign-in time and IP address. The section initially displays **5 entries**. Click **Show all (N)** to expand and view the complete history.
+
+---
+
+## API keys
+
+Create and manage bearer keys for the [REST API](/api/overview). The table
+lists each key's name, prefix (`hilt_live_…`), scope, creation and last-used
+times, expiry, and status (active, revoked, or expired).
+
+- **Create API key** opens a dialog to name the key, choose **Read-only** or
+  **Read & write** scope (write adds the ability to accept/deny findings),
+  and optionally set an expiry (30 days, 90 days, or 1 year).
+- The full key is revealed **once** after creation — copy it before closing
+  the dialog; only a short prefix is shown afterwards.
+- **Revoke** invalidates a key immediately: its next API request is rejected.
+- You can hold up to 20 active keys. Keys inherit your own host and team
+  restrictions — they can never access more than your account can.

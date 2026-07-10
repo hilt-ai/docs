@@ -1,0 +1,54 @@
+---
+title: "Hosts"
+sidebarTitle: "Hosts"
+description: "List monitored hosts and their live status."
+---
+
+Returns every host your key can see — Linux and macOS Collectors alike — with its current liveness status.
+
+---
+
+## List hosts
+
+```text
+GET /v1/hosts
+```
+
+| Parameter | Description |
+|---|---|
+| `status` | `alive`, `stale`, or `dead` |
+| `host_type` | Filter by host type (for example `production`, `staging`) |
+
+```bash
+curl "https://<your-dashboard-host>/v1/hosts" \
+  -H "Authorization: Bearer $HILT_API_KEY" \
+  -G --data-urlencode "status=dead"
+```
+
+```json
+{
+  "hosts": [
+    {
+      "host_id": "web-prod-01",
+      "node": "web-prod-01.internal",
+      "host_type": "production",
+      "status": "dead",
+      "last_seen": 1783341900123456789,
+      "age_sec": 86400
+    }
+  ],
+  "total": 1
+}
+```
+
+## Status semantics
+
+Status reflects how recently the host's collector reported, using the same thresholds as the dashboard:
+
+| Status | Meaning |
+|---|---|
+| `alive` | Reported within the last 60 seconds |
+| `stale` | Last report between 1 and 5 minutes ago |
+| `dead` | No report for more than 5 minutes |
+
+`last_seen` is Unix nanoseconds; `age_sec` is the seconds elapsed at the time of the request (computed on the server, so it's consistent with `status`).

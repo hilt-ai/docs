@@ -1,0 +1,96 @@
+---
+title: "完整示例：在终端中完成分诊"
+sidebarTitle: "完整示例"
+description: "拉取今天的严重检测发现、检查其中一条并推送审核决定——端到端演示。"
+---
+
+本演练只用 `curl` 和 `jq`，从零走完一个完整的分诊闭环，与 SIEM 或 SOAR 集成自动化的流程一致。
+
+## 1. 创建密钥
+
+在仪表盘中：**设置 → API 密钥 → 创建 API 密钥**，权限选择**读写**（第 4 步要推送审核决定）。导出为环境变量：
+
+```bash
+export HILT="https://<your-dashboard-host>"
+export HILT_API_KEY="hilt_live_a1b2c3d4e5f6..."
+```
+
+## 2. 拉取今天的严重检测发现
+
+```bash
+curl "$HILT/v1/findings" \
+  -H "Authorization: Bearer $HILT_API_KEY" \
+  -G --data-urlencode "severity=critical" \
+     --data-urlencode "since=$(date -u +%Y-%m-%dT00:00:00Z)" \
+  | jq -r '.findings[] | [.id, .classification.severity, .narrative.summary] | @tsv'
+```
+
+```text
+web-prod-01-1000-1783058049000000000  critical  Unusual process activity followed by outbound transfer…
+```
+
+结果较多时，在 `.next_cursor` 非空期间反复携带
+`--data-urlencode "cursor=$NEXT"` 翻页。
+
+## 3. 检查可疑的那条
+
+```bash
+FINDING="web-prod-01-1000-1783058049000000000"
+
+curl "$HILT/v1/findings/$FINDING" \
+  -H "Authorization: Bearer $HILT_API_KEY" \
+  | jq '{headline: .fusion_narrative.headline,
+         what: .fusion_narrative.what_happened,
+         evidence: .evidence}'
+```
+
+想看它周围的原始活动？检测发现 ID 中包含主机和纳秒时间戳——拉取前后的网络事件：
+
+```bash
+curl "$HILT/v1/events" \
+  -H "Authorization: Bearer $HILT_API_KEY" \
+  -G --data-urlencode "host=web-prod-01" \
+     --data-urlencode "type=network" \
+     --data-urlencode "since=2026-07-03T05:50:00Z" \
+     --data-urlencode "until=2026-07-03T06:10:00Z" \
+  | jq '.events[] | {comm, dst_addr, dst_port, bytes_sent}'
+```
+
+## 4. 推送审核决定
+
+```bash
+curl -X POST "$HILT/v1/findings/$FINDING/review" \
+  -H "Authorization: Bearer $HILT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "accepted", "notes": "Confirmed. Host isolated, ticket SEC-142."}'
+```
+
+该检测发现现在会在仪表盘中显示为**已接受**，审核人是创建该密钥的账户用户名；订阅了 `finding.reviewed` 的 Webhook 会在数秒内收到这个决定。
+
+## 5. 用 Webhook 闭环
+
+与其定时轮询第 2 步，不如注册一个 `finding.created` 的 Webhook（**管理 → Webhooks**），让 Hilt 主动调用你。一个最小接收端：
+
+```python
+from flask import Flask, request, abort
+import hashlib, hmac, os
+
+app = Flask(__name__)
+SECRET = os.environ["HILT_WEBHOOK_SECRET"]  # whsec_... from registration
+
+@app.post("/hilt-webhook")
+def hook():
+    ts = request.headers["X-Hilt-Timestamp"]
+    sig = request.headers["X-Hilt-Signature"]
+    expected = "sha256=" + hmac.new(
+        SECRET.encode(), f"{ts}.".encode() + request.get_data(), hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        abort(401)
+    event = request.get_json()
+    if event["type"] == "finding.created":
+        print("new finding:", event["data"]["finding_id"])
+    return "", 200
+```
+
+在此基础上自由组合：用 [`/v1/events`](/zh/api/events) 丰富新检测发现的上下文、自动创建工单，并通过[审核接口](/zh/api/findings#审核检测发现)把分析师的结论推送回来。

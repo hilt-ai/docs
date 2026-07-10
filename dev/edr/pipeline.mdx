@@ -1,0 +1,38 @@
+---
+title: "EDR Pipeline"
+description: "Forwarder batching, edr-collector edge ingest and auth, Kafka topic routing, and macOS enrichment into endpoint_events."
+sidebarTitle: "Pipeline"
+---
+
+## Forwarder
+
+`macos-edr-agent/forwarder/main.go` is a Go daemon that tails the sensor's findings and spool NDJSON files and POSTs batches to the collector edge. Points worth knowing:
+
+- The spool tailer ships only lines carrying `"hdr"` — stray finding/heartbeat lines in the spool are skipped (`main.go:262`).
+- It stamps `machine.host_type=macos` on every batch (`main.go:48,122`), which is what routes enrichment per platform.
+- Batches carry `batch_id`, `host_id`, `boot_id`, `wall_time_ns` and the `X-DAG-Agent-Version` header; the collector rejects batches missing any of them.
+
+## edr-collector
+
+[edr-collector](https://github.com/hilt-ai/edr-collector) is a format-identical deploy fork of [dag-collector](https://github.com/hilt-ai/dag-collector) running at the authenticated public edge. The mode switch lives in `dag-collector/src/edr.go`:
+
+- `COLLECTOR_MODE=dlp` (default) accepts DLP topics only; `COLLECTOR_MODE=edr` accepts only topic `dag.edr` plus the `dag.endpoint.*` telemetry topics. `modeAllowsTopic()` enforces the split — same image serves both modes.
+- In `edr` mode, `handler.go` runs `authEDRBatch`: ed25519 per-batch signatures, fail-closed unless `EDR_AUTH=off`.
+- Topic routing is by `hdr.type` (`src/event.go`); endpoint topics partition by `host_id` for per-host fault isolation.
+
+## Enrichment (macOS mode)
+
+The enrichment-endpoint deployment runs `ENRICH_PLATFORM=macos` and uses `dag-enrichment/internal/platform/macos/` (`normalize.go`, `idcache.go`) instead of the Linux handlers. It consumes the endpoint topics and writes:
+
+| Output | Content |
+| --- | --- |
+| `endpoint_events` | All exec/file/net/persistence/device/auth telemetry, one wide row per event |
+| `dag_edr_events` + `dag_edr_raw` | Findings and their ES/NE raw evidence, joined by `incident_id` |
+| `dag_edr_agent` | 30s heartbeats (run state, versions, `device_name`) |
+| `dag_host_last_seen` | Via `endpoint_host_last_seen_mv` (cybe-dag-infra migration `000054`) — Collectors-page liveness |
+
+Long-tail per-family fields (persistence item type, mount volume, injection target pid, TCC service, XProtect signature…) go into the `attrs` Map so new ES hooks need **no migration**.
+
+## Infra
+
+Terraform modules in [cybe-dag-infra](https://github.com/hilt-ai/cybe-dag-infra): `modules/edr_ingest` (edge), `modules/enrichment`, `modules/edr-update-control-plane`, `modules/fleet_digest`. ClickHouse DDL is in `schema/migrations/` — the endpoint schema is `000051_endpoint_events.sql`, liveness MV is `000054_endpoint_host_last_seen.sql`.
