@@ -1,100 +1,39 @@
 ---
 title: "Networks"
 sidebarTitle: "Networks"
-description: "Monitoring network connections, destinations, and data transfer across your fleet."
+description: "Linux fleet network signals and host views, plus macOS application egress."
 ---
 
-Shows where your hosts are talking on the network, which processes connect to which destinations, how much data moves, and which connections are new or abnormal.
+Networks shows how hosts talk to destinations. Use the **Linux | macOS** scope toggle.
 
-## Page layout
+---
 
-A subtitle below the page title shows the current **host count** and **total signal count**.
+## Linux scope
 
-The header adapts to your scope:
+Subtitle style: `N hosts · M signals`.
 
-- **Host selector** and **time range** (shared with the rest of the dashboard).
-- **Back link**: an **All hosts** link returns to the fleet view when a host is selected.
-- **Scope filter** (per-host): **All** / **Internal** / **External**.
-- **View toggle** (per-host): **Timeline** / **Graph** / **Map**.
-- **Investigate events**: jumps to Investigate scoped to network activity for the current host.
+Modes typically include:
 
-### Signal summary
-
-A summary strip highlights three kinds of network signals (fleet-wide counts with no host selected, host-level counts otherwise):
-
-| Signal | Meaning |
+| Mode | What you see |
 | --- | --- |
-| **New Processes** | Processes communicating on the network for the first time in this window |
-| **New Destinations** | IP addresses contacted for the first time by a known process |
-| **Volume Spikes** | Abnormal increase in bytes transferred compared to baseline |
+| **Fleet** | New processes, destinations, and volume spikes across hosts |
+| **Timeline** | Network activity over time |
+| **Graph** | Connection topology |
+| **Map** | Geographic or logical map of destinations |
+
+On a selected host you can filter **All / Internal / External** traffic. Pivot into [Investigate](/dashboard/investigate) for the underlying flows.
 
 ---
 
-## Fleet view
+## macOS scope
 
-With no host selected, the page shows cross-host network activity: a host roster sidebar alongside a connections graph.
+Outbound connections by **application and destination** — Sankey / ribbon views ranking by bytes or flow count. Every flow is attributed to the responsible app via Endpoint Security and the Network Extension path.
 
-### Compared Hosts sidebar
-
-Lists the hosts in scope, click to spotlight, again to clear. It has its own search (press `/` to focus), and each row shows the host label, status, signal count, and flow count. Clicking a host spotlights it and centers the graph; clicking again clears the spotlight.
-
-A **Hide offline hosts** toggle filters stale and dead hosts from the roster and graph. When disabled, offline hosts sink to the bottom of the roster by default.
-
-### Connections graph
-
-The graph plots hosts and the destinations they share, with a toolbar summary (`N hosts · N destination addresses · N cross-host connections`). On large fleets you can toggle between **Overview** and **Show destinations**. The legend distinguishes **Host**, **Destination**, and **Shared** (edge) elements, and a navigation panel offers **Fit all** and **Active host** when a host is spotlighted.
-
-### Detail panels
-
-Clicking a node or edge slides in a detail panel from the right:
-
-| Selection | Key fields |
-| --- | --- |
-| **Connection** (edge) | The host pair, connection count, bytes A→B and B→A, and **Process Pairs** (the communicating commands, apps, identities, and bytes) |
-| **Host** (node) | Destinations, flows, bytes out, peers; Top Destinations, Processes, and Cross-Node Peers; plus jump buttons to the host's **Timeline / Graph / Map** |
-| **Destination** (node) | Hostname/address, per-host port chips, flows, bytes out/in, and the processes involved |
+This absorbs the former “Network Egress” endpoint documentation.
 
 ---
 
-## Per-host views
+## Related
 
-Selecting a host switches the main area based on the **View** toggle. The **Scope** filter (All / Internal / External) applies across all three.
-
-### Timeline
-
-The default per-host view. Each row is a process (`comm`), sorted by activity duration:
-
-- The **Y axis** lists processes; the **X axis** is the selected time range.
-- Each row draws an activity bar (first seen to last seen) with destination markers.
-- **Signal markers** flag events on the timeline, New Process, New Destination, and Volume Spike.
-- Click a row to open the process detail panel; click a marker to open it with that destination preselected.
-
-If all traffic is within normal patterns (or there are no flow events in range), the view shows an empty state.
-
-### Graph
-
-A radial graph centered on the host: processes radiate out as squares, with destinations grouped into clusters.
-
-- Toggle between **Flagged** and **All traffic**.
-- **Search nodes** filters by process or destination.
-- The legend covers New Process, New Destination, Volume Spike, and Normal.
-- Click a process to open its detail panel; click a cluster to inspect its destinations. A fullscreen toggle is available.
-
-### Map
-
-A world map placing destination markers by geographic location. Clicking a marker opens a location panel with the city/country, destination count, bytes, flow count, a Volume Spike badge when relevant, and an expandable list of destinations with their processes.
-
----
-
-## Process detail panel
-
-Shared by the Timeline and Graph views, the process detail panel breaks down a single process's network activity:
-
-| Area | Contents |
-| --- | --- |
-| **Header** | Back to processes, the command, an instance selector when there are several, a summary (`N dest · N flows · bytes out · bytes in · duration`), and an Investigate link |
-| **Byte chart** | Bytes sent (blue) and bytes received (green) over time |
-| **Context** | Traffic for the selected `host:port`, or a prompt to pick a destination |
-| **Destinations table** | Destination (flag, hostname, geo), port (with service), Out, In, Flows, and the **Signal** (New Process / New Destination / Volume Spike) |
-
----
+- File exfil paths → [Files](/dashboard/files)
+- Third-party dependency behavior → [Exposure](/dashboard/exposure)

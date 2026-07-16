@@ -1,73 +1,17 @@
 ---
 title: "查询"
 sidebarTitle: "查询"
-description: "针对 Hilt 遥测数据的自然语言与结构化查询。"
+description: "针对遥测与 Hilt 文档的自然语言助手。"
 ---
 
-用自然语言询问有关遥测数据、事件、进程、文件访问和网络流的问题，并在聊天界面中获得答案。
+查询是部署的全屏聊天助手。从 **顶栏 Ask** 进入（不在侧边栏）。可询问遥测、异常、主机，以及 Hilt 如何工作。
 
-<Note>
-**run_queries** 权限控制「查询」页面是否出现在侧边栏导航中。没有该权限的用户仍可通过直接 URL 访问此页面 — 该权限管控的是可见性，而非路由访问。
-</Note>
-
-该代理（Agent）还可以回答关于 **Hilt 本身如何工作** 的问题 — 部署、采集器、配置、权限、数据处理、本地部署运维、隔离等 — 它会搜索随你的部署一起分发的 Hilt 文档。代理会根据每个问题判断应使用实时遥测数据、文档，还是两者兼用。
+助手按问题选择使用遥测、文档或两者。支持启动提示芯片、长查询思考指示、历史侧栏，以及从顶栏 Ask 交接。
 
 ---
 
-## 入门建议标签
+## 相关
 
-在任何对话开始前，空白状态会显示四个示例问题作为可点击标签，帮助你快速上手 — 例如：
-
-- _"Which hosts ran the most outbound connections this week?"_
-- _"Show me all file writes to /etc/shadow in the last 24 hours"_
-- _"What anomalies were detected on production hosts today?"_
-- _"How do I deploy the collector on Kubernetes?"_
-
-点击某个标签会将其填入输入框并立即发送。
-
----
-
-## 思考指示器与超时恢复
-
-当查询耗时超过 **3 秒**时，会出现一个带有已用时间计时器的思考指示器，让你知道查询仍在运行。
-
-- **45 秒**后，会显示一条安抚消息，确认查询仍在进行中且未停滞。
-- 如果查询**超时**，界面会建议简化问题或缩小时间窗口以减少扫描的数据量。
-
----
-
-## 回答产品与操作指南问题
-
-除遥测数据外，代理还可以回答关于 Hilt 工作原理的问题，答案来源于随你的部署打包的产品文档：
-
-- _"How do I deploy the Linux collector on Kubernetes?"_
-- _"What permissions do I need to run queries?"_
-- _"How does the on-prem auto-update agent work?"_
-- _"What data does Hilt store, and what does it not capture?"_
-
-当代理从文档中回答时，它会**引用来源**页面和章节，方便你进一步阅读。对于混合型问题 — 例如 _"Why isn't my collector showing up?"_ — 它会将文档（预期的采集器行为）与实时遥测数据（哪些主机实际在上报）结合起来回答。
-
-文档在本地打包，因此在没有出站互联网的本地部署中也能完全离线使用。如果文档未涵盖某个内容，代理会告诉你它未能找到相关信息，而不会猜测。
-
-<Note>
-打包的文档与你已部署的 Hilt 版本匹配。回答反映的是该版本；在你的发布之后才记录的新功能可能尚不可用。
-</Note>
-
----
-
-## 聊天历史
-
-左侧边栏在 **Recents** 标题下列出你过往的会话。
-
-- **New chat** 开启一个全新会话。
-- 每一行显示会话标题（新会话会根据你的第一个问题自动命名）。
-- **⋯** 行内菜单提供 **Rename**（行内重命名，最多 80 个字符：按 Enter 保存，按 Escape 取消）和 **Delete**。
-- **Collapse sidebar** / **Open sidebar** 可切换一条窄栏；你的偏好会被记住。
-
-登录后，会话会保存到你的账户。
-
----
-
-## 起草检测规则
-
-你可以让代理将某个发现项转化为检测规则，例如 _"为那个数据外泄模式写一条检测规则。"_ 在它执行时，提议的规则会作为答案的一部分返回。要使其生效，请将该草稿带到 **Detection Rules** 页面，那里的规则构建器可让你审阅、调整并保存它。规则的保存与管理发生在那里，而不是在「查询」页面本身。
+- 非自然语言深潜 → [调查](/zh/dashboard/investigate)
+- REST → [API 概览](/zh/api/overview)
+- MCP → [MCP 服务器](/zh/dashboard/mcp-server)

@@ -1,0 +1,65 @@
+---
+title: "设备端检测与响应"
+sidebarTitle: "检测"
+description: "macOS 采集器内的设备端检测引擎：规则族、分级与内核内响应。"
+---
+
+macOS 采集器内嵌设备端检测引擎，在事件发生时于本机评估内核事件。本节说明引擎关注什么，以及发现如何进入控制台。
+
+原始遥测见 [事件覆盖](/zh/macos-collector/event-coverage)。相关控制台中心页见 [恶意软件](/zh/dashboard/malware)、[凭据](/zh/dashboard/credentials)、[文件](/zh/dashboard/files)、[网络](/zh/dashboard/networks) 与 [框架](/zh/dashboard/frameworks)。
+
+---
+
+## 检测发生在哪里
+
+检测在 **端点上、ESensor 内部** 运行，在事件离开 Mac 之前完成。引擎位于 Apple Endpoint Security 的 AUTH 路径上，因此可以 **在内核中拒绝操作**，而不仅是事后报告。每条被评估的事件都携带代码签名信任与应用归属 — 规则对 *谁在行动* 打分，而不只是 *发生了什么*。
+
+---
+
+## 规则族
+
+| 族 | 监视内容 | 延伸阅读 |
+| --- | --- | --- |
+| **Tamper（篡改）** | Gatekeeper 隔离标记移除、配置描述文件变更、针对 agent 的攻击 | [篡改](/zh/macos-collector/detections/tamper) |
+| **Persistence（持久化）** | Launch agents、daemons、login items | [持久化](/zh/macos-collector/detections/persistence) |
+| **Credential & privacy** | 钥匙串、浏览器存储、TCC、摄像头/麦克风 | [凭据](/zh/dashboard/credentials) |
+| **Data movement** | 可移动介质写入、异常出站 | [文件](/zh/dashboard/files)、[网络](/zh/dashboard/networks) |
+
+---
+
+## agent 如何响应
+
+| 状态 | 含义 |
+| --- | --- |
+| `blocked` | 内核中已拒绝 |
+| `alerted` | 操作已完成；升高严重度的发现待审阅 |
+| `logged` | 记录用于上下文与关联 |
+
+严重度随行动者的代码签名判定缩放。agent 保护自身 bundle、更新程序与 launch items — 未授权的 kill/delete/rename 会被拒绝并作为 blocked 篡改发现上报。
+
+---
+
+## 共享发现布局
+
+发现通常包含：**发生了什么 · 负责进程 · 触及了什么 · 为何重要 · 证据 · 建议操作**，以及严重度/状态与负责应用的信任判定。
+
+---
+
+## 内核基础（为何 macOS 行看起来不同）
+
+每条 Endpoint Security 事件可携带：
+
+- **代码签名身份** — platform、Developer ID、ad hoc、unsigned/invalid
+- **应用归属** — 拥有应用，而不仅是 `comm`
+
+因此持久化与篡改的严重度可由 *谁* 行动驱动。细节见 [事件数据模型](/zh/macos-collector/event-data-model)。
+
+---
+
+## 从发现到仪表盘
+
+发现使用与遥测相同的认证摄取路径。在 [恶意软件](/zh/dashboard/malware) 审阅，在 [框架](/zh/dashboard/frameworks) 映射覆盖，并在 [调查](/zh/dashboard/investigate)（macOS 范围）深潜证据。
+
+<Note>
+检测规则随采集器发布并版本化。agent 头上的策略版本记录 Mac 正在运行的规则集。
+</Note>

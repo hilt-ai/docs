@@ -1,67 +1,50 @@
 ---
 title: "Investigate"
 sidebarTitle: "Investigate"
-description: "Deep-dive investigation view for exploring host activity across time."
+description: "Time-bounded event investigation with Linux and macOS scope, filters, and timeline."
 ---
 
-The raw event explorer. Investigate lets you scope to hosts and a time window, narrow down with structured filters, and read individual events in chronological order, with anomaly windows highlighted inline. It's where most "Investigate events" links across the dashboard land.
+Investigate is the primary event deep-dive. Scope a time window and hosts, narrow with structured filters, and read process-grouped events chronologically. Most “investigate” links from Lineage, Networks, Anomalies, and Users land here.
 
-The Investigate page enforces a **24-hour maximum time window**. The 7-day time preset is disabled or clamped to 24 hours. On fresh visits, the page **auto-selects all activity hosts** (up to 500).
-
-Re-clicking **Investigate** in the sidebar resets all URL state and remounts the page from scratch.
+Use the **Linux | macOS** scope toggle in the hub bar. Linux shows the eBPF event stream; macOS shows Endpoint Security events with the same chrome.
 
 ---
 
-## Context banner
+## Scope and time
 
-When you arrive from another page, a context banner gives you a one-click way back, labeled for the source. Context banner sources include **Data Lineage**, **Networks**, **Session**, and **Files** drill-downs.
+- **Linux**: kernel/process/file/network telemetry from the Linux collector
+- **macOS**: endpoint events; subtitle reflects macOS event counts; extra filter tabs for **User** and **Application**
+
+Time presets and a custom range bound the investigation. The page enforces a practical maximum window (typically 24 hours). Fresh visits often auto-select active hosts.
+
+Re-clicking **Investigate** in the sidebar resets URL state and remounts a clean view.
+
+---
 
 ## Filters
 
-Filters are grouped into tabs across the header, **Event**, **Process**, **Network**, **File**, **Topology**, and **Location**. Each opens a panel of structured fields:
+Filter tabs across the header:
 
 | Tab | What you filter on |
 | --- | --- |
-| **Event** | Event types, grouped as Process, Files, Network, and Workloads (e.g. _Process started_, _File opened_, _Network flow_) |
-| **Process** | Command, parent command, Process ID (kernel tgid), Thread ID (kernel pid), parent PID, UID, effective UID, user, workload ID |
-| **Network** | Source/destination IP and port, protocol, connection type, bytes sent/received thresholds |
-| **File** | Path prefix, open flags, permission bits, command-line contains |
-| **Topology** | Program ID, session ID, process instance ID |
-| **Location** | Hosts (multi-select), boot ID, container ID, pod UID |
+| **Event** | Event types (process, files, network, workloads) |
+| **Process** | Command, parent, PIDs, UID, user, workload |
+| **Network** | IPs, ports, protocol, bytes |
+| **File** | Path prefix, flags, permissions |
+| **Topology** | Program / session / process instance IDs |
+| **Location** | Hosts, boot ID, container, pod |
+| **User / Application** | macOS only |
 
-Active filters show as removable chips, with **Clear all** to reset. Filtering is entirely structured. 
-
----
-
-## Timeline scrubber
-
-Above the event list, an **Activity** histogram plots event volume over time, one bar per time bucket, with the count on the Y axis.
-
-- **Drag to zoom**: select a region to narrow the window; the selection becomes a custom range.
-- **Back** and **Reset** step out of zoom levels.
-- **Anomaly overlay**: amber bands mark windows where findings occurred (±2.5 minutes).
-- Hovering a bucket shows its event count and time. 
+Active filters appear as removable chips. Context banners appear when you arrive from Lineage, Networks, Sessions, or Files.
 
 ---
 
-### Expanding an event
+## Timeline and event list
 
-Click a row to expand it. If the event overlaps a finding, an **Anomaly overlap** banner explains why. The expansion shows type-specific forensic fields, path, command line, flow, user, lineage, UID, along with pivot links such as **Connections to…**, **File access for…**, and **Data Lineage**, plus a **More / Less** toggle for the full forensic detail (identity, execution, runtime, and so on).
-
-### Loading more
-
-Events load 200 at a time. Use **Show more** to fetch older events.
+An **Activity** histogram sits above the list. Drag to zoom; amber bands mark windows that overlap anomaly findings. Events load in batches; expand a row for forensic fields and pivots into Connections, Files, or Lineage.
 
 ---
 
-## Event list
+## Ask
 
-Below the scrubber is the event list. Despite being internally called a "process group" list, it's a **flat, chronological list, one row per event**, not grouped under process headers.
-
-### Toolbar
-
-- **Sort**: **Newest** or **Oldest** first.
-- A {n} **loaded** count.
-- **Refresh**: manually reloads (the list does not auto-poll; anomaly markers do refresh every 30 seconds).
-
-The header title is **Investigate**, and the subtitle reflects how you got here: for example _"All hosts · 12,340 events"_, _"web-01 · 512 events"_, or, when arriving from a finding, _"Investigating: \<alert group\> - \<host\>"_ naming the finding's group and host.
+From Investigate you can open the natural-language **Ask** flow (also available from the top bar) to hand off into [Query](/dashboard/query).

@@ -2,7 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "sequoia",
   "name": "Hilt Documentation",
-  "description": "Deploy, configure, and operate Hilt: data detection and response for your infrastructure.",
+  "description": "Deploy, configure, and operate Hilt: Data Movement Governance for modern infrastructure.",
   "colors": {
     "primary": "#166E3F",
     "light": "#26BD6C",
@@ -62,78 +62,95 @@
               "dashboard/overview",
               "dashboard/collectors",
               {
-                "group": "Cloud",
+                "group": "Data",
                 "pages": [
+                  "dashboard/investigate",
                   "dashboard/data-lineage",
                   "dashboard/networks",
                   "dashboard/files",
-                  "dashboard/users"
-                ]
-              },
-              {
-                "group": "Endpoint",
-                "pages": [
-                  "dashboard/endpoint/foundation",
-                  "dashboard/endpoint/persistence",
-                  "dashboard/endpoint/tamper",
-                  "dashboard/endpoint/credential-privacy",
-                  "dashboard/endpoint/removable-media",
-                  "dashboard/endpoint/network-egress",
-                  "dashboard/endpoint/attack-matrix",
-                  "dashboard/endpoint/process-lineage",
-                  "dashboard/endpoint/credential-access",
-                  "dashboard/endpoint/activity",
-                  "dashboard/endpoint/files"
+                  "dashboard/users",
+                  "dashboard/activity",
+                  "dashboard/credentials"
                 ]
               },
               {
                 "group": "Security",
                 "pages": [
-                  "dashboard/detection-accuracy",
                   "dashboard/anomalies",
-                  "dashboard/detection-rules",
-                  "administration/behavioral-suppression",
-                  "dashboard/fleet-behavior",
-                  "dashboard/investigate",
+                  "dashboard/alerts",
+                  "dashboard/exposure",
+                  "dashboard/malware",
+                  "dashboard/frameworks",
+                  "dashboard/frameworks/attack",
+                  "dashboard/frameworks/kill-chain",
+                  "dashboard/quarantine"
+                ]
+              },
+              {
+                "group": "Tools",
+                "pages": [
                   "dashboard/query",
-                  "dashboard/quarantine",
                   "administration/reports"
                 ]
               },
-              "dashboard/settings",
               {
-                "group": "Admin",
+                "group": "Settings",
                 "pages": [
-                  "administration/layout",
-                  "administration/user-management",
-                  "administration/identity-mappings",
-                  "administration/system-status",
-                  "administration/prometheus",
-                  "administration/teams",
-                  "administration/slack-notifications",
-                  "on-prem/model-lifecycle",
+                  "dashboard/settings",
                   {
-                    "group": "Data Export",
+                    "group": "Account",
                     "pages": [
-                      "on-prem/data-export-overview",
-                      "on-prem/data-catalog",
-                      "on-prem/data-export-schema",
-                      "on-prem/data-export-implementation"
+                      "dashboard/settings-account"
                     ]
                   },
                   {
-                    "group": "Auto-Update",
+                    "group": "Uptime",
                     "pages": [
+                      "administration/system-status",
+                      "administration/prometheus"
+                    ]
+                  },
+                  {
+                    "group": "System",
+                    "pages": [
+                      "on-prem/model-lifecycle",
                       "on-prem/auto-update-overview",
                       "on-prem/auto-update-prerequisites",
                       "on-prem/auto-update-workflow",
-                      "on-prem/auto-update-operations"
+                      "on-prem/auto-update-operations",
+                      "on-prem/data-export-overview",
+                      "on-prem/data-catalog",
+                      "on-prem/data-export-schema",
+                      "on-prem/data-export-implementation",
+                      "dashboard/fleet-behavior"
                     ]
                   },
-                  "administration/storage",
-                  "administration/clickhouse-tables",
-                  "administration/audit-log",
-                  "dashboard/mcp-server"
+                  {
+                    "group": "Teams",
+                    "pages": [
+                      "administration/teams",
+                      "administration/user-management",
+                      "administration/identity-mappings"
+                    ]
+                  },
+                  {
+                    "group": "Integrations",
+                    "pages": [
+                      "administration/slack-notifications",
+                      "administration/webhooks"
+                    ]
+                  },
+                  {
+                    "group": "Admin",
+                    "pages": [
+                      "administration/cloud-sources",
+                      "administration/billing",
+                      "administration/storage",
+                      "administration/clickhouse-tables",
+                      "administration/audit-log",
+                      "dashboard/mcp-server"
+                    ]
+                  }
                 ]
               }
             ]
@@ -182,7 +199,14 @@
               "macos-collector/networking-security",
               "macos-collector/event-data-model",
               "macos-collector/event-coverage",
-              "macos-collector/detections",
+              {
+                "group": "Detections",
+                "pages": [
+                  "macos-collector/detections",
+                  "macos-collector/detections/persistence",
+                  "macos-collector/detections/tamper"
+                ]
+              },
               "macos-collector/sizing-capacity",
               "macos-collector/data-flow",
               "macos-collector/troubleshooting"
@@ -239,68 +263,95 @@
               "zh/dashboard/overview",
               "zh/dashboard/collectors",
               {
-                "group": "云",
+                "group": "数据",
                 "pages": [
+                  "zh/dashboard/investigate",
                   "zh/dashboard/data-lineage",
                   "zh/dashboard/networks",
                   "zh/dashboard/files",
-                  "zh/dashboard/users"
-                ]
-              },
-              {
-                "group": "端点",
-                "pages": [
-                  "zh/dashboard/edr"
+                  "zh/dashboard/users",
+                  "zh/dashboard/activity",
+                  "zh/dashboard/credentials"
                 ]
               },
               {
                 "group": "安全",
                 "pages": [
-                  "zh/dashboard/detection-accuracy",
                   "zh/dashboard/anomalies",
-                  "zh/dashboard/detection-rules",
-                  "zh/administration/behavioral-suppression",
-                  "zh/dashboard/fleet-behavior",
-                  "zh/dashboard/investigate",
+                  "zh/dashboard/alerts",
+                  "zh/dashboard/exposure",
+                  "zh/dashboard/malware",
+                  "zh/dashboard/frameworks",
+                  "zh/dashboard/frameworks/attack",
+                  "zh/dashboard/frameworks/kill-chain",
+                  "zh/dashboard/quarantine"
+                ]
+              },
+              {
+                "group": "工具",
+                "pages": [
                   "zh/dashboard/query",
-                  "zh/dashboard/quarantine",
                   "zh/administration/reports"
                 ]
               },
-              "zh/dashboard/settings",
               {
-                "group": "管理",
+                "group": "设置",
                 "pages": [
-                  "zh/administration/layout",
-                  "zh/administration/user-management",
-                  "zh/administration/identity-mappings",
-                  "zh/administration/system-status",
-                  "zh/administration/prometheus",
-                  "zh/administration/teams",
-                  "zh/administration/slack-notifications",
-                  "zh/on-prem/model-lifecycle",
+                  "zh/dashboard/settings",
                   {
-                    "group": "数据导出",
+                    "group": "账户",
                     "pages": [
-                      "zh/on-prem/data-export-overview",
-                      "zh/on-prem/data-catalog",
-                      "zh/on-prem/data-export-schema",
-                      "zh/on-prem/data-export-implementation"
+                      "zh/dashboard/settings-account"
                     ]
                   },
                   {
-                    "group": "自动更新",
+                    "group": "运行状态",
                     "pages": [
+                      "zh/administration/system-status",
+                      "zh/administration/prometheus"
+                    ]
+                  },
+                  {
+                    "group": "系统",
+                    "pages": [
+                      "zh/on-prem/model-lifecycle",
                       "zh/on-prem/auto-update-overview",
                       "zh/on-prem/auto-update-prerequisites",
                       "zh/on-prem/auto-update-workflow",
-                      "zh/on-prem/auto-update-operations"
+                      "zh/on-prem/auto-update-operations",
+                      "zh/on-prem/data-export-overview",
+                      "zh/on-prem/data-catalog",
+                      "zh/on-prem/data-export-schema",
+                      "zh/on-prem/data-export-implementation",
+                      "zh/dashboard/fleet-behavior"
                     ]
                   },
-                  "zh/administration/storage",
-                  "zh/administration/clickhouse-tables",
-                  "zh/administration/audit-log",
-                  "zh/dashboard/mcp-server"
+                  {
+                    "group": "团队",
+                    "pages": [
+                      "zh/administration/teams",
+                      "zh/administration/user-management",
+                      "zh/administration/identity-mappings"
+                    ]
+                  },
+                  {
+                    "group": "集成",
+                    "pages": [
+                      "zh/administration/slack-notifications",
+                      "zh/administration/webhooks"
+                    ]
+                  },
+                  {
+                    "group": "管理",
+                    "pages": [
+                      "zh/administration/cloud-sources",
+                      "zh/administration/billing",
+                      "zh/administration/storage",
+                      "zh/administration/clickhouse-tables",
+                      "zh/administration/audit-log",
+                      "zh/dashboard/mcp-server"
+                    ]
+                  }
                 ]
               }
             ]
@@ -338,7 +389,28 @@
           {
             "tab": "macOS 采集器",
             "pages": [
-              "zh/macos-collector"
+              "zh/macos-collector/layout",
+              "zh/macos-collector/system-requirements",
+              "zh/macos-collector/release-artifacts",
+              "zh/macos-collector/install-flow",
+              "zh/macos-collector/deploy-standalone",
+              "zh/macos-collector/deploy-mdm",
+              "zh/macos-collector/uninstall",
+              "zh/macos-collector/configuration",
+              "zh/macos-collector/networking-security",
+              "zh/macos-collector/event-data-model",
+              "zh/macos-collector/event-coverage",
+              {
+                "group": "检测",
+                "pages": [
+                  "zh/macos-collector/detections",
+                  "zh/macos-collector/detections/persistence",
+                  "zh/macos-collector/detections/tamper"
+                ]
+              },
+              "zh/macos-collector/sizing-capacity",
+              "zh/macos-collector/data-flow",
+              "zh/macos-collector/troubleshooting"
             ]
           },
           {
@@ -388,17 +460,22 @@
     },
     {
       "source": "/on-prem/overview",
-      "destination": "/administration/layout",
+      "destination": "/dashboard/settings",
       "permanent": true
     },
     {
       "source": "/on-prem/layout",
-      "destination": "/administration/layout",
+      "destination": "/dashboard/settings",
       "permanent": true
     },
     {
       "source": "/administration/overview",
-      "destination": "/administration/layout",
+      "destination": "/dashboard/settings",
+      "permanent": true
+    },
+    {
+      "source": "/administration/layout",
+      "destination": "/dashboard/settings",
       "permanent": true
     },
     {
@@ -418,7 +495,77 @@
     },
     {
       "source": "/dashboard/edr",
-      "destination": "/dashboard/endpoint/foundation",
+      "destination": "/macos-collector/detections",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/endpoint/foundation",
+      "destination": "/macos-collector/detections",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/endpoint/persistence",
+      "destination": "/macos-collector/detections/persistence",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/endpoint/tamper",
+      "destination": "/macos-collector/detections/tamper",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/endpoint/credential-privacy",
+      "destination": "/dashboard/credentials",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/endpoint/credential-access",
+      "destination": "/dashboard/credentials",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/endpoint/removable-media",
+      "destination": "/dashboard/files",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/endpoint/network-egress",
+      "destination": "/dashboard/networks",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/endpoint/attack-matrix",
+      "destination": "/dashboard/frameworks/attack",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/endpoint/process-lineage",
+      "destination": "/dashboard/data-lineage",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/endpoint/activity",
+      "destination": "/dashboard/investigate",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/endpoint/files",
+      "destination": "/dashboard/files",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/detection-rules",
+      "destination": "/dashboard/alerts",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/detection-accuracy",
+      "destination": "/dashboard/anomalies",
+      "permanent": true
+    },
+    {
+      "source": "/administration/behavioral-suppression",
+      "destination": "/dashboard/anomalies",
       "permanent": true
     },
     {
@@ -439,6 +586,41 @@
     {
       "source": "/zh/deployment-architecture",
       "destination": "/zh/deployment/aws",
+      "permanent": true
+    },
+    {
+      "source": "/zh/dashboard/edr",
+      "destination": "/zh/macos-collector/detections",
+      "permanent": true
+    },
+    {
+      "source": "/zh/macos-collector",
+      "destination": "/zh/macos-collector/layout",
+      "permanent": true
+    },
+    {
+      "source": "/zh/dashboard/detection-rules",
+      "destination": "/zh/dashboard/alerts",
+      "permanent": true
+    },
+    {
+      "source": "/zh/dashboard/detection-accuracy",
+      "destination": "/zh/dashboard/anomalies",
+      "permanent": true
+    },
+    {
+      "source": "/zh/administration/behavioral-suppression",
+      "destination": "/zh/dashboard/anomalies",
+      "permanent": true
+    },
+    {
+      "source": "/zh/administration/layout",
+      "destination": "/zh/dashboard/settings",
+      "permanent": true
+    },
+    {
+      "source": "/zh/on-prem/layout",
+      "destination": "/zh/dashboard/settings",
       "permanent": true
     }
   ]

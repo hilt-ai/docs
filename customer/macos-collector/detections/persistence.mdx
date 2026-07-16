@@ -1,0 +1,139 @@
+---
+title: "Persistence"
+sidebarTitle: "Persistence"
+description: "Everything that installs itself to survive a reboot on macOS — launch agents, daemons, and login items — caught at registration by Background Task Management, with the installing process's code-signing verdict driving severity."
+---
+
+Persistence answers one question: **what installed itself to survive a reboot?** It is the first page an attacker has to clear and the last thing they want you to see, because a foothold that does not persist dies at the next restart. This page is built almost entirely on a single, exceptionally clean primitive — the macOS 13+ Background Task Management `btm_add` event — and on the trust verdict that the [kernel foundation](/macos-collector/detections) stamps on the process that did the installing.
+
+Findings are produced on-device and appear in Malware, Frameworks, and related Security views. The sections below describe the persistence signal itself. The rest of this page covers what is specific to persistence.
+
+---
+
+## Why `btm_add` is the highest-signal primitive on macOS
+
+On Linux, persistence is a scavenger hunt: cron, systemd units, rc files, shell profiles, `LD_PRELOAD`, and a dozen more, each a separate place to watch and a separate parser to maintain. On macOS 13+ (Ventura and later), Apple funnels essentially all of it through one framework — **Background Task Management (BTM)** — and the [collector](/macos-collector/event-coverage) subscribes to its `NOTIFY_BTM_LAUNCH_ITEM_ADD` callback. When anything registers a launch agent, launch daemon, or login item, a single `btm_add` row lands in `endpoint_events`.
+
+That gives this page two structural advantages:
+
+- **It fires at registration, not at run.** You see the persistence the moment it is installed — before the next reboot, before the payload ever executes a second time. There is no window to win a race in.
+- **It is never filtered.** Persistence events [bypass volume filtering entirely](/macos-collector/event-coverage#what-is-never-filtered). A `btm_add` is always recorded, regardless of who installed it, so the page never has a blind spot created by a noise rule.
+
+And because every row also carries the foundation's identity columns, a `btm_add` does not just say *"a launch daemon was added"* — it says *which* process added it, **signed by whom, trusted how**. That last part is the entire story of severity on this page.
+
+---
+
+## The `btm_add` payload
+
+Beyond the always-present [code-signing](/macos-collector/event-data-model#code-signing-identity-every-event-the-macos-differentiator) and [application attribution](/macos-collector/event-data-model#application-attribution-every-event-the-macos-differentiator) columns, a persistence event carries three payload fields:
+
+| Column | Meaning |
+| :-- | :-- |
+| `item_type` | The kind of persistence registered: `launch_agent`, `launch_daemon`, or `login_item`. |
+| `item_path` | The path of the installed launch item or login item — the `.plist` or app that will run on boot/login. |
+| `managed` | Whether the item was installed by **MDM** (`managed`) or by a **user or process** (unmanaged). |
+
+These three, plus the installing process's trust verdict, are everything the page reasons about.
+
+| `item_type` | Runs as | Typical path | Maps to |
+| :-- | :-- | :-- | :-- |
+| `launch_daemon` | **root**, at boot, no user session needed | `/Library/LaunchDaemons/*.plist` | [T1543.004](https://attack.mitre.org/techniques/T1543/004/) — Launch Daemon |
+| `launch_agent` | the user, at login | `~/Library/LaunchAgents/*.plist`, `/Library/LaunchAgents/*.plist` | [T1543.001](https://attack.mitre.org/techniques/T1543/001/) — Launch Agent |
+| `login_item` | the user, at login (Login Items / SMAppService) | an app or helper bundle | [T1547.011](https://attack.mitre.org/techniques/T1547/011/) — Login Items |
+
+<Note>
+A `launch_daemon` is the most powerful of the three because it runs as **root before any user logs in**. When the timeline shows a daemon registered by a binary you do not trust, that is the row to open first.
+</Note>
+
+BTM also covers the classic scheduled-task path on macOS — cron entries managed through it map to [T1053.003](https://attack.mitre.org/techniques/T1053/003/) (Cron) — so a single event source spans the four persistence techniques that dominate real-world macOS intrusions.
+
+---
+
+## Page-specific structure
+
+The shared layout's generic pieces take on a persistence-specific shape.
+
+### The "Persistence items" activity group
+
+The page has one activity group, **Persistence items**, and its summary card shows the count of registered launch items and the worst severity among them. On the reference Mac that card reads **~1,389 persistence findings** — which sounds enormous until you see the dedup, because the overwhelming majority are a handful of well-signed updaters re-registering the same plist over and over.
+
+### Severity is the installer's trust verdict
+
+This is the headline insight of the page, and the cleanest illustration of the [whole section's thesis](/macos-collector/detections#why-endpoint-kernel-telemetry-is-different): **the same action gets a different severity depending entirely on who did it.**
+
+| Installer `code_signature` | Example | Severity | Reasoning |
+| :-- | :-- | :-- | :-- |
+| `platform` | an Apple OS component | `info` | The OS registering its own launch items is routine. |
+| `developer_id` | Google, Docker, Microsoft updater | `info` | A notarized, known vendor installing its auto-start helper is expected software behavior. |
+| `adhoc` | a locally compiled binary | `high` | A valid signature with **no identity behind it** installing persistence is a frequent malware tell. |
+| `unsigned_or_invalid` | a dropped payload | `high` | An untrusted binary registering something to survive reboot is the textbook foothold. |
+| any of the above, but `managed` | an MDM-pushed daemon | `info` | MDM-managed items are administrator-intended and de-prioritized regardless of signer. |
+
+A launch agent registered by a `developer_id` updater is `info` and scrolls past. The *same* launch agent registered by an `unsigned_or_invalid` or `adhoc` binary is `high` and sits at the top of the table. You are not writing path-based allow/deny rules — the trust tier on the installing process *is* the severity input, and it comes for free on every row.
+
+### Dedup: the chatty-updater problem
+
+Legitimate software re-registers its persistence constantly. Docker Desktop, for instance, rewrites its launch-agent plist roughly **once a minute**, which would otherwise bury the table under hundreds of identical `developer_id` rows. The shared [grouped table](/macos-collector/detections#shared-finding-layout) collapses near-identical findings — same rule, same installing app, same `item_path` — into **one row with an `N×` badge** you can expand to see every timestamp. So Docker's minute-by-minute churn reads as a single `Docker ×1,000+` line, and the ~1,389 raw findings resolve to a short, legible list of distinct persistence items.
+
+<Warning>
+The `N×` collapse is cosmetic, not a filter — expanding the badge shows every individual registration with its own timestamp. A high-severity finding never hides inside a collapsed group, because grouping keys on the rule and severity too.
+</Warning>
+
+---
+
+## Finding detail
+
+Selecting a row opens the standard [six-part detail panel](/macos-collector/detections#shared-finding-layout). On Persistence each panel is filled out like this:
+
+| Panel | What it shows for a persistence finding |
+| :-- | :-- |
+| **What happened** | `item_type` was registered at `item_path` (e.g. *"Launch daemon registered at `/Library/LaunchDaemons/com.acme.helper.plist`"*), with the registration time and the `N×` count. |
+| **Process responsible** | The installing process: `application_display_name`, `comm`, its **`code_signature` verdict**, `team_id`, and `cdhash`. This is where the severity comes from. |
+| **What was touched** | The launch item itself — full `item_path`, the resolved `item_type`, and the **`managed`** flag (MDM vs. user/process). |
+| **Why it matters** | The mapped MITRE technique (T1543.001 / T1543.004 / T1547.011 / T1053.003) and a plain-language read of the risk given the installer's trust tier. |
+| **Evidence** | The raw `btm_add` row and a pivot to every `endpoint_events` action by the same `responsible_pid` / `cdhash`. |
+| **Recommended action** | For untrusted installers: inspect the plist's program arguments, confirm with the user, and quarantine — with a jump to [Process Lineage](/dashboard/data-lineage) to see what spawned the installer. |
+
+The **Process responsible** panel is the one that matters most here. The `team_id` tells you the exact Apple Developer team that signed the installer (empty, correctly, for Apple platform binaries), and the `cdhash` is a cryptographic fingerprint you can pivot on across the whole table to find every other thing that binary did.
+
+---
+
+## Querying persistence directly
+
+Because `btm_add` carries the installer's trust verdict on the same row, the high-severity slice of this entire page is one `WHERE` clause:
+
+```sql
+-- Untrusted persistence: launch items installed by anything we don't trust.
+SELECT event_time,
+       device_name,
+       item_type,                 -- launch_agent | launch_daemon | login_item
+       item_path,
+       application_display_name,   -- the owning app that installed it
+       comm,
+       code_signature,            -- adhoc | unsigned_or_invalid drive HIGH
+       team_id,
+       cdhash,
+       managed                    -- MDM-installed items are de-prioritized
+FROM endpoint_events
+WHERE event_type = 'btm_add'
+  AND code_signature IN ('adhoc', 'unsigned_or_invalid')
+  AND managed = 0
+ORDER BY event_time DESC;
+```
+
+Flip the `code_signature` filter to `developer_id` and you get the routine, info-level baseline — the updaters and helpers that make up most of the ~1,389 findings. The verdict column is the only thing that changes between "show me the noise" and "show me the foothold."
+
+<Note>
+`btm_add` requires **macOS 13.0 (Ventura) or later** — BTM is the framework that backs it. On older hosts the subscription [degrades gracefully](/macos-collector/event-coverage#roadmap-hooks-not-yet-enabled): the rest of the sensor keeps running, this page simply has no rows to show.
+</Note>
+
+---
+
+## How it fits the rest of the section
+
+Persistence is a pinpoint detector — it tells you precisely *what* was installed and *by whom*. Two neighbors give it context:
+
+- **[Process Lineage](/dashboard/data-lineage)** answers the next question. When an `unsigned_or_invalid` binary registers a launch daemon, you want to know what spawned *that* binary. The `responsible_pid` and `cdhash` on the finding pivot straight into the `exec`/`fork` tree to reconstruct the kill chain back to its origin.
+- **[ATT&CK Matrix](/dashboard/frameworks/attack)** rolls these findings up. Every persistence finding lights its mapped cell — T1543.001, T1543.004, T1547.011, or T1053.003 — so a single launch-daemon install shows up both here, as a row, and there, as coverage of the Persistence tactic column.
+
+For the underlying event, see [the `btm_add` payload](/macos-collector/event-data-model#persistence-payload-btm_add) and [event coverage](/macos-collector/event-coverage). For why trust and identity ride on every row in the first place, start at the [foundation](/macos-collector/detections).

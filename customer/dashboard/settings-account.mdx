@@ -1,0 +1,59 @@
+---
+title: "Account"
+sidebarTitle: "Profile"
+description: "Account profile: username, password, sessions, sign-in history, and API keys."
+---
+
+Account → **Profile** is your personal account page inside Settings.
+
+---
+
+## Account identity
+
+Shows your **username** and **role**. A **Password last changed** line shows when you last updated your password.
+
+Click the pencil next to your username to rename it.
+
+---
+
+## Change password
+
+Provide **current password**, **new password**, and **confirmation**. Strength indicators:
+
+| Indicator | Requirement |
+| --- | --- |
+| **8+** | At least 8 characters |
+| **Aa** | Mixed case |
+| **123** | At least one digit |
+| **#!** | At least one special character |
+
+After a successful change you are signed out and must sign in again.
+
+---
+
+## Active sessions
+
+Lists sessions across devices (this device badge, IP / location, last activity). **Sign out everywhere** terminates all sessions.
+
+---
+
+## Recent sign-ins
+
+Chronological login events (time and IP). Expand to show the full history.
+
+---
+
+## API keys
+
+Create bearer keys for the [REST API](/api/overview). Each key shows name, prefix (`hilt_live_…`), scope, creation / last-used, expiry, and status.
+
+- **Create API key** — name, **Read-only** or **Read & write**, optional expiry
+- Full key shown **once** at creation
+- **Revoke** invalidates immediately
+- Up to 20 active keys; keys inherit your host and team restrictions
+
+---
+
+## Related
+
+- Settings map → [Settings](/dashboard/settings)

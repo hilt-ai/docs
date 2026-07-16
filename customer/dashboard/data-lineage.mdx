@@ -1,118 +1,37 @@
 ---
 title: "Data Lineage"
-sidebarTitle: "Data Lineage"
-description: "Visualizing how data moves across hosts, processes, and network connections."
+sidebarTitle: "Lineage"
+description: "Process and data-flow lineage for Linux estates, and exec-based process lineage for macOS."
 ---
 
----
-
-Traces process relationships and execution sessions for a host: which processes spawn which, what they run, and where anomalies surface in the chain.
-
-## Page layout
-
-The page header carries the controls and adapts to what you're looking at:
-
-- **Host selector** and **time range** (shared with the rest of the dashboard).
-- **Back link**: when a host is selected, an **All hosts** link returns you to the fleet view.
-- **View toggle**: appears once a host is selected: **Data Flow** / **Sessions**.
-- **Investigate events**: jumps to Investigate scoped to the current host and time window.
-
-A **metric summary strip** sits below the header. The metrics depend on your scope:
-
-- **Per-host**: Processes, Binaries, Relationships, Identities, Anomalies
-- **Fleet**: Processes, Binaries, Relationships, Anomalies
-
-The Processes, Relationships, and Anomalies cards are clickable and deep-link into Investigate or Anomalies for the same scope.
+Lineage answers *who launched what* and how data moved between processes. Use the **Linux | macOS** scope toggle — the two estates share the hub but render different graphs.
 
 ---
 
-## Fleet overview
+## Linux scope
 
-With no host selected, the page shows **Process Activity** across the fleet.
+Title: **Data Lineage**. Subtitle summarizes hosts, relationships, and related anomalies.
 
-A **Search hosts** filter in the table header lets you narrow the list by host name.
+When a host is selected you can switch:
 
-### Columns
-
-| Column | What it shows |
+| View | Purpose |
 | --- | --- |
-| **Host** | Display name |
-| **Processes** | Process count |
-| **Binaries** | Distinct binary count |
-| **Relationships** | Parent–child relationship count |
-| **Anomalies** | Anomaly count |
+| **Data Flow** | Process and data topology for the host |
+| **Sessions** | Session-oriented graphs |
 
-### Behavior
-
-- **Default sort**: Processes, highest first.
-- **Click a row** to drill into that host's Data Flow view.
-- **Kubernetes grouping**: nodes in the same cluster collapse under one expandable cluster row showing the node count.
-
-If there's no activity, the table prompts you to expand the time window.
+Without a host focused, you see a fleet overview of relationships. Drill into a node to continue in [Investigate](/dashboard/investigate).
 
 ---
 
-## Data Flow view
+## macOS scope
 
-The default per-host view. A flow graph (built on React Flow) lays out **parent → child process relationships** for the selected host and time range.
+Title remains **Data Lineage**; the graph is built from Endpoint Security `exec` / fork telemetry — every process spawn the kernel sees, with code-signing trust on edges where available.
 
-### Nodes
-
-Each node is a process card showing:
-
-- The command (`comm`) and the identity that ran it.
-- A behavior-group badge.
-- Activity summary: `N events · N execs`.
-
-Processes that are evidence for an anomaly are outlined with a red ring.
-
-### Navigating the graph
-
-- **Zoom in / out** and **Fit view** controls sit on the canvas; a minimap is pinned to the top-right.
-- **Cluster nodes** group related processes, click to expand. Expanded parents offer **Collapse children**, and a global **Collapse all** appears whenever any cluster is open.
-
-### Flow detail panel
-
-Click a process node (other than the root or a cluster) to slide in a detail panel from the right:
-
-| Section | Contents |
-| --- | --- |
-| **Header** | Process command, labeled "Process" |
-| **Identity** | The identity that ran it |
-| **Activity** | Executions, events, PIDs, and active duration |
-| **Risk signals** | Badges such as _dominant_, _high fan-out_, _root activity_, _persistent_, _brief_, _singleton_, _high churn_ |
-| **Spawns** | Clickable links to downstream child processes |
-| **Footer** | **Investigate events**, filtered to this process |
-
-The detail panel describes the selected **process node**, not graph edges.
+This replaces the older standalone “Process Lineage” endpoint page. Focus a Mac from the collector sidebar or host picker to narrow the graph.
 
 ---
 
-## Sessions view
+## Related
 
-Switch the per-host toggle to **Sessions** to inspect execution sessions, recurring shapes of process activity, with the ability to load any individual run.
-
-<Note>Session clustering is clamped to a **48-hour window**. When the global time range is wider than 48 hours, an amber banner appears explaining the clamp.</Note>
-
-### Choosing a session
-
-Sessions are organized by **grouping** (recurring exec shapes). Use the grouping control to find and load a run:
-
-- **Grouped sessions**: the recurring shapes in this time range.
-- **Select session in this grouping**: pick a specific run to load into the graph.
-- The groupings popover (**Groupings in this range**) lets you expand a row for sample sessions, then choose one.
-
-Each grouping (cluster) row shows the command chain (`parent_comm → comm`), a session count badge for multi-run groupings, and stats such as exec count and duration (or how far apart recurring runs are). Expanding a multi-run grouping reveals **Sample sessions** with session id, exec count, duration, identity, and container.
-
-Low-signal groupings are tucked away as **background patterns** (single exec, single run). Use **Show background pattern(s)** to reveal them and **Hide background** to collapse them again.
-
-### Session detail
-
-Once a session is selected, the view splits:
-
-- **Left**: the session execution graph, with the grouping picker beneath it.
-- **Right**: the **Events** panel for the session.
-
-The events panel lists process events with **Time**, **Type**, **Detail**, and **UID** columns, loading more as you scroll (infinite scroll). The session header shows the command chain, exec count, duration, identity, and container, along with **Selected from graph · reset** and an **Investigate** link.
-
----
+- Raw events for the same window → [Investigate](/dashboard/investigate)
+- Network edges → [Networks](/dashboard/networks)

@@ -1,0 +1,208 @@
+---
+title: "通过 MDM 部署"
+sidebarTitle: "MDM 部署"
+description: "Zero-click fleet rollout of the Hilt macOS Collector through Jamf, Kandji, or Intune: push the signed .pkg, auto-approve the System Extension, and pre-grant Full Disk Access with PPPC — no end-user interaction."
+---
+
+## Overview
+
+The Hilt macOS Collector ships as a notarized macOS app, **Hilt EDR** (`EDRApp.app`, team **Cybe Corporation / MVMB6LCP2A**), that embeds two Apple System Extensions:
+
+| Extension | Type | Bundle id | Role |
+| :-- | :-- | :-- | :-- |
+| ESensor | Endpoint Security (ES) | `Hilt.EDRApp.ESensor` | Telemetry sensor: process / file / network / persistence events |
+| NetFilter | NetworkExtension content filter | `Hilt.EDRApp.NetFilter` | Per-flow network attribution |
+
+There is **no kernel extension** — both are pure user-space System Extensions on Apple's modern frameworks, and the collector runs with **System Integrity Protection (SIP) enabled** on a normal, hardened Mac. See [Networking and trust model](/zh/macos-collector/networking-security) for the full signing-and-entitlement story.
+
+On an unmanaged Mac, an Endpoint Security product requires two unavoidable user consents — approving the System Extension and granting Full Disk Access — because they are Apple security requirements that cannot be click-suppressed without an MDM. The [direct-download path](/zh/macos-collector/deploy-standalone) walks the user through those two consents. **Under MDM you remove both prompts** by pushing two configuration profiles alongside the app, so enrollment becomes a silent, zero-touch install.
+
+This page covers the three pieces of an MDM rollout:
+
+1. **App delivery** — deploy the signed `.pkg` to the fleet.
+2. **System Extensions payload** — auto-approve the embedded extensions so no approval prompt appears.
+3. **PPPC (Privacy) payload** — pre-grant Full Disk Access so no FDA prompt appears.
+
+<Note>
+The macOS collector is **early access**. The notarized `.pkg` plus SIP-on install described here is the target shipping model. Auto-update and on-device quarantine response are not yet available on macOS.
+</Note>
+
+## Enrollment prerequisites
+
+The two profiles have different enrollment requirements. Plan your rollout around the stricter one (supervision), or accept a single FDA toggle per host where supervision is unavailable.
+
+| Profile | What it does | Minimum enrollment |
+| :-- | :-- | :-- |
+| System Extensions (`com.apple.system-extension-policy`) | Pre-approves the extension — no approval prompt | **User-Approved MDM (UAMDM)**. Supervision *not* required. |
+| PPPC (`com.apple.TCC.configuration-profile-policy`) | Pre-grants Full Disk Access — no FDA prompt | **Supervision** (ADE / Automated Device Enrollment, or a supervised enrollment). |
+
+- **UAMDM** is granted on any Mac that is enrolled in MDM with the user having approved the enrollment (or via ADE, where it is automatic). It is enough to silence the System Extension approval.
+- **Supervision** is the stronger state, typically achieved through **Automated Device Enrollment (ADE)** (formerly DEP) or Apple Configurator. Only a supervised Mac honors a PPPC payload that grants `SystemPolicyAllFiles`.
+
+On a UAMDM-but-not-supervised Mac, the extension auto-approves but the user must still toggle Full Disk Access once. On a supervised, ADE-enrolled fleet, the entire install is silent.
+
+| Mac state | System Extension approval | Full Disk Access | User actions |
+| :-- | :-- | :-- | :-- |
+| Unmanaged (direct download) | one click | one toggle | ~2 clicks + 1 password |
+| UAMDM, not supervised | auto (silent) | one toggle | one FDA toggle |
+| Supervised (ADE) | auto (silent) | auto (silent) | **zero** |
+
+## Piece 1 — Deploy the signed .pkg
+
+The collector is distributed as a notarized, Developer ID-signed `.pkg`. Installing it places `EDRApp.app` in `/Applications` and registers the small forwarder LaunchDaemon that ships events. See [Release artifacts](/zh/macos-collector/release-artifacts) for where to obtain the package and its checksum.
+
+<Steps>
+  <Step title="Upload the package to your MDM">
+    Add the signed `.pkg` to your MDM's package store:
+    - **Jamf Pro:** upload to a distribution point (Jamf Admin or the web console), then scope a policy with an **Install Package** action.
+    - **Kandji:** add a **Custom App** of type **Installer Package (.pkg)** and assign it to a Blueprint.
+    - **Intune:** add it as a **macOS app → Line-of-business app** (`.pkg`), or wrap and deploy via the Intune macOS PKG installer.
+  </Step>
+  <Step title="Order delivery before first launch">
+    Deliver the **System Extensions payload before the app first launches** (see Piece 2). If the app starts before its approval profile lands, macOS will surface a one-time approval prompt that the profile would have suppressed. In Jamf, scope the configuration profile to the same smart group at the same priority or higher than the install policy; in Kandji and Intune, profiles and apps in a Blueprint / assignment converge at check-in, so target the same group.
+  </Step>
+  <Step title="Verify the install landed">
+    From a managed host (or via your MDM's remote-command / script runner):
+    ```bash
+    pkgutil --pkg-info-plist <package-identifier>
+    ls -d /Applications/EDRApp.app
+    systemextensionsctl list
+    ```
+    `systemextensionsctl list` should show `Hilt.EDRApp.ESensor` and `Hilt.EDRApp.NetFilter` in the `[activated enabled]` state once approval has applied.
+  </Step>
+</Steps>
+
+The `.pkg` is notarized and Developer ID-signed, so Gatekeeper admits it without any local override. No `csrutil disable`, no `systemextensionsctl developer on`, and no developer mode are involved on managed hosts — those are dev-only steps that a notarized package removes entirely.
+
+## Piece 2 — System Extensions payload (auto-approve the extension)
+
+To suppress the System Extension approval prompt, push a **System Extensions** configuration profile. The payload type is `com.apple.system-extension-policy`, and the key is to whitelist Hilt's Apple Developer Team ID so any extension signed by that team is auto-approved.
+
+**Required values**
+
+| Key | Value | Meaning |
+| :-- | :-- | :-- |
+| Payload type | `com.apple.system-extension-policy` | System Extensions policy |
+| `AllowedTeamIdentifiers` | `MVMB6LCP2A` | Auto-approve any system extension signed by Cybe Corporation |
+| `AllowedSystemExtensions` (optional, tighter) | `MVMB6LCP2A` → `Hilt.EDRApp.ESensor`, `Hilt.EDRApp.NetFilter` | Restrict approval to exactly these two extensions |
+
+Whitelisting the Team ID (`MVMB6LCP2A`) is the simplest and recommended form: it auto-approves both ESensor and NetFilter, and survives extension renames or additions within the same team. If your policy prefers an explicit allowlist, pin the two bundle ids under `AllowedSystemExtensions` keyed to the team.
+
+**By MDM:**
+
+- **Jamf Pro:** Configuration Profile → **System Extensions** payload → set **System Extension Types** to *Allowed Team IDs*, add `MVMB6LCP2A`. (Optionally add *Allowed System Extensions* with the two bundle ids.)
+- **Kandji:** **System Extensions** library item → add an allowed team identifier `MVMB6LCP2A`.
+- **Intune:** **Devices → Configuration → macOS → Templates → Extensions → System Extensions** → allow the team identifier `MVMB6LCP2A`.
+
+A raw payload, for reference or for a custom-profile MDM, looks like this:
+
+```xml
+<dict>
+  <key>PayloadType</key>
+  <string>com.apple.system-extension-policy</string>
+  <key>AllowedTeamIdentifiers</key>
+  <array>
+    <string>MVMB6LCP2A</string>
+  </array>
+  <key>AllowedSystemExtensions</key>
+  <dict>
+    <key>MVMB6LCP2A</key>
+    <array>
+      <string>Hilt.EDRApp.ESensor</string>
+      <string>Hilt.EDRApp.NetFilter</string>
+    </array>
+  </dict>
+</dict>
+```
+
+This payload only requires **UAMDM**, not supervision. With it in place before first launch, the extension activates without ever surfacing the *"System extension blocked / Open System Settings"* prompt.
+
+## Piece 3 — PPPC payload (pre-grant Full Disk Access)
+
+Full Disk Access is **required** for any Endpoint Security client — this is not optional, and the FDA entry on macOS appears as **ESensor / "Hilt EDR Sensor"**, not "EDRApp". To grant it silently, push a **Privacy Preferences Policy Control (PPPC)** profile.
+
+The payload type is `com.apple.TCC.configuration-profile-policy`. Set the `SystemPolicyAllFiles` service to **Allow**, keyed to ESensor's code requirement so the grant binds to the correct, signed binary.
+
+**Required values**
+
+| Key | Value |
+| :-- | :-- |
+| Payload type | `com.apple.TCC.configuration-profile-policy` |
+| Identifier | `Hilt.EDRApp.ESensor` |
+| Identifier type | `bundleID` |
+| Code requirement | `identifier "Hilt.EDRApp.ESensor" and anchor apple generic and certificate leaf[subject.OU] = MVMB6LCP2A` |
+| Service | `SystemPolicyAllFiles` |
+| Access | `Allow` |
+
+**By MDM:**
+
+- **Jamf Pro:** Configuration Profile → **Privacy Preferences Policy Control** payload → add an app with **Identifier** `Hilt.EDRApp.ESensor` (type *Bundle ID*), paste the code requirement, set **App or service** = *SystemPolicyAllFiles*, **Access** = *Allow*. Jamf can auto-compute the code requirement if you upload the signed app.
+- **Kandji:** **PPPC** library item → add the ESensor identifier with the code requirement → grant *Full Disk Access (SystemPolicyAllFiles)*.
+- **Intune:** macOS PPPC profile → service `SystemPolicyAllFiles` → *Allow*, with the identifier and code requirement above.
+
+A raw payload, for reference:
+
+```xml
+<dict>
+  <key>PayloadType</key>
+  <string>com.apple.TCC.configuration-profile-policy</string>
+  <key>Services</key>
+  <dict>
+    <key>SystemPolicyAllFiles</key>
+    <array>
+      <dict>
+        <key>Identifier</key>
+        <string>Hilt.EDRApp.ESensor</string>
+        <key>IdentifierType</key>
+        <string>bundleID</string>
+        <key>CodeRequirement</key>
+        <string>identifier "Hilt.EDRApp.ESensor" and anchor apple generic and certificate leaf[subject.OU] = MVMB6LCP2A</string>
+        <key>Authorization</key>
+        <string>Allow</string>
+      </dict>
+    </array>
+  </dict>
+</dict>
+```
+
+This payload **requires supervision** (ADE / supervised enrollment). On a supervised, ADE-enrolled fleet it grants Full Disk Access with no user interaction; the install is fully silent end to end.
+
+<Note>
+PPPC can pre-grant **Full Disk Access** (and Accessibility), but it can **never** pre-grant **Camera, Microphone, or Screen Recording** — Apple always requires a manual user grant for those three. The Hilt ES sensor only needs Full Disk Access, so an MDM install is fully silent. You do not need, and should not request, any of the camera / mic / screen services.
+</Note>
+
+## Result and verification
+
+With all three pieces in place against a supervised, ADE-enrolled Mac:
+
+1. The MDM installs the `.pkg` → `EDRApp.app` lands in `/Applications` and the forwarder LaunchDaemon registers.
+2. The System Extensions profile auto-approves ESensor and NetFilter — no approval prompt.
+3. The PPPC profile pre-grants Full Disk Access to ESensor — no FDA prompt.
+
+The user sees nothing; telemetry begins flowing. To confirm from a managed host:
+
+```bash
+# Extensions activated and enabled
+systemextensionsctl list
+
+# ESensor process running
+pgrep -fl ESensor
+
+# Forwarder LaunchDaemon loaded
+launchctl print system/<forwarder-daemon-label>
+```
+
+`systemextensionsctl list` should report `Hilt.EDRApp.ESensor` and `Hilt.EDRApp.NetFilter` as `[activated enabled]`. Within a minute the host appears in the dashboard **Collectors** fleet with a **macOS host-type badge**, and its events flow into the **Investigate**, **Networks**, **Files**, and **Users** views. See [Data flow](/zh/macos-collector/data-flow) for the end-to-end pipeline (ESensor → forwarder → edr-collector → MSK → enrichment → ClickHouse `endpoint_events`).
+
+## Updates and macOS upgrades
+
+- **App / extension update** (same Team ID, signed): no re-approval. The existing System Extension approval and FDA grant carry over, and `launchd` relaunches the new extension build automatically. Push the new `.pkg` through the same MDM mechanism.
+- **macOS major upgrade:** Full Disk Access grants can occasionally reset across major OS upgrades (a known TCC behavior). The MDM PPPC profile re-applies the grant automatically at the next check-in, so supervised fleets self-heal. Direct-download (non-MDM) users may need to re-toggle FDA once.
+
+## What this deployment does not do
+
+- **No inbound exposure.** The collector opens no listening sockets and never phones home. The only network path is outbound HTTPS from the forwarder to the configured ingest endpoint. See [Networking and trust model](/zh/macos-collector/networking-security).
+- **No kernel extension.** Nothing loads into the kernel; there is no kext approval and no SIP change. The Mac stays hardened with SIP enabled.
+- **No camera / mic / screen capture.** The sensor requests only Full Disk Access. It cannot, and does not, request Camera, Microphone, or Screen Recording — and PPPC could not pre-grant them anyway.
+- **No auto-update or on-device response (yet).** During early access, upgrades are pushed by re-deploying the `.pkg`; on-device quarantine response is not available on macOS.
+- **No supervision bypass.** PPPC's silent Full Disk Access grant genuinely requires supervision. On UAMDM-only Macs, expect exactly one FDA toggle per host; everything else is silent.

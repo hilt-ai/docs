@@ -1,99 +1,33 @@
 ---
 title: "异常"
 sidebarTitle: "异常"
-description: "理解并分流由 Hilt 机器学习模型检测到的异常发现项。"
+description: "ML 发现队列与用于行为抑制的异常窗口。"
 ---
 
-行为发现项的分流队列。每个发现项代表异常评分系统检测到的一次偏离（或由某条检测规则触发）；在此页面，你可以审阅它们，并将每一项标记为真实异常或误报。
+异常是行为（ML）发现的审阅界面。中心页有两个标签：**Anomalies** 与 **Anomaly Windows**。
 
 ---
 
-## 页面标头
+## 标签：Anomalies
 
-页面标头包含一个 **主机选择器**，用于将发现项范围限定到特定主机，以及 **时间预设**（5m、15m、1h、6h、24h、7d）来控制时间窗口。
+可在 **Graph** 与 **Tree** 布局间切换。选中发现后打开调查中心（证据章节、会话树、图）。典型操作：
 
-当没有深度链接到某个发现项时，页面会**自动选择 Review 标签页中的第一个发现项**。
-
-## 过滤器
-
-过滤通过 **Filters** 弹出框进行结构化设置：
-
-| 区块 | 选项 |
+| 操作 | 效果 |
 | --- | --- |
-| **Type** | All · Activity spike · Network · Sensitive file · Lateral movement · Detection rule |
-| **Severity** | All · Critical · High · Medium · Low |
-| **Source** | All · Detection rules · ML anomalies |
-| **Sort by** | Time · Severity · Confidence · Urgency |
-| **Visibility** | 一个 **Suppressed** 开关，用于显示因先前反馈而被隐藏的发现项 |
-
-生效中的过滤器会以可移除的标签（chip）形式出现在标头下方。当你从某条检测规则范围进入时，会显示一个 **Rule:** {name} 标签，表明当前生效的范围。
+| **Accept** | 确认为真实异常 |
+| **Deny** | 标记为良性 / 误报 |
+| **Suppress** | 拒绝并抑制匹配的未来模式 |
 
 ---
 
-## 发现项队列
+## 标签：Anomaly Windows
 
-队列按审阅状态拆分为三个标签页：
-
-| 标签页 | 内容 |
-| --- | --- |
-| **Review** | 等待裁决的发现项 |
-| **Accepted** | 你已确认为真实的发现项 |
-| **Denied** | 你已驳回的发现项 |
-
-### 发现项卡片
-
-每个发现项都是一张卡片，展示：
-
-- **标题（Headline）**：该发现项的叙述标题（或其行为标签）。
-- **相对时间** 与简短的 **主机名**。
-- **类型**：例如 _Type: Activity spike_（已分类时）。
-- **裁决**：审阅后显示 **Accepted** 或 **Denied** 徽章。
-- 一行说明发生了什么的 **摘要**，并内嵌事件标签（chip）。
-- 当行为对该主机而言不典型时，显示 **cluster** 徽章。
-- **User / Reviewer** 和 **Confidence**（High / Medium / Low）。
-- 当主机已被隔离时，显示 **Host quarantined · View** 链接。
-
-被选中的卡片以绿色强调色高亮。每张卡片上都会显示一个 **严重程度徽章**（Critical、High、Medium、Low）。当可用时，还会显示 **Time to Detect (TTD)**（例如 "detected ~30s after it began"）。
+产品中标题为 **Behavioral Anomaly Suppression**：安排周期性窗口，在窗口内对所有主机隐藏行为（ML）异常。基于规则的告警在 [告警](/zh/dashboard/alerts) 管理，不在这里。
 
 ---
 
-## 发现项详情
+## 相关
 
-选择某个发现项会在右侧面板中打开它的报告。（如果未选择任何项，面板会提示你 _"Select a finding from the queue to view details."_）报告分为两部分。
-
-### 叙述
-
-顶部条带解释该发现项：
-
-- **标题（Headline）**，附带 **主机** 和发现项的 **时间**。
-- 一个 **type** 徽章和一个 **confidence** 徽章（悬停可见 "Model Confidence"）。
-- 适用时显示 **Quarantined** 链接。
-- 叙述本身 — _发生了什么_ 以及 _为何异常_ — 外加上下文标签（chip）。
-- 涉及的作业、应用或工作负载的 **Identity** 徽章。
-
-可能会出现两条上下文横幅：一条 **workload phase change** 提示（说明仅基于流量的信号已被弱化处理），以及当该模式与某位审阅者先前驳回过的发现项相匹配时的 **feedback-suppression** 提示，其中包含模式相似度（精确匹配或一个百分比）。
-
-### 审阅发现项（Confirm / Dismiss）
-
-在叙述条带中，你对该发现项采取行动：
-
-- **Confirm**：将其标记为真实异常（移至 **Accepted**）。
-- **Dismiss**：将其标记为良性或误报（移至 **Denied**）。
-- 一个备注字段（_"Add review notes..."_）可让你记录上下文。
-
-<Note>
-**只读用户**（Viewer 角色）不会看到 Confirm/Dismiss 按钮或备注字段。这些 HITL 控件仅对拥有审阅权限的用户可用。
-</Note>
-
-### 操作按钮
-
-详情面板中的两个按钮提供快速后续操作：
-
-- **Explain**：启动该发现项的引导式讲解，逐步介绍叙述、证据和上下文，帮助你理解发生了什么。
-- **Investigate**：打开 [调查](/zh/dashboard/investigate) 页面上的限定范围事件时间线，预先过滤到该发现项的主机和时间窗口。
-
-### 因果图
-
-在叙述下方，**因果图（Causal Graph）** 将导致该异常的事件链条可视化呈现。它是一张垂直的因果故事图，带有可展开的进程步骤 — 每个节点展示某个进程做了什么及其下游分支效应。展开某个步骤会显示该链条节点上发生的具体操作（文件访问、网络连接、子进程）。
-
----
+- 自定义确定性规则 → [告警 → Rules](/zh/dashboard/alerts)
+- 事件上下文 → [调查](/zh/dashboard/investigate)
+- 模型生命周期 → [模型](/zh/on-prem/model-lifecycle)

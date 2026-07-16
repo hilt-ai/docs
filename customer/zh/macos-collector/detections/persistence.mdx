@@ -1,0 +1,97 @@
+---
+title: "持久化"
+sidebarTitle: "持久化"
+description: "在 macOS 上一切会跨重启存活的安装项 — launch agents、daemons 与 login items — 由 Background Task Management 在注册时捕获，并由安装进程的代码签名判定驱动严重度。"
+---
+
+持久化只回答一个问题：**什么把自己装成了能跨重启存活？** 它几乎完全建立在 macOS 13+ Background Task Management 的 `btm_add` 事件上，并由安装进程的代码签名信任判定驱动严重度。
+
+发现在设备端产生，并出现在 [恶意软件](/zh/dashboard/malware)、[框架](/zh/dashboard/frameworks) 及相关安全视图中。下文描述持久化信号本身。
+
+---
+
+## 为何 `btm_add` 是高信号原语
+
+在 Linux 上，持久化分散在 cron、systemd、rc、shell profile、`LD_PRELOAD` 等处。在 macOS 13+（Ventura 及以后），Apple 基本把它们收拢到 **Background Task Management (BTM)**。[采集器](/zh/macos-collector/event-coverage) 订阅 `NOTIFY_BTM_LAUNCH_ITEM_ADD`：任何注册 launch agent、launch daemon 或 login item 的动作都会落入 `endpoint_events` 的一行 `btm_add`。
+
+两点结构优势：
+
+- **在注册时触发，而不是在运行时。** 在下次重启或二次执行之前就能看见落脚点。
+- **永不被体积过滤丢弃。** 持久化事件[完全绕过体积过滤](/zh/macos-collector/event-coverage#what-is-never-filtered)。
+
+每一行还携带身份列：不只是「加了一个 launch daemon」，而是 **哪个进程加的、由谁签名、信任如何**。
+
+---
+
+## `btm_add` 载荷
+
+除始终存在的[代码签名](/zh/macos-collector/event-data-model#code-signing-identity-every-event-the-macos-differentiator)与[应用归属](/zh/macos-collector/event-data-model#application-attribution-every-event-the-macos-differentiator)列外，还有：
+
+| 列 | 含义 |
+| --- | --- |
+| `item_type` | `launch_agent` / `launch_daemon` / `login_item` |
+| `item_path` | 已安装 launch item / login item 的路径 |
+| `managed` | 是否由 **MDM** 安装（`managed`） |
+
+| `item_type` | 运行身份 | 典型路径 | ATT&CK |
+| --- | --- | --- | --- |
+| `launch_daemon` | **root**，开机即可 | `/Library/LaunchDaemons/*.plist` | T1543.004 |
+| `launch_agent` | 用户，登录时 | `~/Library/LaunchAgents/*.plist` 等 | T1543.001 |
+| `login_item` | 用户，登录时 | 应用或 helper bundle | T1547.011 |
+
+<Note>
+`launch_daemon` 最危险：无需用户会话即以 root 在开机时运行。不信任二进制注册的 daemon 应优先打开。
+</Note>
+
+---
+
+## 严重度 = 安装者的信任判定
+
+| 安装者 `code_signature` | 示例 | 严重度 |
+| --- | --- | --- |
+| `platform` | Apple OS 组件 | `info` |
+| `developer_id` | 已知厂商更新程序 | `info` |
+| `adhoc` | 本地编译二进制 | `high` |
+| `unsigned_or_invalid` | 投放载荷 | `high` |
+| 任意，但 `managed` | MDM 下发 | `info` |
+
+合法软件会反复重注册同一 plist；近乎相同的发现会折叠为带 `N×` 标记的一行，展开可见每次时间戳。高严重度发现不会藏进折叠组。
+
+---
+
+## 发现详情六段
+
+| 面板 | 内容 |
+| --- | --- |
+| **What happened** | 在 `item_path` 注册了何种 `item_type` |
+| **Process responsible** | 安装进程、`code_signature`、`team_id`、`cdhash` |
+| **What was touched** | launch item 路径与 `managed` |
+| **Why it matters** | 映射的 MITRE 技术与按信任层级的白话风险 |
+| **Evidence** | 原始 `btm_add` 与同 `responsible_pid` / `cdhash` 的其他动作 |
+| **Recommended action** | 对不信任安装者：检查 plist、与用户确认、必要时隔离；可跳转到 [血缘](/zh/dashboard/data-lineage) |
+
+---
+
+## 直接查询
+
+```sql
+SELECT event_time, device_name, item_type, item_path,
+       application_display_name, comm, code_signature, team_id, cdhash, managed
+FROM endpoint_events
+WHERE event_type = 'btm_add'
+  AND code_signature IN ('adhoc', 'unsigned_or_invalid')
+  AND managed = 0
+ORDER BY event_time DESC;
+```
+
+<Note>
+`btm_add` 需要 **macOS 13.0+**。更旧主机上该订阅会优雅降级，本页可能无行。
+</Note>
+
+---
+
+## 与其他页面的关系
+
+- [血缘](/zh/dashboard/data-lineage) — 不信任二进制注册 daemon 后，看它由谁拉起
+- [ATT&CK](/zh/dashboard/frameworks/attack) — 持久化发现点亮 Persistence 战术列
+- [事件数据模型](/zh/macos-collector/event-data-model) / [事件覆盖](/zh/macos-collector/event-coverage)

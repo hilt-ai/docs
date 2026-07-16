@@ -1,0 +1,49 @@
+---
+title: "Alerts"
+sidebarTitle: "Alerts"
+description: "Rule-break queue, custom detection rules, and sensitive path registry."
+---
+
+Alerts is the hub for deterministic detections. Three tabs: **Alerts**, **Rules**, and **Sensitivity**.
+
+---
+
+## Tab: Alerts
+
+The queue of rule breaks — severity, rule name, actor, host, and time. Open a row to see evidence and pivot into [Investigate](/dashboard/investigate) or related [Anomalies](/dashboard/anomalies).
+
+---
+
+## Tab: Rules
+
+Subtitle: *Custom if-this-then-alert rules over live telemetry*.
+
+### Rule list
+
+| Column | Content |
+| --- | --- |
+| **On** | Enable / disable |
+| **Name** | Rule name and label |
+| **Severity** | High / medium / low |
+| **Fires** | Fire count |
+| **Last** | Last fire time |
+| **Actions** | View related findings, edit, delete |
+
+**New Rule** and **Create with AI** open the builder. Rules can evaluate **per event** or as a **time aggregate** (count / sum / average over a window) with conditions on process, file, network, and identity fields.
+
+When a rule matches it raises a finding into this queue (and can surface alongside ML findings depending on configuration).
+
+---
+
+## Tab: Sensitivity
+
+Subtitle: *File paths treated as sensitive across risk scoring and alerts*.
+
+Maintain the registry of sensitive paths so scoring and rule evaluation treat those locations with higher weight.
+
+---
+
+## Related
+
+- ML triage → [Anomalies](/dashboard/anomalies)
+- API for rules → [Detection Rules API](/api/detection-rules)

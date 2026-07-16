@@ -1,20 +1,31 @@
 ---
 title: "Why Hilt"
-description: "What makes Hilt different for security and infrastructure teams."
+sidebarTitle: "Why Hilt"
+description: "Why Data Movement Governance closes the gap left by DLP, EDR, and after-the-fact forensics."
 ---
 
-## Your Infrastructure, Your Data
+Your stack can clear every access check and your data can still leave. DLP predicts what should not leave. Forensics reconstructs what already did. **Hilt watches data move** — across cloud, SaaS-adjacent workloads, AI agents, and endpoints — at runtime.
 
-Hilt deploys inside your cloud account. You control the environment, networking, and access. Hilt does not require standing vendor access to production systems to operate day to day.
+---
 
-## Metadata-Only Collection
+## The gap
 
-Collectors observe metadata—who accessed what, when, and how—not file contents. Sensitive data stays in your environment while still giving security teams the visibility they need.
+| Approach | Strength | Blind spot |
+| --- | --- | --- |
+| Predictive DLP | Policy before the act | Misses permitted-but-anomalous patterns |
+| Classic EDR | Threats on the host | Not built as a data-movement control plane |
+| After-the-fact forensics | Deep truth | Too late to contain |
 
-## Zero Trust Architecture
+Hilt keeps EDR for threats and adds **movement governance**: identity-resolved findings, lineage, and host quarantine when the pattern is wrong.
 
-Traffic stays on private networking where possible. Data is encrypted in transit and at rest with customer-managed keys. The platform is designed for environments that cannot send raw telemetry to third-party SaaS backends.
+---
 
-## Enterprise Ready
+## Deployment posture
 
-Hilt supports compliance documentation, audit logging, role-based access, and operational controls for large teams. Customer docs cover deployment, administration, and trust & security in detail once you're onboarded.
+- Single-tenant in **your** cloud
+- Metadata-only by default (content inspection is a deliberate choice)
+- Collectors off the critical path
+
+<Card title="Integrations" icon="plug" href="/integrations">
+  API, webhooks, and MCP.
+</Card>

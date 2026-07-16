@@ -1,73 +1,35 @@
 ---
 title: "Query"
 sidebarTitle: "Query"
-description: "Natural language and structured queries against your Hilt telemetry."
+description: "Natural-language assistant over telemetry and Hilt documentation."
 ---
 
-Ask natural-language questions about telemetry, events, processes, file access, and network flows, and get answers back in a chat interface.
+Query is the fullscreen chat assistant for your deployment. Reach it from the **top-bar Ask** control (not the sidebar). Ask about telemetry, anomalies, hosts, and how Hilt works.
 
-<Note>
-The **run_queries** permission controls whether the Query page appears in the sidebar navigation. Users without this permission can still reach the page via a direct URL — the permission gates visibility, not route access.
-</Note>
-
-The agent also answers questions about **how Hilt itself works** — deployment, collectors, configuration, permissions, data handling, on-prem operations, quarantine, and more — by searching the Hilt documentation that ships with your deployment. It decides per question whether to use live telemetry, the documentation, or both.
+Placeholder copy in product: *Ask about your data, anomalies, or platform help…*
 
 ---
 
-## Starter suggestion chips
+## What it answers
 
-Before any conversation, the empty state shows four example questions as clickable chips to help you get started — for example:
+- Live telemetry questions (processes, files, network, anomalies)
+- Product how-to questions by searching the documentation shipped with your deployment
 
-- _"Which hosts ran the most outbound connections this week?"_
-- _"Show me all file writes to /etc/shadow in the last 24 hours"_
-- _"What anomalies were detected on production hosts today?"_
-- _"How do I deploy the collector on Kubernetes?"_
-
-Clicking a chip fills it into the input and sends it immediately.
+The agent chooses telemetry, docs, or both per question.
 
 ---
 
-## Thinking indicator and timeout recovery
+## Conversation UX
 
-When a query takes more than **3 seconds**, a thinking indicator with an elapsed timer appears so you know the query is still running.
-
-- After **45 seconds**, a reassurance message is shown to confirm the query is still in progress and has not stalled.
-- If a query **times out**, the UI suggests simplifying the question or narrowing the time window to reduce the amount of data scanned.
-
----
-
-## Answering product and how-to questions
-
-Alongside telemetry, the agent can answer questions about how Hilt works, drawn from the product documentation bundled into your deployment:
-
-- _"How do I deploy the Linux collector on Kubernetes?"_
-- _"What permissions do I need to run queries?"_
-- _"How does the on-prem auto-update agent work?"_
-- _"What data does Hilt store, and what does it not capture?"_
-
-When it answers from documentation, the agent **cites the source** page and section so you can read more. For hybrid questions — for example, _"Why isn't my collector showing up?"_ — it combines the documentation (expected collector behavior) with live telemetry (which hosts are actually reporting).
-
-The documentation is bundled locally, so this works fully offline in on-prem deployments with no outbound internet. If the documentation does not cover something, the agent tells you it could not find it rather than guessing.
-
-<Note>
-The bundled documentation matches the version of Hilt you have deployed. Answers reflect that version; very new features documented after your release may not yet be available.
-</Note>
+- Starter chips on empty state
+- Thinking indicator for long-running queries
+- History sidebar and new-chat control
+- Hand-off from the header Ask bar while already on `/query`
 
 ---
 
-## Chat history
+## Related
 
-The left sidebar lists your past conversations under a **Recents** heading.
-
-- **New chat** starts a fresh conversation.
-- Each row shows the conversation title (new conversations are titled automatically from your first question).
-- The **⋯** row menu offers **Rename** (inline, up to 80 characters: Enter to save, Escape to cancel) and **Delete**.
-- **Collapse sidebar** / **Open sidebar** toggles a narrow rail; your preference is remembered.
-
-Conversations are saved to your account when signed in.
-
----
-
-## Drafting detection rules
-
-You can ask the agent to turn a finding into a detection rule: for example, _"write a detection rule for that exfiltration pattern."_ When it does, the proposed rule comes back as part of the answer. To put it into effect, take that draft to the **Detection Rules** page, where the rule builder lets you review, adjust, and save it. Saving and managing rules happens there, not on the Query page itself.
+- Event deep-dive without NL → [Investigate](/dashboard/investigate)
+- REST access → [API Overview](/api/overview)
+- MCP for assistants → [MCP Server](/dashboard/mcp-server)

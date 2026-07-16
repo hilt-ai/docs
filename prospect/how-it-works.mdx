@@ -1,28 +1,18 @@
 ---
 title: "How It Works"
-description: "A high-level overview of the Hilt platform from deployment to investigation."
+description: "Collect, enrich, score, investigate, and contain — the Hilt DMG loop."
 ---
 
-## Deploy in Your Cloud
+Hilt follows a single loop from kernel to narrative:
 
-Hilt runs as a single-tenant deployment in your cloud account—AWS, GCP, Azure, or Ali Cloud. You retain ownership of the infrastructure, data, and access controls. Hilt provisions the analytics stack, dashboard, and private ingest endpoint in your environment.
+1. **Collect** — Linux eBPF and macOS Endpoint Security collectors ship metadata-only telemetry (process, file, network) to your single-tenant control plane.
+2. **Enrich** — Identity, workload, and network context attach to every move.
+3. **Score** — Behavioral models and custom rules flag anomalous patterns — not just denied actions.
+4. **Investigate** — Analysts (and Hilt's agentic investigation) turn findings into identity-resolved narratives with lineage.
+5. **Contain** — Quarantine hosts and intervene on third-party exposure without inline user blocking.
 
-{/* TODO: expand */}
+The product thesis: every individual move can look permitted. **The pattern is the breach.**
 
-## Lightweight Collectors
-
-Collectors run on your Linux hosts, macOS endpoints, and containerized workloads. The Linux agent is a static eBPF-based binary with no kernel modules. The macOS agent uses Endpoint Security and optional browser telemetry. On AWS ECS Fargate, where kernel-level access isn't available, a lightweight sidecar delivers the same behavioral coverage without requiring any changes to your application image. Every collector streams metadata to your private ingest endpoint—no file content leaves your environment.
-
-{/* TODO: expand */}
-
-## Behavioral Detection
-
-Hilt builds behavioral baselines for users, hosts, and data flows. After a short cold-start period, ML models score activity against those baselines and surface anomalies for review. Detection focuses on unusual access patterns, not static signatures alone.
-
-{/* TODO: expand */}
-
-## Investigation & Response
-
-The platform dashboard unifies cloud and endpoint telemetry. Security teams can investigate anomalies, trace data lineage, query historical activity, and take response actions such as quarantine. Admin tooling covers users, teams, audit logs, and operational workflows.
-
-{/* TODO: expand */}
+<Card title="See the console" icon="layout-dashboard" href="/platform">
+  Tour the Hilt platform surfaces.
+</Card>

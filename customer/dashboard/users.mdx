@@ -1,95 +1,32 @@
 ---
 title: "User Timeline"
-sidebarTitle: "User Timeline"
-description: "Tracking user identity and activity across hosts."
+sidebarTitle: "Users"
+description: "Track user identity and activity across your infrastructure."
 ---
 
-Shows who is active across infrastructure, surfaces at-risk identities, and allows to drill into a single user's activity and forensic timeline. 
+In the sidebar this page is labeled **Users**. The page title is **User Timeline** — *Track user activity across your infrastructure*.
+
+There is no Linux/macOS scope toggle. The view is identity-centric (SSH, Teleport, username sources, and related presence).
 
 ---
 
-## Fleet summary bar
+## List views
 
-Above the user list, three stat pills summarize the current scope:
-
-| Pill | Meaning |
+| Filter | Meaning |
 | --- | --- |
-| **Active users** | Users with activity in this time range |
-| **At risk** | Users marked unusual or critical risk |
-| **Critical** | Users at critical risk |
+| **All** | Full identity roster |
+| **At risk** | Identities with elevated risk signals |
+
+Each row summarizes risk, recent presence, and key events. Open a user for **summary** then **timeline** detail, with host and time filters.
 
 ---
 
-## User list
+## Drill-down
 
-### Filter and search
-
-- **Host filter**: a host selector in the page header scopes the user list to a specific host. When a host filter is active, an **Investigate events** button appears in the header and jumps to Investigate scoped to that host and user context.
-- **Segmented toggle**: **All** or **At risk** (users whose risk level is _unusual_ or _critical_).
-- **Search**: filter by identity, identity source, or Okta name/email.
-
-Users are sorted by risk (critical → unusual → normal), then identity-source priority, then event count.
-
-### User cards
-
-Each user is a clickable card showing:
-
-- **Avatar**: initials, tinted red (critical) or amber (unusual) when at risk.
-- **Display name**: the Okta full name when known, otherwise the raw identity.
-- **Event count**, plus **· N alerts** when anomalies are present.
-- **Secondary line**: the raw identity (when different), relative last-seen time, and an identity-source hint such as **Okta verified**, **Teleport**, **Verified chain**, **Linux**, **Owner**, or **SSH / IP**.
-- **Type badges**: **Shared** or **Service** for non-personal accounts.
-
-The selected card is outlined (green for normal risk, red/amber for at-risk).
+From a user's timeline, jump into [Investigate](/dashboard/investigate) scoped to that identity's activity, or into related [Anomalies](/dashboard/anomalies).
 
 ---
 
-## User detail
+## Not this page
 
-The right panel has two sub-views: a **summary** (default) and the **full timeline**.
-
-### Summary header
-
-- The user's **name** in green, with a **risk badge** (_critical_ / _unusual_) and **Shared** / **Service** badges where applicable.
-- A metadata line: identity, email, department, identity source, event count, host count, and anomaly-alert count when greater than zero.
-
-### Insight card
-
-A short behavioral narrative. 
-
-### Activity breakdown
-
-A donut chart of the user's events, with the total in the center. The legend rows are clickable and deep-link into Investigate by event type:
-
-| Legend | Event type |
-| --- | --- |
-| **Files** | File opens |
-| **Network** | Network flows |
-| **Exec** | Process executions |
-| **Exec trace** | Exec enter events |
-
-### Key events
-
-Up to five recent events that match the user's behavioral flags. Each row shows a timestamp, event-type badge, detail, a flag pill (e.g. **Sensitive files**, **Data exfiltration**, **Credential access**), and a short reason. 
-
-### Forensic timeline preview
-
-A condensed preview grouped by process, up to three processes with up to three events each, followed by a **View full timeline** link and an `N events across N process(es)` summary.
-
-### Navigate
-
-Outline buttons to jump elsewhere with the user's scope carried over:
-
-| Button | Goes to |
-| --- | --- |
-| **Investigate events** | Investigate, scoped to this user |
-| **Anomaly alerts** | Anomalies for the current time range |
-| **Data Lineage** | Data Lineage (when the host is known; the `/processes` URL redirects to `/data-lineage`) |
-
----
-
-## Full timeline
-
-Selecting **View full timeline** (or the timeline sub-view) replaces the summary with a chronological **swimlane** of the user's activity. A **Back to summary** button returns to the overview, and the subtitle shows the identity with its event and process counts.
-
-Each row lays out the timestamp, colored process-thread lanes, the command, an event-type badge, and the detail. Rows expand to show forensic fields, file path, command line, flow, user/owner/lineage/UID, and pivot links, with **More** / **Less** to show additional fields. A footer summarizes the event count and peak concurrent processes.
+Sidebar **Activity** is a different surface: [file actions by application](/dashboard/activity). Do not confuse Users (identities) with Activity (file-upload detection).

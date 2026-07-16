@@ -1,85 +1,34 @@
 ---
 title: "Quarantine"
 sidebarTitle: "Quarantine"
-description: "Isolating compromised hosts from the network while preserving forensic access."
+description: "Host isolation, blast-radius assessment, and fleet containment posture."
 ---
 
-Quarantine is Hilt's network isolation response. When a host shows signs of compromise or active data exfiltration, it can be quarantined — severing its network access to prevent lateral movement or continued data loss, while preserving the ability to investigate.
+Quarantine isolates hosts and shows blast radius when you need to stop data movement quickly.
 
----
-
-## How quarantine works
-
-When a host is quarantined:
-
-1. **Network isolation**: the host's security group (AWS) or equivalent network policy is replaced with a quarantine security group that blocks all inbound and outbound traffic except the Hilt collector's ingest path.
-2. **Collector continues**: the Hilt collector maintains its outbound connection, so telemetry continues flowing for forensic analysis.
-3. **State recorded**: the original security group IDs are saved so the action can be reversed.
-4. **Audit trail**: the quarantine action and timestamp are recorded.
-
-<Warning>
-Quarantine severs the host's network connections. Running workloads on the host will lose connectivity. Only use quarantine when the security risk of continued operation outweighs the availability impact.
-</Warning>
+Subtitle reflects how many hosts are currently isolated.
 
 ---
 
-## Quarantine page
+## Active quarantines
 
-The Quarantine page provides a fleet-wide view of isolation status.
+The list shows isolated and pending hosts. Expand a host for:
 
-### Summary strip
+- **Blast radius** — what else is in scope
+- **Network mini-map** — blocked or relevant traffic
+- **Readiness** — whether isolation can proceed cleanly
 
-Three metrics at the top of the page:
-
-- **Active quarantines**: the number of hosts currently isolated
-- **Connections blocked**: total blocked connection attempts across quarantined hosts
-- **Fleet hosts**: total host count for context
-
-### Host list
-
-Each quarantined host appears as a row showing:
-
-- **Status badge**: Isolated (actively quarantined) or Pending review (flagged for quarantine decision)
-- **Host ID** and identifying details
-- **Network footprint**: a summary of the host's recent communication — internal hosts reached, external destinations, and critical services
-
-### Fleet posture
-
-The Node Readiness table shows the fleet's overall quarantine posture:
-
-- **Mode**: Observing (monitoring without enforcement) or Enforcing (active quarantine capability)
-- **Per-node readiness**: accuracy and confidence metrics for each host's quarantine eligibility
+Fleet posture controls let you quarantine or release hosts from this page.
 
 ---
 
-## Releasing a host
+## How isolation works
 
-To restore a quarantined host to normal operation:
-
-1. Navigate to the quarantined host on the Quarantine page
-2. Click **Unquarantine host**
-3. Confirm with **Yes, restore access**
-
-The host's original security group is restored, re-establishing its previous network access.
+Hilt contains by **host network isolation**, not inline blocking of individual users. Pair quarantine with [Investigate](/dashboard/investigate) and [Anomalies](/dashboard/anomalies) so you know why a host was cut off.
 
 ---
 
-## Network footprint
+## Related
 
-After quarantine, the dashboard shows a network footprint summary for the isolated host:
-
-- **Internal hosts reached**: other hosts this host communicated with in the 7 days before isolation
-- **External destinations**: outside addresses this host connected to
-- **Critical services**: key services that depended on or were accessed by this host
-
-This helps assess the blast radius and prioritize follow-up investigation.
-
----
-
-## Limitations
-
-| Limitation | Detail |
-| :-- | :-- |
-| **Cloud-only** | Quarantine via security groups requires AWS (or equivalent cloud API access). On-prem VMs without cloud security groups are not currently supported. |
-| **Network-level only** | Quarantine isolates at the network layer. It does not terminate processes, lock accounts, or modify host state. |
-| **Requires IAM permissions** | The Hilt deployment must have permissions to modify security groups in your account. |
+- Exposure intervention → [Exposure](/dashboard/exposure)
+- Malware findings → [Malware](/dashboard/malware)

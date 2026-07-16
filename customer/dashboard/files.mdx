@@ -1,122 +1,30 @@
 ---
 title: "Files"
 sidebarTitle: "Files"
-description: "Browsing file activity across hosts: opens, writes, renames, and deletions."
+description: "File telemetry and path explorer for Linux and macOS, including removable media on Mac."
 ---
 
----
-
-Shows what's happening to files across the fleet: opens, deletes, permission changes, and renames, and lets you browse a host's filesystem the way the collector observed it.
-
-A **metric summary strip** sits below the header. The metrics depend on your scope:
-
-- **Fleet view**: Opens, Unlinks, Paths, Hosts
-- **Per-host view**: Events, Paths, Processes, Sessions
-
-When a host is selected, an **Investigate events** button appears in the page header and jumps to Investigate scoped to the current host and time window.
+Files is the fleet file explorer. Use the **Linux | macOS** scope toggle.
 
 ---
 
-## Fleet overview
+## Linux scope
 
-### Search, selection, and compare
-
-- **Search** filters hosts by name.
-- **Row checkboxes** (with a select-all in the header) let you pick hosts to compare.
-- When one or more hosts are selected, a **Compare Hosts (N)** button opens the comparison modal.
-
-### Columns
-
-| Column | What it counts |
-| --- | --- |
-| **Host** | Display name |
-| **Opens** | File open events |
-| **Deletes** | Unlink/delete events |
-| **Chmods** | Permission changes |
-| **Unique Paths** | Distinct paths touched |
-| **Sensitive** | Activity on sensitive paths |
-
-Default sort is Opens, highest first. As elsewhere, hosts group into expandable Kubernetes cluster rows, and a pinned host order (from Collectors) disables column sort.
+Title: **Files**. Browse hosts that report file opens, writes, renames, and deletes. Drill from fleet overview into a host path browser and per-file detail, then into [Investigate](/dashboard/investigate) for the responsible process.
 
 ---
 
-## Per-host view
+## macOS scope
 
-Selecting a host opens a three-part workspace: a **file explorer** on the left, a **main pane** in the center, and a resizable **mini terminal** along the bottom.
+Title may show as **Endpoint Files**. Telemetry comes from `endpoint_events` with code-signing provenance: where a file came from, who wrote it, and whether quarantine flags were stripped.
 
-### Search bar
+### Removable media
 
-A search bar (placeholder _Search by file name or path..._) sits at the top of the host view. It debounces as you type and shows matching paths with a file-class badge, path bucket, and event count. Selecting a result navigates to the file's parent directory and opens its detail modal.
-
-### File explorer
-
-The left sidebar is a lazily-expanded folder tree starting at `/`:
-
-- **Folder rows** show the name plus `N paths · N evts`.
-- **File rows** show the basename and event count.
-
-It respects the **Show system paths** and **Show Hidden** toggles set in the browse pane.
-
-### Main pane
-
-The center pane shows one of three states depending on what you're doing:
-
-#### Landing
-
-Shown before you drill into a directory, a per-host summary:
-
-| Section | Contents |
-| --- | --- |
-| **Stats cards** | Total Events · Unique Paths · Processes |
-| **Path Buckets** | Horizontal bars grouping paths by category |
-| **File Classes** | Category / activity / distinct files |
-| **Top Directories** | Directory, paths, events, click to browse |
-| **Top Files** | Path, processes, events, click to open the detail modal |
-| **Interesting Files** | Path, class badge, reason, top process, and delete/chmod/rename counts |
-
-#### Browse
-
-When you select a directory:
-
-- A **Current location** breadcrumb with back/forward arrows.
-- A **Folders & files** heading with folder and file-path counts.
-- **View options** toggles: **Show system paths** and **Show Hidden** (dotfiles are shown by default).
-- A **Folders** table (Path · Paths inside · Events) and a **File paths** table (Path · Class · Events · Procs · Del · Chmod · Top Process). Interesting files are highlighted.
-
-#### File list
-
-When a search is active, the pane shows **File paths**, one row per distinct path, using the same columns as the browse file table. Results are sorted by total events, highest first.
-
-### Mini terminal
-
-A resizable panel at the bottom mirrors the explorer location and accepts a small command set: `cd`, `ls`, `tree`, `pwd`, `cat <file>`, and `clear`. `cd ..` follows the browse back stack.
+On macOS, the Files hub includes **removable media** context (USB / volumes / AirDrop-related activity). Mounts and writes under `/Volumes` are attributed to the application that performed them. This replaces the old standalone Removable Media page.
 
 ---
 
-## File detail
+## Related
 
-Clicking a file opens the detail modal. The header shows the basename, full path, and a **Deleted** badge when applicable.
-
-| Section | Contents |
-| --- | --- |
-| **Identity** | Directory, extension, file class, path bucket, first seen, last seen |
-| **Overview** | Opens, Deletes, Chmods, Renames; distinct processes and top process; a per-process breakdown table (Process · Opn · Del · Mod · Ren · Σ) |
-| **Who Touched This** | Process, parent, user (identity, Teleport, SSH, owner), EUID, event count, and event types (open, delete, permissions, rename) |
-| **Renames & permission changes** | Type, time, path, process, EUID, and details (old→new path or octal mode) |
-| **File activity timeline** | A stacked bar chart of file opens over time |
-
-### File open timeline
-
-The timeline chart plots open activity across time buckets (X axis) against open count (Y axis), split into **Read** and **Write** series. Badges summarize totals Opens, whether activity is read- or write-leaning, and the peak bucket, and **View matching events in Investigate** carries the scope over to Investigate.
-
----
-
-## Host comparison
-
-The **Compare Hosts** modal (opened from the fleet overview) lines up the selected hosts across three tabs:
-
-| Tab | Contents |
-| --- | --- |
-| **Activity Overview** | A per-host metric table (Opens, Deletes, Chmods, Unique Paths, Sensitive) plus a File Types by Host breakdown |
-| **Shared Files** | Paths seen on more than one host: Path · Hosts · Total Events · Accessed By, sortable |
-| **Directories** | A cross-host heatmap of the top directories |
+- Upload / create / delete alerts by app → [Activity](/dashboard/activity)
+- Credential store file access → [Credentials](/dashboard/credentials)

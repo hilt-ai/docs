@@ -1,64 +1,65 @@
 ---
 title: "Dashboard layout"
 sidebarTitle: "Layout"
-description: "How the Hilt dashboard is organized: navigation sections and what each page covers."
+description: "How the Hilt console is organized: sidebar order, top-bar tools, and Settings."
 ---
 
-The dashboard mirrors the sidebar in the Hilt web app. Pages are grouped into **Overview**, **Collectors**, **Cloud**, **Endpoint**, **Security**, and **Admin**, with a standalone **Settings** page.
+The Hilt console mirrors the product sidebar. Pages fall into **Overview**, **Collectors**, a **Data** group, a **Security** group, then **Settings**. **Query** and **Reports** live in the top bar (documented under Tools).
 
-## Overview
+Hilt is a **Data Movement Governance (DMG)** platform: it watches how data moves across Linux and macOS estates, resolves identity, scores behavioral anomalies, and supports investigation and containment.
 
-- [Overview](/dashboard/overview): the unified landing for both Cloud (Linux) and Endpoint (macOS) — health signals, recent anomalies, and threat profile across the whole fleet
+---
 
-## Collectors
+## Overview and Collectors
 
-- [Collectors](/dashboard/collectors): fleet list of deployed Hilt collectors and per-host detail
+- [Overview](/dashboard/overview): customizable home widgets for fleet health, findings, and threat profile
+- [Collectors](/dashboard/collectors): fleet list of Linux and macOS collectors and per-host detail
 
-## Cloud
+---
 
-- [Data Lineage](/dashboard/data-lineage): process and data-flow visualization across hosts
-- [Networks](/dashboard/networks): TCP connections, destinations, and data transfer
-- [Files](/dashboard/files): file opens, writes, renames, and deletions
-- [User Timeline](/dashboard/users): user identity and activity across the fleet
+## Data
 
-## Endpoint
+Several Data hubs use a **Linux | macOS** scope toggle. Linux covers eBPF / cloud-workload telemetry; macOS covers Endpoint Security telemetry. The toggle is global for that session.
 
-macOS endpoint detection built on Apple Endpoint Security kernel telemetry. See the [Foundation](/dashboard/endpoint/foundation) page for the shared model and layout.
+- [Investigate](/dashboard/investigate): time-bounded event investigation with filters and timeline
+- [Lineage](/dashboard/data-lineage): process and data-flow graphs (Linux) or exec-based process lineage (macOS)
+- [Networks](/dashboard/networks): fleet network signals (Linux) or app→destination egress (macOS)
+- [Files](/dashboard/files): file telemetry and path explorer; macOS includes removable media
+- [Users](/dashboard/users): User Timeline — identity activity across the fleet
+- [Activity](/dashboard/activity): file actions by application (uploads, creates, deletes, edits)
+- [Credentials](/dashboard/credentials): credential and privacy access on macOS endpoints
 
-- [Foundation](/dashboard/endpoint/foundation): what every endpoint event carries, the shared layout, and how the section is organized
-- [Persistence](/dashboard/endpoint/persistence): launch agents, daemons, and login items that survive reboot
-- [Tamper Detection](/dashboard/endpoint/tamper): Gatekeeper bypass, profile changes, and agent self-protection
-- [Credential & Privacy](/dashboard/endpoint/credential-privacy): Keychain, browser credentials, TCC, camera/mic
-- [Removable Media](/dashboard/endpoint/removable-media): USB/DMG mounts and the files written to them
-- [Network Egress](/dashboard/endpoint/network-egress): per-app outbound flows, destinations, ports, and volume
-- [ATT&CK Matrix](/dashboard/endpoint/attack-matrix): MITRE technique coverage across the endpoint fleet
-- [Process Lineage](/dashboard/endpoint/process-lineage): the kernel's exec/fork spawn graph
-- [Credential Access](/dashboard/endpoint/credential-access): which process touched which class of secret
-- [Activity](/dashboard/endpoint/activity): the raw, live endpoint event stream
-- [Files](/dashboard/endpoint/files): macOS file explorer with provenance and signed-writer attribution
+---
 
 ## Security
 
-- [Detection & Accuracy](/dashboard/detection-accuracy): how Hilt detects anomalies and measures model accuracy
-- [Anomalies](/dashboard/anomalies): ML and rule-based findings for triage
-- [Rules](/dashboard/detection-rules): custom detection rule builder
-- [Anomaly Windows](/administration/behavioral-suppression): scheduled suppression of ML anomalies during known-noisy periods
-- [Fleet behavior](/dashboard/fleet-behavior): behavioral clustering and host movement
-- [Investigate](/dashboard/investigate): deep-dive event timeline and filters
-- [Query](/dashboard/query): natural-language and structured telemetry queries
+- [Anomalies](/dashboard/anomalies): ML finding queue and Anomaly Windows (behavioral suppression)
+- [Alerts](/dashboard/alerts): rule-break queue, custom Rules, and Sensitivity paths
+- [Exposure](/dashboard/exposure): third-party dependency landscape and intervention policy
+- [Malware](/dashboard/malware): malware and tamper behavior on endpoints
+- [Frameworks](/dashboard/frameworks): MITRE ATT&CK and Cyber Kill Chain coverage
 - [Quarantine](/dashboard/quarantine): host isolation and blast-radius assessment
-- [Reports](/administration/reports): security report generation and PDF export
+
+---
+
+## Tools (top bar)
+
+- [Query](/dashboard/query): natural-language assistant over telemetry and docs
+- [Reports](/administration/reports): executive and process-intel reports with PDF export
+
+---
 
 ## Settings
 
-- [Settings](/dashboard/settings): password, username, and session management
+Admin is folded into Settings. Open [Settings](/dashboard/settings) for the map of tabs:
 
-## Admin
+| Tab | Sections |
+| --- | --- |
+| **Account** | Profile, password, sessions, API keys |
+| **Uptime** | Inference, Pipeline, Databases, Integrations health |
+| **System** | Models, Updates, Data Export, Fleet Behavior |
+| **Teams** | Teams, Members, Identity mapping |
+| **Integrations** | Slack, Webhooks |
+| **Admin** | Cloud Sources, Billing, Storage, Audit Log, MCP |
 
-- [Administration](/administration/layout): users, teams, identity mapping, and platform configuration
-- [Model Lifecycle](/on-prem/model-lifecycle): TRACE detection model status, promotion, and rollback
-- [Data Export](/on-prem/data-export-overview): core anonymized data export review and approval
-- [Auto-Update](/on-prem/auto-update-overview): automatic platform update configuration
-- [Storage](/administration/storage): telemetry storage usage, tiering, and lifecycle policies
-- [Audit Log](/administration/audit-log): authentication and administrative action history
-- [MCP Server](/dashboard/mcp-server): Model Context Protocol server for AI assistant integration
+On-device macOS detection depth (persistence, tamper, and related rule families) lives under [macOS Collector → Detections](/macos-collector/detections), not as a separate Endpoint tree in the sidebar.

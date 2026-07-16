@@ -1,0 +1,27 @@
+---
+title: "macOS 采集器"
+sidebarTitle: "布局"
+description: "macOS 采集器是什么、观察什么，以及如何阅读本指南。"
+---
+
+本指南介绍 Hilt macOS 采集器：将数据移动治理从 Linux 服务器扩展到员工 Mac 的已公证 macOS 应用 — 它观察什么、如何独立或通过 MDM 部署，以及如何与你另行获得的 Hilt 数据平面集成。
+
+<Note>
+macOS 采集器能力与配置可能随版本演进。部分 Linux 上可用的能力（例如自动更新、设备端隔离响应）在 macOS 上的覆盖范围以你账户团队启用的版本为准。
+</Note>
+
+在文件路径、服务名与环境变量中你可能看到内部代号 `edr` 或 `dag.endpoint.*`；对外产品名称为 **Hilt macOS Collector**。
+
+## 采集器是什么
+
+采集器是已公证的 macOS 应用，订阅 Apple Endpoint Security 与 Network Extension，在本机评估检测规则，并将元数据级遥测与发现发送到你的摄取端点。
+
+## 本指南内容
+
+- 系统要求、发布产物与安装流程
+- 独立部署与 MDM 部署
+- 配置、网络信任模型、事件数据模型与覆盖
+- [检测](/zh/macos-collector/detections)（含[持久化](/zh/macos-collector/detections/persistence)与[篡改](/zh/macos-collector/detections/tamper)）
+- 规模、数据流与故障排查
+
+控制台中对应的数据/安全中心页见 [仪表盘布局](/zh/dashboard/layout)。

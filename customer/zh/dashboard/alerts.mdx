@@ -1,0 +1,32 @@
+---
+title: "告警"
+sidebarTitle: "告警"
+description: "规则命中队列、自定义检测规则与敏感路径登记。"
+---
+
+告警是确定性检测的中心页。三个标签：**Alerts**、**Rules**、**Sensitivity**。
+
+---
+
+## 标签：Alerts
+
+规则命中队列 — 严重度、规则名、主体、主机与时间。可打开行查看证据并跳转到 [调查](/zh/dashboard/investigate) 或 [异常](/zh/dashboard/anomalies)。
+
+---
+
+## 标签：Rules
+
+自定义 *if-this-then-alert* 规则。列表含启用开关、名称、严重度、触发次数、上次触发与编辑操作。**New Rule** / **Create with AI** 打开构建器；规则可按单事件或时间聚合（count / sum / average）求值。
+
+---
+
+## 标签：Sensitivity
+
+维护敏感路径登记，使风险评分与规则求值对这些位置赋予更高权重。
+
+---
+
+## 相关
+
+- ML 审阅 → [异常](/zh/dashboard/anomalies)
+- 规则 API → [检测规则 API](/zh/api/detection-rules)

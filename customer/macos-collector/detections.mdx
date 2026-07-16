@@ -1,42 +1,65 @@
 ---
 title: "On-device detections & response"
-sidebarTitle: "Detections & Response"
-description: "The detection engine inside the macOS collector: the rule families it evaluates on-device, how findings are graded and delivered, and where the agent blocks rather than observes."
+sidebarTitle: "Detections"
+description: "On-device detection engine in the macOS collector: rule families, grading, and in-kernel response."
 ---
 
-The macOS collector is not only a telemetry sensor — it embeds an on-device detection engine that evaluates every kernel event as it happens. This page describes what that engine looks for, how it responds, and how its findings reach the dashboard. For the pages where you triage those findings, see the [Endpoint section](/dashboard/endpoint/foundation); for the raw telemetry the engine evaluates, see [Event coverage](/macos-collector/event-coverage).
+The macOS collector embeds an on-device detection engine that evaluates kernel events as they happen. This section describes what that engine looks for and how findings reach the console.
+
+For raw telemetry, see [Event coverage](/macos-collector/event-coverage). For console hubs that display related activity, see [Malware](/dashboard/malware), [Credentials](/dashboard/credentials), [Files](/dashboard/files), [Networks](/dashboard/networks), and [Frameworks](/dashboard/frameworks).
+
+---
 
 ## Where detection happens
 
-Detection runs **on the endpoint, inside ESensor**, before any event leaves the Mac. Because the engine sits on Apple's Endpoint Security AUTH path, it can do something a telemetry-only agent cannot: **deny an operation in-kernel** rather than report it after the fact. Every event the engine evaluates already carries [code-signing trust and application attribution](/dashboard/endpoint/foundation#why-endpoint-kernel-telemetry-is-different), so rules grade *who is acting* — a platform binary, a Developer ID app, or unsigned code — not just *what happened*.
+Detection runs **on the endpoint, inside ESensor**, before events leave the Mac. Because the engine sits on Apple's Endpoint Security AUTH path, it can **deny an operation in-kernel** rather than only report it afterward. Every evaluated event carries code-signing trust and application attribution — rules grade *who is acting*, not only *what happened*.
+
+---
 
 ## Rule families
 
-| Family | What it watches | Dashboard page |
-| :-- | :-- | :-- |
-| **Tamper** | Attempts to weaken macOS defenses or the agent itself: Gatekeeper quarantine-flag removal, configuration-profile changes, kills or deletions aimed at the collector. | [Tamper](/dashboard/endpoint/tamper) |
-| **Persistence** | Launch items, login items, and background-task registrations that give code a foothold across reboots. | [Persistence](/dashboard/endpoint/persistence) |
-| **Credential & privacy** | Reads of `~/.ssh`, browser credential stores, and TCC-protected locations by code that has no business there. | [Credential & Privacy](/dashboard/endpoint/credential-privacy) |
-| **Data movement** | Staging and exfiltration patterns: bulk reads followed by removable-media writes or unusual egress. | [Removable Media](/dashboard/endpoint/removable-media), [Network Egress](/dashboard/endpoint/network-egress) |
+| Family | What it watches | Where to read more |
+| --- | --- | --- |
+| **Tamper** | Gatekeeper quarantine removal, profile changes, attacks on the agent | [Tamper](/macos-collector/detections/tamper) |
+| **Persistence** | Launch agents, daemons, login items | [Persistence](/macos-collector/detections/persistence) |
+| **Credential & privacy** | Keychain, browser stores, TCC, camera/mic | [Credentials](/dashboard/credentials) |
+| **Data movement** | Removable media writes, unusual egress | [Files](/dashboard/files), [Networks](/dashboard/networks) |
+
+---
 
 ## How the agent responds
 
-Every finding carries a **status** that records what the agent did, and a **severity** from `critical` to `info`:
-
 | Status | Meaning |
-| :-- | :-- |
-| `blocked` | The engine denied the operation in-kernel. Used where the action is unambiguous — tampering with Gatekeeper quarantine or with the agent's own binaries and launch items. |
-| `alerted` | The operation completed, and the finding was raised for review at elevated severity. |
-| `logged` | The operation completed and was recorded for context and correlation. |
+| --- | --- |
+| `blocked` | Denied in-kernel (e.g. agent self-protection, clear Gatekeeper tamper) |
+| `alerted` | Operation completed; elevated finding for review |
+| `logged` | Recorded for context and correlation |
 
-Severity is scaled by the actor's code-signing verdict: the same file access scores differently coming from a notarized Developer ID application than from an unsigned binary.
+Severity scales with the actor's code-signing verdict. The agent protects its own bundle, updater, and launch items — unauthorized kill/delete/rename attempts are denied and surfaced as blocked tamper findings. Authorized MDM and signed updater paths remain allowed; see [Uninstall](/macos-collector/uninstall).
 
-The agent also protects itself. Its application bundle, updater binary, and launch items are registered as protected targets — the engine denies attempts to delete, rename, or kill them, and each denial surfaces as a `blocked` tamper finding. Authorized paths (MDM management, Apple's installer, the signed Hilt updater) are exempt, so updates and administrator-initiated removal work normally; see [Uninstall](/macos-collector/uninstall).
+---
+
+## Shared finding layout
+
+Findings typically include: **What happened · Process responsible · What was touched · Why it matters · Evidence · Recommended action**, plus severity/status and the responsible app's trust verdict.
+
+---
+
+## Kernel foundation (why macOS rows look different)
+
+Every Endpoint Security event can carry:
+
+- **Code-signing identity** — platform, Developer ID, ad hoc, unsigned/invalid
+- **Application attribution** — owning app, not only `comm`
+
+That is why persistence and tamper severity can be driven by *who* acted. Details: [Event data model](/macos-collector/event-data-model).
+
+---
 
 ## From finding to dashboard
 
-Findings stream through the same [authenticated ingest path](/macos-collector/networking-security) as telemetry and land in your deployment alongside the raw kernel events that produced them. Each finding arrives with the six-part breakdown the Endpoint pages render — **What happened · Process responsible · What was touched · Why it matters · Evidence · Recommended action** — and links to its raw ES and network evidence, so the triage view and the forensic view are one click apart.
+Findings use the same authenticated ingest path as telemetry. Triage them in [Malware](/dashboard/malware), map coverage in [Frameworks](/dashboard/frameworks), and deep-dive evidence in [Investigate](/dashboard/investigate) (macOS scope).
 
 <Note>
-Detection rules ship with the collector and are versioned: the **policy version** visible in the agent header on every Endpoint page records exactly which rule set a Mac is running.
+Detection rules ship with the collector and are versioned. The policy version on agent headers records which rule set a Mac is running.
 </Note>

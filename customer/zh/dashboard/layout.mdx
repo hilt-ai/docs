@@ -1,52 +1,65 @@
 ---
 title: "仪表盘结构"
 sidebarTitle: "布局"
-description: "Hilt 仪表盘的组织方式：导航分区，以及每个页面所涵盖的内容。"
+description: "Hilt 控制台如何组织：侧边栏顺序、顶栏工具与设置。"
 ---
 
-仪表盘与 Hilt Web 应用中的侧边栏一一对应。页面分为 **概览**、**采集器**、**云端**、**终端**、**安全** 和 **管理** 六组，另有独立的 **设置** 页面。
+Hilt 控制台与产品侧边栏一致。页面分为 **Overview（总览）**、**Collectors（采集器）**、**Data（数据）** 组、**Security（安全）** 组，以及 **Settings（设置）**。**Query** 与 **Reports** 位于顶栏（文档归在「工具」下）。
 
-## 概览
+Hilt 是 **数据移动治理（Data Movement Governance, DMG）** 平台：在 Linux 与 macOS 资产上观察数据如何移动，解析身份，对行为异常打分，并支持调查与遏制。
 
-- [概览](/zh/dashboard/overview)：着陆页，展示健康信号、近期异常与威胁画像
+---
 
-## 采集器
+## 总览与采集器
 
-- [采集器](/zh/dashboard/collectors)：已部署 Hilt 采集器的主机群列表，以及单台主机的详情
+- [总览](/zh/dashboard/overview)：可编辑的首页组件，展示舰队健康与近期发现
+- [采集器](/zh/dashboard/collectors)：Linux 与 macOS 采集器列表及主机详情
 
-## 云端
+---
 
-- [数据血缘](/zh/dashboard/data-lineage)：跨主机的进程与数据流可视化
-- [网络](/zh/dashboard/networks)：TCP 连接、目的地址与数据传输
-- [文件](/zh/dashboard/files)：文件的打开、写入、重命名与删除
-- [用户时间线](/zh/dashboard/users)：全主机群范围内的用户身份与活动
+## 数据
 
-## 终端
+多个数据中心页使用 **Linux | macOS** 范围切换。Linux 对应 eBPF / 云工作负载遥测；macOS 对应 Endpoint Security 遥测。
 
-- [EDR](/zh/dashboard/edr)：macOS 终端检测 — 持久化、篡改检测、数据移动、凭据与隐私访问
+- [调查](/zh/dashboard/investigate)：带过滤器与时间线的事件深潜
+- [血缘](/zh/dashboard/data-lineage)：进程与数据流图（Linux）或基于 exec 的进程血缘（macOS）
+- [网络](/zh/dashboard/networks)：舰队网络信号（Linux）或应用→目的地出站（macOS）
+- [文件](/zh/dashboard/files)：文件遥测与路径浏览器；macOS 含可移动介质
+- [用户](/zh/dashboard/users)：用户时间线 — 跨舰队的身份活动
+- [活动](/zh/dashboard/activity)：按应用的文件操作（上传、创建、删除、编辑）
+- [凭据](/zh/dashboard/credentials)：macOS 端点上的凭据与隐私访问
+
+---
 
 ## 安全
 
-- [检测与准确度](/zh/dashboard/detection-accuracy)：Hilt 如何检测异常并衡量模型准确度
-- [异常](/zh/dashboard/anomalies)：供分流处理的机器学习与基于规则的发现项
-- [规则](/zh/dashboard/detection-rules)：自定义检测规则构建器
-- [异常窗口](/zh/administration/behavioral-suppression)：在已知嘈杂时段对 ML 异常进行计划性抑制
-- [主机群行为](/zh/dashboard/fleet-behavior)：行为聚类与主机迁移
-- [调查](/zh/dashboard/investigate)：深入分析的事件时间线与过滤器
-- [查询](/zh/dashboard/query)：自然语言与结构化遥测数据查询
-- [隔离](/zh/dashboard/quarantine)：主机隔离与影响范围评估
-- [报告](/zh/administration/reports)：安全报告的生成与 PDF 导出
+- [异常](/zh/dashboard/anomalies)：ML 发现队列与异常窗口（行为抑制）
+- [告警](/zh/dashboard/alerts)：规则命中队列、自定义规则与敏感路径
+- [暴露面](/zh/dashboard/exposure)：第三方依赖景观与干预策略
+- [恶意软件](/zh/dashboard/malware)：端点上的恶意软件与篡改行为
+- [框架](/zh/dashboard/frameworks)：MITRE ATT&CK 与网络杀伤链覆盖
+- [隔离](/zh/dashboard/quarantine)：主机隔离与爆炸半径评估
+
+---
+
+## 工具（顶栏）
+
+- [查询](/zh/dashboard/query)：针对遥测与文档的自然语言助手
+- [报告](/zh/administration/reports)：高管与进程情报报告及 PDF 导出
+
+---
 
 ## 设置
 
-- [设置](/zh/dashboard/settings)：密码、用户名与会话管理
+管理功能已并入设置。打开 [设置](/zh/dashboard/settings) 查看各标签页：
 
-## 管理
+| 标签 | 内容 |
+| --- | --- |
+| **Account** | 个人资料、密码、会话、API 密钥 |
+| **Uptime** | 推理、流水线、数据库、集成健康 |
+| **System** | 模型、更新、数据导出、舰队行为 |
+| **Teams** | 团队、成员、身份映射 |
+| **Integrations** | Slack、Webhooks |
+| **Admin** | 云数据源、计费、存储、审计日志、MCP |
 
-- [系统管理](/zh/administration/layout)：用户、团队、身份映射与平台配置
-- [模型生命周期](/zh/on-prem/model-lifecycle)：TRACE 检测模型的状态、升级与回滚
-- [数据导出](/zh/on-prem/data-export-overview)：核心匿名化数据导出的审核与审批
-- [自动更新](/zh/on-prem/auto-update-overview)：自动平台更新配置
-- [存储](/zh/administration/storage)：遥测数据存储用量、分层与生命周期策略
-- [审计日志](/zh/administration/audit-log)：身份认证与管理操作的历史记录
-- [MCP Server](/zh/dashboard/mcp-server)：用于 AI 助手集成的 Model Context Protocol 服务器
+macOS 设备端检测深度（持久化、篡改等）位于 [macOS 采集器 → 检测](/zh/macos-collector/detections)，不再作为侧边栏中独立的「端点」树。

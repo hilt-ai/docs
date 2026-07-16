@@ -40,12 +40,12 @@ Linux 主机和容器化工作负载的主要事件流：每观测到一次内�
 
 ### `endpoint_events` — macOS 设备
 
-macOS 原生事件流，每条 Apple Endpoint Security 消息对应一行，每一行都带有代码签名信任信息（`signing_id`、`code_signature`、`team_id`、`cdhash`）和应用归属信息（`application_id`、`application_display_name`、`responsible_pid`、`session_id`）。当前面向 macOS 终端的详细页面参见 [EDR](/zh/dashboard/edr) 和 [macOS 采集器](/zh/macos-collector)。
+macOS 原生事件流，每条 Apple Endpoint Security 消息对应一行，每一行都带有代码签名信任信息（`signing_id`、`code_signature`、`team_id`、`cdhash`）和应用归属信息（`application_id`、`application_display_name`、`responsible_pid`、`session_id`）。macOS 相关控制台页面见 [检测](/zh/macos-collector/detections)、[凭据](/zh/dashboard/credentials)、[文件](/zh/dashboard/files) 与 [macOS 采集器](/zh/macos-collector/layout)。
 
 | | |
 | :-- | :-- |
 | **写入方** | 以 macOS 模式运行、消费 `dag.endpoint.*` 主题的富化服务 |
-| **读取方** | [EDR](/zh/dashboard/edr) 页面的每个标签页、Query 智能助手、MCP 工具 |
+| **读取方** | 读取端点遥测的平台数据/安全中心页、Query 智能助手、MCP 工具 |
 | **保留期限** | 默认 90 天（不少部署会将其提高到 365 天） |
 
 ### `dag_edr_events` — macOS EDR 发现项
@@ -55,7 +55,7 @@ macOS 原生事件流，每条 Apple Endpoint Security 消息对应一行，每�
 | | |
 | :-- | :-- |
 | **写入方** | macOS EDR 转发器 |
-| **读取方** | [EDR](/zh/dashboard/edr) 的持久化、防篡改、凭据与隐私、数据流动等标签页 |
+| **读取方** | [检测](/zh/macos-collector/detections) 与相关安全中心页 |
 | **保留期限** | 90 天 |
 
 ---

@@ -1,0 +1,105 @@
+---
+title: "配置参考"
+sidebarTitle: "配置"
+description: "Environment variables, on-disk paths, host identity, and MDM-delivered configuration for the Hilt macOS Collector."
+---
+
+The Hilt macOS Collector ("Hilt EDR", bundle `EDRApp.app`) is configured by environment, not by a hand-edited config file. The two Apple System Extensions it embeds — **ESensor** (Endpoint Security telemetry) and **NetFilter** (per-flow network attribution) — derive their behavior from the signed app bundle and the system policy delivered by [MDM](#mdm-delivered-configuration). The only operator-tunable surface is the **forwarder** LaunchDaemon, which reads three environment variables and ships the sensor's telemetry over outbound HTTPS to your Hilt `edr-collector`.
+
+There is no CLI wizard and no `csrutil disable`: the collector runs on a normal, hardened Mac with **System Integrity Protection (SIP) enabled**. See [System requirements](/zh/macos-collector/system-requirements) for why.
+
+## Forwarder settings
+
+The forwarder is the only component with runtime configuration. It is set at install time and injected into the `com.hilt.edr.forwarder` LaunchDaemon. On a [standalone install](/zh/macos-collector/deploy-standalone) you pass these as environment variables to the installer; on an [MDM-managed install](/zh/macos-collector/deploy-mdm) the packaged forwarder ships with the destination baked in.
+
+| Env var | Default | Purpose |
+| :-- | :-- | :-- |
+| `EDR_COLLECTOR_URL` | `http://127.0.0.1:8080` | Base URL of your Hilt `edr-collector`. The forwarder POSTs batches to `${EDR_COLLECTOR_URL}/ingest`. This is the macOS analogue of the Linux collector's `DAG_SHIP_URL`. A trailing slash is trimmed automatically. |
+| `EDR_FINDINGS_FILE` | `/Library/Application Support/Hilt/EDR/findings.ndjson` | The sensor's telemetry output file (NDJSON, one event per line). The forwarder tails this file; ESensor writes it. |
+| `EDR_SPOOL_FILE` | `forwarder-spool.ndjson` alongside the findings file | Offline spool. When the collector is unreachable, batches are written here and drained on reconnect. |
+
+<Note>
+`EDR_COLLECTOR_URL` is **not hardcoded**. If it is left unset, the forwarder defaults to `http://127.0.0.1:8080`, which only works for local testing. A real deployment must point it at your account's `edr-collector` ingest endpoint — for example the edge Network Load Balancer DNS name. Roaming Macs reach this endpoint over the public internet; no VPN is required.
+</Note>
+
+### Ingest behavior
+
+The forwarder is a dumb shipper: it tails the findings file, batches events, and POSTs them in the same wire envelope the Linux DLP agent uses, stamped `machine.host_type = "macos"` so enrichment routes and normalizes per platform.
+
+| Property | Value |
+| :-- | :-- |
+| Endpoint | `POST ${EDR_COLLECTOR_URL}/ingest` |
+| Transport | Outbound HTTPS (the only network destination) |
+| Batch size | Up to 500 events per POST (the collector's hard cap is 5000 / 10 MB) |
+| Flush interval | Every 2 seconds, or when a batch fills |
+| Agent version header | `X-DAG-Agent-Version: 1.1.0` (the collector requires ≥ 1.1.0) |
+| Request timeout | 15 seconds |
+| Offline spool cap | 64 MB; oldest backlog is dropped past the cap |
+| Spool drain | Every 5 seconds while a spool file exists |
+
+Only telemetry lines (those carrying an `hdr` envelope) are shipped; stray finding or heartbeat lines are ignored so the collector never rejects a batch. The forwarder persists a byte offset next to the findings file (`findings.ndjson.offset`) so a restart resumes exactly where it left off — no re-shipping, no skipped startup burst.
+
+## Host identity
+
+Every macOS event is tagged with the host's identity so it can be correlated across the fleet and surfaced in the dashboard. Unlike the Linux collector — where you set a node label explicitly via `DAG_NODE_ID` — the macOS collector derives its human-readable name **automatically** from the Mac itself.
+
+| Field | Source | Shown in dashboard |
+| :-- | :-- | :-- |
+| `device_name` | The Mac's **ComputerName** (System Settings > General > About > Name), resolved on-device | The human host name in Collectors, Investigate, and Networks/Files/Users views |
+| `host_id` | A stable per-host UUID generated at install and carried on every event | The canonical fleet identifier; the Kafka partition key |
+| `host_type` | Always `macos` (stamped by the forwarder) | The macOS host-type badge in the Collectors fleet |
+| `boot_id` | The current boot session UUID | Provenance / session continuity |
+
+`host_id` is the partition key the `edr-collector` uses (an FNV-64a hash of `host_id`), so a given Mac always lands on one Kafka partition and its events stay ordered. `device_name` is a per-event field, not a partition key — renaming the Mac updates the display name without disturbing event ordering.
+
+<Note>
+`device_name` follows the macOS ComputerName, not the network hostname. If you rename the Mac in System Settings, new events carry the new name automatically; there is no agent setting to override it.
+</Note>
+
+## On-disk layout
+
+The standalone `.pkg` installs the app into `/Applications`; the System Extensions are activated from inside the bundle, and the forwarder's working files live under Application Support.
+
+| Path | Purpose |
+| :-- | :-- |
+| `/Applications/EDRApp.app` | The notarized "Hilt EDR" app bundle (embeds ESensor + NetFilter) |
+| `/Library/Application Support/Hilt/EDR/findings.ndjson` | Sensor telemetry output (the forwarder's input) — overridable via `EDR_FINDINGS_FILE` |
+| `/Library/Application Support/Hilt/EDR/findings.ndjson.offset` | Persisted tail offset for restart-safe resume |
+| `/Library/Application Support/Hilt/EDR/forwarder-spool.ndjson` | Offline spool — overridable via `EDR_SPOOL_FILE` |
+| `com.hilt.edr.forwarder` LaunchDaemon | Runs the forwarder with `EDR_COLLECTOR_URL` injected; `RunAtLoad` + `KeepAlive` |
+
+The System Extensions themselves are managed by macOS (`systemextensionsctl`), not by a LaunchDaemon — the OS launches and supervises them once the extension is approved.
+
+## MDM-delivered configuration
+
+For zero-touch fleets, the collector's *system policy* is delivered by MDM rather than by hand. These profiles are what make a silent, no-prompt install possible; they configure macOS to trust and pre-authorize the collector, and are separate from the forwarder's `EDR_COLLECTOR_URL` (which is baked into the packaged forwarder for the managed path). See [Deploy via MDM](/zh/macos-collector/deploy-mdm) for the full procedure.
+
+| Profile payload | Identifier | Setting | Enrollment requirement |
+| :-- | :-- | :-- | :-- |
+| System Extensions policy | `com.apple.system-extension-policy` | `AllowedTeamIdentifiers = MVMB6LCP2A` | MDM enrollment (UAMDM) |
+| PPPC (Privacy Preferences Policy Control) | `com.apple.TCC.configuration-profile-policy` | `SystemPolicyAllFiles = Allow` | Supervision |
+
+- The **System Extensions policy** auto-approves the ESensor and NetFilter extensions by Team ID (`MVMB6LCP2A`, Cybe Corporation), so the user never sees the "extension was blocked" prompt. This requires the Mac to be MDM-enrolled (UAMDM); it does **not** require supervision.
+- The **PPPC profile** pre-grants Full Disk Access to the ESensor extension (`SystemPolicyAllFiles = Allow`), which every Endpoint Security client requires to read protected paths. Pre-granting FDA by profile **does** require the device to be supervised.
+
+<Note>
+Full Disk Access is **required** for the Endpoint Security client to function. On a [standalone install](/zh/macos-collector/deploy-standalone) the user grants it manually in System Settings > Privacy & Security > Full Disk Access — the entry appears as **ESensor** ("Hilt EDR Sensor"), not "EDRApp". The MDM PPPC profile grants the same thing automatically.
+</Note>
+
+## What the configuration does not control
+
+The macOS Collector deliberately exposes a narrow configuration surface. The following are fixed by design and are **not** settings:
+
+- **No inbound listener.** There is no port to open, no bind address, no phone-home. The only network activity is the forwarder's outbound HTTPS POST to `EDR_COLLECTOR_URL`.
+- **No SIP or developer-mode toggle.** The collector runs with SIP enabled because the app and extensions are Developer ID-signed, carry an embedded provisioning profile for the Endpoint Security entitlement, use the Hardened Runtime, and are notarized and stapled by Apple. There is nothing to disable.
+- **No kernel extension to load.** The collector is pure user-space System Extensions on Apple's modern frameworks. There is no kext, no `kextload`, no approval of a legacy KEXT.
+- **No sampling or rule configuration on-device.** Userspace event filtering (chiefly the high-volume `file_open` events, which dominate at ~95%+) is built into the sensor, not a tunable. Detection and scoring happen downstream in enrichment, not on the Mac.
+- **No event-content toggles.** The collector captures metadata only — process, file, and network event headers plus code-signing and application attribution fields. It never captures file contents, packet payloads, memory, or credentials.
+
+## See also
+
+- [Deploy a standalone install](/zh/macos-collector/deploy-standalone) — the direct-download `.pkg` path and its two one-time approvals.
+- [Deploy via MDM](/zh/macos-collector/deploy-mdm) — zero-click rollout with the two configuration profiles above.
+- [System requirements](/zh/macos-collector/system-requirements) — macOS 13.0+, Apple Silicon + Intel, and the SIP-enabled signing story.
+- [Networking and security](/zh/macos-collector/networking-security) — the outbound-only posture and the collector → MSK narrow door.
+- [Event data model](/zh/macos-collector/event-data-model) — what each event captures, including the code-signing trust and application-attribution fields unique to macOS.

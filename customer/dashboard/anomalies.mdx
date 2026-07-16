@@ -1,114 +1,49 @@
 ---
 title: "Anomalies"
 sidebarTitle: "Anomalies"
-description: "Understanding and triaging anomaly findings detected by Hilt's ML models."
+description: "ML finding queue and Anomaly Windows for behavioral suppression."
 ---
 
+Anomalies is the triage surface for behavioral (ML) findings. The hub has two tabs: **Anomalies** and **Anomaly Windows**.
+
+Detection accuracy concepts (how models score and how feedback improves them) are covered here rather than on a separate page.
+
 ---
 
-The triage queue for behavioral findings. Each finding represents a deviation detected by the anomaly scoring system (or raised by a detection rule); this page is where you review them and mark each one as a real anomaly or a false positive.
+## Tab: Anomalies
 
----
+Subtitle reflects how many findings need review versus total in the window.
 
-## Page header
+### Presentation
 
-The page header includes a **host selector** to scope findings to specific hosts, and **time presets** (5m, 15m, 1h, 6h, 24h, 7d) to control the time window.
+Switch between **Graph** and **Tree** layouts. Selecting a finding opens the investigation center with evidence chapters, session tree, and graph views.
 
-When no finding is deep-linked, the page **auto-selects the first finding in the Review tab**.
+### Queue and verdicts
 
-## Filters
+Findings are ordered for review (risk, time, confidence, urgency). Typical actions:
 
-Filtering is structured through the **Filters** popover:
-
-| Section | Options |
+| Action | Effect |
 | --- | --- |
-| **Type** | All · Activity spike · Network · Sensitive file · Lateral movement · Detection rule |
-| **Source** | All · Detection rules · ML anomalies |
-| **Sort by** | Risk (default) · Time · Confidence · Urgency |
-| **Visibility** | A **Suppressed** toggle to reveal findings hidden by prior feedback |
+| **Accept** | Confirm as a real anomaly |
+| **Deny** | Mark benign / false positive |
+| **Suppress** | Deny and suppress matching future patterns |
 
-Active filters appear as removable chips beneath the header. When you arrive scoped to a detection rule, a **Rule:** {name} chip shows the active scope.
-
----
-
-## Finding queue
-
-The queue is split into three tabs by review state:
-
-| Tab | Contents |
-| --- | --- |
-| **Review** | Findings awaiting a verdict |
-| **Accepted** | Findings you confirmed as real |
-| **Denied** | Findings you dismissed |
-
-### Finding cards
-
-Each row shows a **criticality dot**, the finding's headline, host, and how long ago it fired:
-
-- **Criticality dot**: filled red (critical), filled amber (elevated), or a hollow outline (routine). The underlying statistical score is never shown, only this three-tier read.
-- **Relative time** and short **hostname**.
-- **TTD** (Time to Detect), when available, for example "TTD ~5m".
-- A one-line **summary** with the flagged actor emphasized inline.
-
-The selected card is highlighted with a green accent.
-
-### Similar findings (clusters)
-
-When a finding is one of several with the same underlying pattern, the row shows **"N similar"** (plus a host count, for example "4 similar · 3 hosts"). Clicking it expands the cluster. Each member gets its own row with its own title and own criticality dot. Members are related, not identical, so they are never merged under one heading. The representative row's dot always shows the worst tier present in the cluster.
+Use host and time filters. Host-type filters can narrow Linux vs macOS collectors without a hub scope toggle.
 
 ---
 
-## Finding detail
+## Tab: Anomaly Windows
 
-Selecting a finding opens the investigation surface: a chaptered story panel on the left, a provenance graph in the center, and an Inspector panel on the right.
+Page title in product: **Behavioral Anomaly Suppression**.
 
-### Header
+Schedule recurring windows where **behavioral (ML) anomalies are hidden for all hosts** — useful for known-noisy maintenance or batch jobs. This replaces the old standalone Behavioral Suppression admin page.
 
-- **Title**, **host** (hover for the full name), and **flagged** time.
-- **TTD**, when available.
-- No confidence score is shown here. See Criticality dot, above.
-
-### Reviewing a finding
-
-- **Accept**: confirm it as a real anomaly.
-- **Deny**: mark it as benign or a false positive.
-- **Suppress**: deny it and auto-suppress future findings matching the same pattern, fleet-wide.
-
-Verdicts apply immediately with a 5-second **Undo** (toast, or press `Z`), then auto-advance to the next finding. Keyboard: `a` accept, `d` deny, `s` suppress.
-
-<Note>
-**Read-only users** (Viewer role) do not see verdict controls.
-</Note>
-
-### The story
-
-The narrative is broken into **chapters**. Clicking a chapter moves the graph's camera to that step and highlights its nodes. The vertical spine tracks the selected chapter; the dot next to each chapter is colored when it has detection-relevant activity.
-
-### The graph
-
-Below the story, the graph shows the finding's evidence:
-
-- **The story (causal path)**, the verified chain of cause and effect, is drawn in crimson. Activity the process touched concurrently but that is not part of the causal chain renders in a neutral color.
-- **Story / Model** lens toggle. Story shows the verified causal path. Model shows what the detection engine's own attention weighted most heavily, for comparing the model's focus against the narrative.
-- **Scope chips** widen the graph from the story-only subgraph to the full host graph for that window, or filter to first-seen-only entities.
-- A **replay scrubber** steps through the window's events in order. Pinning a node opens its details in the Inspector.
-
-### Ask
-
-The **Ask** dock on the right answers questions about the finding, grounded in its evidence. Type `@` to mention a specific entity (a process, file, or network destination) and the answer will focus on it. Cited entities render as clickable chips in the response.
-
-### Keyboard shortcuts
-
-Press `?` to open the full shortcut reference. Highlights:
-
-| Key | Action |
-| --- | --- |
-| `j` / `k` | Next / previous finding |
-| `f` | Investigate: collapse the queue, expand the story rail |
-| `t` | Theater: fullscreen investigation |
-| `[` / `]` | Previous / next chapter |
-| `v` | Cycle lens (Story / Model) |
-| `Space` | Replay the story |
-| `l` | Toggle the Ask dock |
+Rule-based alerts are managed under [Alerts](/dashboard/alerts), not here.
 
 ---
+
+## Related
+
+- Custom deterministic rules → [Alerts → Rules](/dashboard/alerts)
+- Deep event context → [Investigate](/dashboard/investigate)
+- Model lifecycle → [Models](/on-prem/model-lifecycle)

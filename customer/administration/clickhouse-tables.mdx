@@ -7,7 +7,7 @@ description: "A reference map of the ClickHouse tables behind the platform: what
 Hilt's [analytics database](/trust-security/architecture#components) is ClickHouse, running inside your own cloud account. Every dashboard page, the [Query](/dashboard/query) agent, and the [MCP server](/dashboard/mcp-server) all resolve to SQL against the tables on this page. It complements two other references: the [Data Catalog](/on-prem/data-catalog) describes data by *category* without internal names; this page names the actual tables for anyone writing SQL directly — an analyst confirming a finding against raw rows, or an on-prem administrator with direct ClickHouse access.
 
 <Note>
-For a fully worked example of querying a table directly, see the [Activity](/dashboard/endpoint/activity#querying-the-same-stream) page, which builds the exact SQL the dashboard runs.
+For a fully worked example of querying a table directly, see the [Activity](/dashboard/investigate) page, which builds the exact SQL the dashboard runs.
 </Note>
 
 ---
@@ -45,7 +45,7 @@ The native macOS event stream, one row per Apple Endpoint Security message, with
 | | |
 | :-- | :-- |
 | **Written by** | The enrichment service, running in macOS mode against `dag.endpoint.*` topics |
-| **Read by** | Every page in the [Endpoint](/dashboard/endpoint/foundation) section, the Query agent, MCP tools |
+| **Read by** | Platform Data and Security hubs that read endpoint telemetry, the Query agent, MCP tools |
 | **Retention** | 90 days by default (many deployments raise this to 365 days) |
 
 ### `dag_edr_events` — macOS EDR findings
@@ -55,7 +55,7 @@ Curated security findings from the macOS EDR forwarder — one row per detection
 | | |
 | :-- | :-- |
 | **Written by** | The macOS EDR forwarder |
-| **Read by** | The five [Endpoint detection pages](/dashboard/endpoint/foundation#shared-layout) (Persistence, Tamper, Credential & Privacy, Removable Media), [ATT&CK Matrix](/dashboard/endpoint/attack-matrix) |
+| **Read by** | On-device [detections](/macos-collector/detections) and related Security hubs (Persistence, Tamper, Credential & Privacy, Removable Media), [ATT&CK Matrix](/dashboard/frameworks/attack) |
 | **Retention** | 90 days |
 
 ---
@@ -66,7 +66,7 @@ Tables that reconstruct process lineage and resolve raw kernel identifiers into 
 
 | Table | Holds | Powers |
 | :-- | :-- | :-- |
-| `dag_process_tree` | One row per observed process, with resolved workload, application, and job identity attached | [Process Lineage](/dashboard/endpoint/process-lineage), [Data Lineage](/dashboard/data-lineage) process detail |
+| `dag_process_tree` | One row per observed process, with resolved workload, application, and job identity attached | [Process Lineage](/dashboard/data-lineage), [Data Lineage](/dashboard/data-lineage) process detail |
 | `dag_fork_edges` | Parent → child spawn edges (`fork`) with process identifiers on both sides | The Data Lineage spawn graph, `get_process_tree` (MCP) |
 | `dag_workload_inventory` | Catalog of resolved workloads (the logical service a set of processes belongs to) | Workload identity badges across Cloud pages |
 | `dag_application_inventory` | Catalog of resolved applications (binary + interpreter identity, independent of any one workload) | Application attribution in Investigate and Files |
@@ -79,7 +79,7 @@ Tables that reconstruct process lineage and resolve raw kernel identifiers into 
 | :-- | :-- | :-- |
 | `dag_network_flow_halves` | Reconciled network flow records — one row per flow, joined from the two kernel-side halves of the connection, with byte counts and the resolved application | [Networks](/dashboard/networks) timeline, graph, and map views |
 
-macOS network flows live directly in `endpoint_events` (`event_type = 'net_flow'`) — there is no separate flow table for the Endpoint section, since NetFilter resolves the responsible application at capture time.
+macOS network flows live directly in `endpoint_events` (`event_type = 'net_flow'`) — there is no separate flow table for macOS egress, since NetFilter resolves the responsible application at capture time.
 
 ---
 

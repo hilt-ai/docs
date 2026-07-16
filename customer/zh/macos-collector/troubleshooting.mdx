@@ -1,0 +1,152 @@
+---
+title: "故障排查"
+sidebarTitle: "故障排查"
+description: "Diagnose and fix common Hilt macOS Collector failures: system extension approval, Endpoint Security entitlement and Full Disk Access errors, and telemetry that never lands."
+---
+
+The Hilt macOS Collector is a notarized macOS app (`EDRApp.app`, team **Cybe Corporation / MVMB6LCP2A**) that embeds two Apple System Extensions — **ESensor** (Endpoint Security telemetry) and **NetFilter** (NetworkExtension content filter) — plus a small forwarder LaunchDaemon. There is **no kernel extension**, and the collector runs with **System Integrity Protection (SIP) enabled**.
+
+Most field issues fall into one of three buckets: the system extension never activates, the Endpoint Security client fails to start (an `ES_NEW_CLIENT_RESULT_ERR_*` code), or events are produced but never reach the `edr-collector`. The table below maps each symptom to its real cause and fix; the sections that follow go deeper on the ones that need procedure or context.
+
+<Note>
+Two **independent** runtime gates must both pass before ESensor can observe anything. **Gate 1 (entitlement)** is checked by the kernel's trusted-execution layer (AMFI) under SIP — its failure code is `ERR_NOT_ENTITLED`. **Gate 2 (Full Disk Access)** is checked by TCC — its failure code is `ERR_NOT_PERMITTED`. They are unrelated: a fully entitled, Apple-signed, notarized ESensor still fails with `ERR_NOT_PERMITTED` until it has Full Disk Access. Keep them straight before you start changing things.
+</Note>
+
+## Symptom → cause → fix
+
+| Symptom | Real cause | Fix |
+| :-- | :-- | :-- |
+| Extension never appears under **Login Items & Extensions**; no approval prompt | App is not in `/Applications`, or the activation request was never submitted | Move `EDRApp.app` to `/Applications` and relaunch; macOS only honors a `OSSystemExtensionRequest` from an app in `/Applications` |
+| Extension shows **`[activated waiting for user]`** in `systemextensionsctl list` | Extension is staged but the user has not approved it | Approve under **System Settings → General → Login Items & Extensions → Endpoint Security Extensions**, or push the MDM System Extensions profile |
+| ESensor logs `ES_NEW_CLIENT_RESULT_ERR_NOT_ENTITLED` | Entitlement not **authorized** — missing/invalid embedded provisioning profile, ad-hoc signature, or a build SIP won't honor | Install the notarized, Developer ID-signed `.pkg`; do not run an ad-hoc or self-built bundle on a SIP-on Mac |
+| ESensor logs `ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED` | Entitlement is fine, but the host process has **no Full Disk Access** | Grant Full Disk Access to **ESensor** (System Settings → Privacy & Security → Full Disk Access), or push the MDM PPPC profile |
+| Extension activates and ES client starts, but **no telemetry** lands in the dashboard | Forwarder LaunchDaemon down, wrong `EDR_COLLECTOR_URL`, or outbound HTTPS blocked | Confirm the forwarder daemon is loaded, the collector URL is correct (base host, no path), and outbound 443 to the ingest endpoint is open |
+| Full Disk Access **lost after a macOS upgrade**; ESensor flips to `ERR_NOT_PERMITTED` | TCC permissions are reset across major macOS upgrades | Re-grant Full Disk Access, or use an MDM PPPC profile so the grant persists across upgrades |
+| FDA entry you expect is missing; you only see **`EDRApp`** in the list | The FDA grant is attributed to the **extension**, not the app | Grant FDA to the **ESensor** entry, shown as **"Hilt EDR Sensor"** — not "EDRApp" |
+| **App Sandbox** unexpectedly enabled on ESensor → instant `ERR_NOT_PERMITTED` | The ES extension must **not** use the App Sandbox | Use the shipped notarized build; the App Sandbox is incompatible with `es_new_client()` |
+
+## Extension does not appear or is not approved
+
+The collector activates ESensor (and NetFilter) by submitting an `OSSystemExtensionRequest` when `EDRApp.app` launches. macOS imposes two hard preconditions before it will even surface an approval prompt.
+
+<Steps>
+  <Step title="Confirm the app is in /Applications">
+    macOS only activates system extensions from an app installed in `/Applications`. If the app was run from `~/Downloads`, a DMG, or any other location, the activation request is silently rejected and no prompt appears. The notarized `.pkg` installs `EDRApp.app` into `/Applications` for you; if you copied the app by hand, move it there and relaunch.
+  </Step>
+  <Step title="Approve the Endpoint Security extension">
+    On a standalone (non-MDM) install the approval is a one-time user action. Open **System Settings → General → Login Items & Extensions**, expand **Endpoint Security Extensions**, and enable **ESensor**. On older terminology you may see this surfaced as a **Privacy & Security → Allow** banner shortly after first launch.
+  </Step>
+  <Step title="Verify it activated">
+    Run `systemextensionsctl list` and confirm ESensor shows `[activated enabled]`. The states below decode the most common results.
+  </Step>
+</Steps>
+
+If you manage a fleet, do not rely on the user-facing prompt at all. Push a **System Extensions configuration profile** (`com.apple.system-extension-policy` with `AllowedTeamIdentifiers = MVMB6LCP2A`) **before** the app first tries to load the extension. That auto-approves activation and requires only MDM enrollment (UAMDM) — supervision is not needed for this payload. See [Deployment](/zh/macos-collector/deploy-mdm) for the full MDM profile set.
+
+### Decoding `systemextensionsctl list` states
+
+| State | Meaning | Action |
+| :-- | :-- | :-- |
+| `[activated enabled]` | Extension is approved and running | None — this is the healthy state |
+| `[activated waiting for user]` | Staged, but awaiting the approval toggle | Approve it (user toggle or MDM System Extensions profile) |
+| `[terminated waiting to uninstall on reboot]` | A prior version is being replaced | Reboot to complete the swap |
+| Extension absent from the list entirely | Activation request never reached the OS | Confirm the app is in `/Applications` and was launched at least once |
+
+## Endpoint Security client errors (`es_new_client`)
+
+When ESensor starts, it calls `es_new_client()`. A failure here means no process, file, or persistence telemetry will ever be emitted, even though the extension itself shows as activated. The two codes you will see in practice map to the two gates described in the note at the top of this page.
+
+**`ES_NEW_CLIENT_RESULT_ERR_NOT_ENTITLED` — Gate 1, entitlement.**
+The restricted entitlement `com.apple.developer.endpoint-security.client` is not being honored. Under SIP, the kernel only honors that entitlement when an **Apple-issued provisioning profile** authorizing it is embedded in a properly signed, notarized bundle. The shipping collector satisfies this: it is signed with a **Developer ID Application** certificate, carries the embedded profile, uses the **Hardened Runtime**, and is **notarized and stapled** by Apple. You hit `ERR_NOT_ENTITLED` almost exclusively when running something that is *not* that build — an ad-hoc-signed binary, a locally rebuilt bundle whose profile is missing or stale, or a tampered app whose signature no longer validates. The fix is to install the official notarized `.pkg`.
+
+<Note>
+This is the headline property of the collector: because the entitlement is authorized the supported, Apple-blessed way, the collector runs on a **normal, hardened Mac with SIP on**. You should never need `csrutil disable` or developer mode. If a runbook tells you to disable SIP to make telemetry work, it predates the entitlement migration and is wrong.
+</Note>
+
+**`ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED` — Gate 2, Full Disk Access.**
+The entitlement is fine, but the host process lacks TCC **Full Disk Access**. Full Disk Access is **required** for any Endpoint Security client — there is no configuration that removes this requirement. Grant it, and the error clears (see the next section). A secondary cause of this exact code is the **App Sandbox** being enabled on the ES extension; the sandbox makes `es_new_client()` fail with `ERR_NOT_PERMITTED` regardless of FDA. The shipped extension is deliberately not sandboxed, so this only surfaces on custom builds.
+
+The collector is built to recover from `ERR_NOT_PERMITTED` without operator intervention: on that error the extension **exits**, and `launchd` relaunches it within roughly ten seconds. The moment Full Disk Access is granted, the next relaunch succeeds and events begin flowing — no app restart or reboot required.
+
+## Granting and keeping Full Disk Access
+
+Full Disk Access is granted to the **extension**, not the app, and the entry is labeled differently than people expect.
+
+<Steps>
+  <Step title="Open the Full Disk Access pane">
+    **System Settings → Privacy & Security → Full Disk Access.**
+  </Step>
+  <Step title="Enable the ESensor entry">
+    Enable the entry shown as **ESensor / "Hilt EDR Sensor"**. It will **not** appear as "EDRApp" — granting FDA to the app bundle alone does not satisfy the ES client. If the entry is missing, launch `EDRApp.app` once so the extension registers, then return to this pane.
+  </Step>
+  <Step title="Confirm recovery">
+    Within ~10 seconds `launchd` relaunches ESensor, `es_new_client()` succeeds, and the `ERR_NOT_PERMITTED` log line stops. No reboot needed.
+  </Step>
+</Steps>
+
+### Full Disk Access lost after a macOS upgrade
+
+macOS resets TCC permissions across **major** OS upgrades. After such an upgrade, ESensor can flip back to `ERR_NOT_PERMITTED` even though nothing in the collector changed. This is expected macOS behavior, not a collector fault. You have two options:
+
+- **Standalone hosts:** re-grant Full Disk Access to **ESensor** using the steps above. The extension's self-relaunch loop means telemetry resumes within seconds of re-granting.
+- **Managed fleets:** push a **PPPC configuration profile** (`com.apple.TCC.configuration-profile-policy` with `SystemPolicyAllFiles = Allow`) so Full Disk Access is pre-granted and **survives upgrades** automatically. The PPPC payload requires **supervision** (ADE / supervised enrollment), not just enrollment. Combined with the System Extensions profile, this yields a silent, upgrade-resilient install. See [Deployment](/zh/macos-collector/deploy-mdm).
+
+## No telemetry landing in the dashboard
+
+If ESensor shows `[activated enabled]` and `es_new_client()` succeeded (no `ERR_*` lines), but macOS hosts are not appearing in the [Collectors](/zh/dashboard/collectors) fleet view or no events show under Investigate/Networks/Files/Users, the break is in the shipping path, not the sensor. ESensor emits events as JSON lines; the **forwarder LaunchDaemon** ships them over outbound HTTPS to the `edr-collector`, which routes to MSK Kafka (`dag.endpoint.exec/file/net`) and on to enrichment (`ENRICH_PLATFORM=macos`) and the ClickHouse `endpoint_events` table. Check the path in order, closest to the host first.
+
+<Steps>
+  <Step title="Confirm the forwarder LaunchDaemon is running">
+    The forwarder is a system LaunchDaemon installed alongside the app. Confirm it is loaded and not crash-looping. If it is missing or unloaded, no events leave the host regardless of how healthy ESensor is.
+  </Step>
+  <Step title="Check EDR_COLLECTOR_URL">
+    The forwarder ships to the URL in `EDR_COLLECTOR_URL`. It must be the **base ingest host** for your deployment with **no extra path** appended — a stray path segment is a common cause of silent rejects. Confirm the value and that it resolves from the host.
+  </Step>
+  <Step title="Verify outbound HTTPS">
+    The collector uses **only outbound HTTPS (443)** to the configured ingest endpoint — no inbound sockets, no phone-home. Confirm that outbound 443 to the ingest host is permitted by any local firewall, web proxy, or network policy. A TLS-intercepting proxy that the host does not trust will also break shipping.
+  </Step>
+  <Step title="Confirm events at the source">
+    If the forwarder, URL, and network all check out but nothing arrives, confirm ESensor is actually producing events by streaming its log (see below). A sensor producing zero events usually means it is still blocked on Gate 1 or Gate 2 despite appearing activated.
+  </Step>
+</Steps>
+
+<Note>
+Aggressive userspace filtering is applied before events leave the host — `file_open` alone is over 95% of raw volume and is heavily reduced. "Lower-than-expected event counts" is therefore usually correct behavior, not a fault. Distinguish *fewer* events from *zero* events: zero events points to one of the gates or the forwarder; merely sparse events is normal filtering. See [Event filtering](/zh/macos-collector/event-coverage).
+</Note>
+
+## How to inspect the collector
+
+Two commands cover almost all live diagnosis.
+
+**List system extensions and their states:**
+
+```bash
+systemextensionsctl list
+```
+
+Look for the ESensor entry (bundle id `Hilt.EDRApp.ESensor`) and the NetFilter entry (`Hilt.EDRApp.NetFilter`). A healthy ESensor reads `[activated enabled]`; `[activated waiting for user]` means it still needs approval. Confirm the team identifier is `MVMB6LCP2A`.
+
+**Stream the extension's live logs:**
+
+```bash
+log stream --predicate 'subsystem == "Hilt.EDRApp.ESensor"' --info
+```
+
+This surfaces `es_new_client()` results in real time. The presence of `ERR_NOT_ENTITLED` (Gate 1) or `ERR_NOT_PERMITTED` (Gate 2) tells you immediately which gate is failing and routes you to the matching section above. To inspect past activity instead of streaming, swap `log stream` for `log show --last 1h` with the same predicate.
+
+To confirm what the OS believes about the installed bundle's signature, entitlements, and notarization:
+
+```bash
+codesign -dv --entitlements - /Applications/EDRApp.app
+spctl -a -vvv --type install /Applications/EDRApp.app
+```
+
+These confirm the Developer ID signature, the embedded `com.apple.developer.endpoint-security.client` entitlement, and that the build is notarized — the foundation that Gate 1 depends on.
+
+## What this page does not cover
+
+- **Re-enabling features that do not exist yet.** Auto-update and on-device quarantine response are **not yet available** on macOS during early access. If telemetry is missing, the cause is install/approval/forwarder — not a disabled update or response feature.
+- **Disabling SIP.** The supported collector runs with **SIP enabled**. There is no troubleshooting step that involves `csrutil disable`; if you think you need it, you are running an unsupported build (see `ERR_NOT_ENTITLED` above).
+- **Kernel extension issues.** There is **no kext**. Anything referencing `kextload`, `kextstat`, or a kernel extension approval pane does not apply to this collector.
+
+For the full architecture and data path, see [Data flow](/zh/macos-collector/data-flow); for install paths and MDM profiles, see [Deployment](/zh/macos-collector/deploy-mdm).

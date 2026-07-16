@@ -1,73 +1,33 @@
 ---
 title: "Settings"
 sidebarTitle: "Settings"
-description: "Managing your account password, username, and active sessions."
+description: "Map of the Settings hub: Account, Uptime, System, Teams, Integrations, and Admin."
 ---
 
-The Settings page is your personal account management page. It is available to all authenticated users (hidden in static and demo modes).
+Settings is a single hub with horizontal tabs. Former Admin pages live here — there is no separate Admin sidebar section.
 
----
-
-## Account identity
-
-The top of the page shows your **username** and **role** (Admin, Analyst, Responder, Viewer, or Owner). Below the username, a **Password last changed** line shows when you last updated your password (or "not available yet" if your password has never been changed).
-
-### Renaming your username
-
-Click the pencil icon next to your username to edit it. Type a new username and confirm, or press Escape to cancel.
+Open **Settings** from the gear in the sidebar footer.
 
 ---
 
-## Change password
+## Tabs
 
-A form to update your password. You must provide your **current password**, choose a **new password**, and **confirm the new password**. The new password and confirmation must match before the form can be submitted.
+| Tab | What it covers | Docs |
+| --- | --- | --- |
+| **Account** | Profile, password, sessions, API keys | [Account](/dashboard/settings-account) |
+| **Uptime** | Inference, Pipeline, Databases, Integrations health | [System Status](/administration/system-status), [Prometheus](/administration/prometheus) |
+| **System** | Models, Updates, Data Export, Fleet Behavior | [Models](/on-prem/model-lifecycle), [Auto-Update](/on-prem/auto-update-overview), [Data Export](/on-prem/data-export-overview), [Fleet Behavior](/dashboard/fleet-behavior) |
+| **Teams** | Teams, Members, Identity mapping | [Teams](/administration/teams), [Members](/administration/user-management), [Identity mapping](/administration/identity-mappings) |
+| **Integrations** | Slack, Webhooks | [Slack](/administration/slack-notifications), [Webhooks](/administration/webhooks) |
+| **Admin** | Cloud Sources, Billing, Storage, Audit Log | [Cloud Sources](/administration/cloud-sources), [Billing](/administration/billing), [Storage](/administration/storage), [Audit Log](/administration/audit-log), [ClickHouse](/administration/clickhouse-tables), [MCP](/dashboard/mcp-server) |
 
-### Password requirements
+Uptime sections in the product rail: **Inference** (LLM narratives, cluster labeling, query), **Pipeline** (enrichment, TRACE), **Databases** (ClickHouse and Postgres), **Integrations** (Slack delivery health).
 
-The password strength indicator shows four criteria:
-
-| Indicator | Requirement |
-| --- | --- |
-| **8+** | At least 8 characters |
-| **Aa** | Mixed case (uppercase and lowercase) |
-| **123** | At least one digit |
-| **#!** | At least one special character |
-
-After changing your password, you will be signed out and must sign in again with the new credentials.
+System shows an auto-update status strip when release endpoints are available.
 
 ---
 
-## Active sessions
+## Related
 
-A list of your currently active sessions across devices. Each session shows:
-
-- **Device indicator**: "This device" badge for your current session.
-- **IP address / location**: where the session originated (shown as "Local network" for loopback addresses).
-- **Last activity**: how recently the session was active.
-
-### Sign out everywhere
-
-The **Sign out everywhere** button terminates all your active sessions across all devices. You will be redirected to the login page.
-
----
-
-## Recent sign-ins
-
-A chronological list of your recent login events, showing the sign-in time and IP address. The section initially displays **5 entries**. Click **Show all (N)** to expand and view the complete history.
-
----
-
-## API keys
-
-Create and manage bearer keys for the [REST API](/api/overview). The table
-lists each key's name, prefix (`hilt_live_…`), scope, creation and last-used
-times, expiry, and status (active, revoked, or expired).
-
-- **Create API key** opens a dialog to name the key, choose **Read-only** or
-  **Read & write** scope (write adds the ability to accept/deny findings),
-  and optionally set an expiry (30 days, 90 days, or 1 year).
-- The full key is revealed **once** after creation — copy it before closing
-  the dialog; only a short prefix is shown afterwards.
-- **Revoke** invalidates a key immediately: its next API request is rejected.
-- You can hold up to 20 active keys. Keys inherit your own host and team
-  restrictions — they can never access more than your account can.
+- Console map → [Layout](/dashboard/layout)
+- Platform API keys are created under [Account](/dashboard/settings-account)

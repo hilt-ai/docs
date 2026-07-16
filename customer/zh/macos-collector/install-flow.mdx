@@ -1,0 +1,141 @@
+---
+title: "安装流程（独立安装）"
+sidebarTitle: "安装流程"
+description: "Install the Hilt macOS Collector from the notarized .pkg: extension approval and Full Disk Access, end to end, with System Integrity Protection left enabled."
+---
+
+This page walks through the **standalone** install of the Hilt macOS Collector — the direct-download path where a single notarized `.pkg` is run on a Mac that is not enrolled in MDM. It is the experience an individual user (or an evaluator) goes through once, by hand.
+
+The whole setup is **one install plus two consents**: approve the system extension, then grant Full Disk Access. No Terminal, no `csrutil`, no developer mode. For the zero-click fleet path that suppresses both consents, see [Deploy via MDM](/zh/macos-collector/deploy-mdm).
+
+<Note>
+**System Integrity Protection (SIP) stays enabled** for this entire flow. The collector is a notarized, Developer ID–signed app whose Endpoint Security extension carries an Apple-issued provisioning profile authorizing the `com.apple.developer.endpoint-security.client` entitlement. Because the entitlement is authorized the legitimate way, you never run `csrutil disable` and never enable developer mode. The target Mac stays fully hardened.
+</Note>
+
+## What gets installed
+
+The collector ships as a single component: **Hilt EDR** (`EDRApp.app`, signed by team Cybe Corporation, Team ID `MVMB6LCP2A`). The app embeds two Apple System Extensions — there is **no kernel extension (kext)**.
+
+| Item | Identifier | Role |
+| :-- | :-- | :-- |
+| Hilt EDR app | `Hilt.EDRApp` | Host app; activates the system extensions |
+| ESensor (ES extension) | `Hilt.EDRApp.ESensor` | Endpoint Security telemetry sensor — process / file / network / persistence events |
+| NetFilter (network extension) | `Hilt.EDRApp.NetFilter` | `NEFilterDataProvider` content filter for per-flow network attribution |
+| Forwarder LaunchDaemon | — | Ships ESensor's JSON-line events over outbound HTTPS to the Hilt `edr-collector` |
+
+Running the `.pkg`:
+
+| Path | Purpose |
+| :-- | :-- |
+| `/Applications/EDRApp.app` | The notarized Hilt EDR app and its embedded System Extensions |
+| Forwarder LaunchDaemon | Small launchd job that reads ESensor's event stream and ships it over HTTPS |
+
+The `.pkg` itself is notarized and signed with a Developer ID Installer certificate, so Gatekeeper accepts it without warnings.
+
+## Install procedure
+
+<Steps>
+  <Step title="Run the notarized .pkg">
+    Double-click the `.pkg` and authenticate with an administrator password when prompted. The installer places **`EDRApp.app`** into `/Applications` and registers the forwarder LaunchDaemon.
+
+    Because the package is notarized and stapled, Gatekeeper raises no "unidentified developer" or malware warning. Installation does not require a reboot.
+  </Step>
+
+  <Step title="Launch the app — it requests the system extension">
+    Open **Hilt EDR** from `/Applications` once. On first launch the app submits an `OSSystemExtensionRequest` to activate the ESensor Endpoint Security extension, and macOS responds with a system prompt that the extension was blocked and needs approval.
+
+    Click **Open System Settings** (or **Allow**) on that prompt. The app keeps the activation request pending until you complete the next step.
+  </Step>
+
+  <Step title="Approve the Endpoint Security extension">
+    Go to **System Settings → General → Login Items & Extensions → Endpoint Security Extensions**, enable **ESensor**, and authenticate.
+
+    This is an Apple security gate that applies to *every* third-party Endpoint Security product — it cannot be click-suppressed without MDM. Once approved, the extension is allowed to load.
+  </Step>
+
+  <Step title="Grant Full Disk Access to ESensor">
+    Go to **System Settings → Privacy & Security → Full Disk Access** and enable the entry for **ESensor** (shown as *ESensor* / **"Hilt EDR Sensor"**). It appears in this list automatically after the previous step.
+
+    <Note>
+    The Full Disk Access entry is named **ESensor / "Hilt EDR Sensor"**, *not* "EDRApp" — grant the toggle on that entry. Full Disk Access is a hard requirement for any Endpoint Security client (see [Full Disk Access](#why-full-disk-access-is-required) below).
+    </Note>
+  </Step>
+</Steps>
+
+That is the entire user experience: **approve once, toggle Full Disk Access once.** No SIP changes, no developer mode, no Terminal.
+
+## Why Full Disk Access is required
+
+An Endpoint Security client has to clear two independent runtime gates before it can subscribe to events. They are easy to confuse, so keep them straight:
+
+| Gate | What it checks | Failure if unmet |
+| :-- | :-- | :-- |
+| **Entitlement** | The embedded provisioning profile authorizes the ES entitlement (enforced by AMFI under SIP) | `es_new_client()` returns `ES_NEW_CLIENT_RESULT_ERR_NOT_ENTITLED` |
+| **Full Disk Access** | The host process has TCC Full Disk Access | `es_new_client()` returns `ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED` |
+
+The notarized, properly-signed collector always clears the first gate. The second gate is **Full Disk Access**, and it is on you (the user) in the standalone flow. Until ESensor has Full Disk Access, `es_new_client()` fails with `ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED`.
+
+ESensor is built to recover from this automatically. When it hits `ERR_NOT_PERMITTED` it **exits**, and `launchd` relaunches it a few seconds later. So if you launch the app before granting Full Disk Access, the extension simply relaunches in a loop until you flip the toggle — at which point the *next* relaunch succeeds and events begin to flow. **You do not need to restart the app or the Mac after granting Full Disk Access.**
+
+<Note>
+This is why the install steps end with Full Disk Access. The order is forgiving — granting it last is fine — but the sensor will not deliver any telemetry until that toggle is on.
+</Note>
+
+## SIP, notarization, and the sandbox
+
+Three properties of the build are what let this work on a normal, hardened Mac:
+
+- **SIP stays enabled.** The ES extension lives inside a signed bundle carrying an Apple-issued provisioning profile that allowlists the Endpoint Security entitlement, so the kernel's trusted-execution layer (AMFI) honors the entitlement with SIP on. No `csrutil disable`, no `systemextensionsctl developer on`.
+- **Notarized and stapled.** The app, its extensions, and the `.pkg` are signed with Developer ID certificates, use the Hardened Runtime, and are notarized + stapled by Apple. Notarization satisfies Gatekeeper's malware/signature check — it is *not* what activates the extension. The extension still has to be approved (Step 3) or pre-approved by MDM.
+- **No App Sandbox on the ES extension.** The Endpoint Security extension must **not** use the App Sandbox; a sandboxed host process causes `es_new_client()` to fail with `ERR_NOT_PERMITTED` regardless of Full Disk Access.
+
+## Verification — what you see once it is running
+
+When the extension is approved and Full Disk Access is granted, ESensor connects its Endpoint Security client and the forwarder begins shipping events. You can confirm the install on the host and in the dashboard:
+
+**On the Mac:**
+
+- **System Settings → General → Login Items & Extensions → Endpoint Security Extensions** shows **ESensor** enabled.
+- **System Settings → Privacy & Security → Full Disk Access** shows **ESensor / "Hilt EDR Sensor"** toggled on.
+- The ESensor extension is running steadily (no relaunch loop), meaning `es_new_client()` succeeded — neither `ERR_NOT_ENTITLED` nor `ERR_NOT_PERMITTED`.
+
+**In the Hilt dashboard:**
+
+The host appears in the **Collectors** fleet view with a **macOS** host-type badge, and its activity flows into the **Investigate**, **Networks**, **Files**, and **Users** views. Events arrive enriched with macOS-specific, first-class fields the Linux collector cannot produce — the code-signing verdict (`platform` / `developer_id` / `adhoc` / `unsigned_or_invalid`), `signing_id`, `team_id`, and `cdhash`, plus application attribution (`application_id`, `application_display_name`, `responsible_pid`, `session_id`, `device_name`). See [Event Data Model](/zh/macos-collector/event-data-model) for the full schema.
+
+Behind the dashboard, the path is:
+
+```text
+ESensor (JSON lines) -> forwarder LaunchDaemon -> outbound HTTPS -> edr-collector
+  -> MSK (dag.endpoint.exec/file/net) -> enrichment (ENRICH_PLATFORM=macos) -> ClickHouse endpoint_events
+```
+
+See [Data Flow](/zh/macos-collector/data-flow) for the full pipeline.
+
+## What this install does NOT do
+
+- **Does not disable System Integrity Protection.** No `csrutil disable`, no Recovery boot, no developer mode at any point.
+- **Does not install a kernel extension.** The collector is pure user-space System Extensions on Apple's modern frameworks.
+- **Does not open any inbound socket or phone home.** The forwarder makes only outbound HTTPS to the configured ingest endpoint. There are no inbound listeners.
+- **Does not read file contents.** ESensor captures event metadata (path, operation, signing identity, attribution) — not the bytes of the files involved.
+- **Does not auto-update.** During early access, upgrades are applied by re-running the notarized `.pkg`; on-device auto-update is not yet available on macOS.
+
+## Requirements
+
+| Requirement | Detail |
+| :-- | :-- |
+| **macOS version** | 13.0 (Ventura) or later — Background Task Management persistence events require macOS 13+ |
+| **Architecture** | Universal: Apple Silicon and Intel |
+| **Privileges** | One administrator authentication to run the `.pkg`; one user authentication to approve the extension |
+| **Network** | Outbound HTTPS to your configured Hilt ingest endpoint |
+| **MDM** | Not required for the standalone path; see [Deploy via MDM](/zh/macos-collector/deploy-mdm) for zero-click fleet installs |
+
+<Note>
+The Hilt macOS Collector is in **early access**. The notarized `.pkg` with SIP-on install described here is the shipping model. Auto-update and on-device quarantine response are not yet available on macOS.
+</Note>
+
+## Next steps
+
+- **Deploying to a fleet?** Use [Deploy via MDM](/zh/macos-collector/deploy-mdm) to push the System Extensions and PPPC profiles that pre-approve the extension and pre-grant Full Disk Access — a silent, zero-click install.
+- **Want to see what is captured?** Review the [Event Data Model](/zh/macos-collector/event-data-model) and the macOS-specific signing and attribution fields.
+- **Tracing the pipeline?** See [Data Flow](/zh/macos-collector/data-flow) for the route from ESensor to `endpoint_events`.

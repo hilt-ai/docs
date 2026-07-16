@@ -1,0 +1,80 @@
+---
+title: "篡改检测"
+sidebarTitle: "篡改"
+description: "削弱 macOS 安全控制的尝试 — Gatekeeper 隔离移除、配置描述文件变更，以及对 Hilt agent 本身的攻击；传感器在内核中拒绝并作为 blocked 发现上报。"
+---
+
+篡改检测回答：*什么试图削弱这台 Mac 的防御 — 或正在监视它的 agent？* 它建立在 [macOS 采集器](/zh/macos-collector/event-data-model) 发出的类型化内核事件上，并且 ESensor 不只是 *观察* 篡改，还会 **拒绝** 它。
+
+每条事件都带有[代码签名信任与应用归属](/zh/macos-collector/detections)，因此「哪个未签名应用清掉了隔离标记」是一行查询，而不是事后重建。
+
+---
+
+## 页面结构
+
+通过采集器主机选择器聚焦到一台 Mac。
+
+| 区域 | 内容 |
+| --- | --- |
+| **Agent header** | 设备名、风险、最近可见、ES / Network Extension 运行状态、策略版本、发现/事件计数 |
+| **Summary cards** | Gatekeeper、MDM / Profiles、Agent Tamper |
+| **Timeline** | 约 60 分钟的篡改发现图 |
+| **Severity / Status** | 按严重度或 `blocked` / `alerted` / `logged` 过滤 |
+| **Findings table** | 可折叠分组；重复篡改显示 `N×` |
+| **Finding detail** | 六段说明；负责进程面板含 `code_signature` |
+
+<Note>
+**Status** 是本页核心：发现可为 `blocked` — 动作在内核完成前被拒绝。见下方自保护模型。
+</Note>
+
+---
+
+## 活动组
+
+| 组 | 基于 | 最高严重度 | ATT&CK |
+| --- | --- | --- | --- |
+| **Gatekeeper** | 对 `com.apple.quarantine` 的 `xattr_delete` / `xattr_set` | High | T1553.001 |
+| **MDM / Profiles** | 配置描述文件与受管偏好路径上的 `file_*` | High | T1562.001 |
+| **Agent Tamper** | 针对采集器的 `signal` / `file_unlink` / `file_rename` | Critical | T1562.001 |
+
+### Gatekeeper
+
+下载文件会打上 `com.apple.quarantine`。剥离该属性即可绕过首次启动提示。采集器订阅 `xattr_delete` 与 `xattr_set`；非 platform / `developer_id` 的剥离通常为 `high`。
+
+### MDM / Profiles
+
+针对配置描述文件与受管偏好路径的写入：来自 MDM agent 自身的 `developer_id` 写入可预期；`adhoc` / `unsigned_or_invalid` 写入按禁用或修改工具模式升高。
+
+### Agent Tamper
+
+试图 **杀死、删除或重命名** Hilt EDR 应用或其 ESensor 扩展 — 最高严重度组。
+
+---
+
+## Agent 自保护 — AUTH 拒绝模型
+
+Endpoint Security 的 **AUTH** 事件会在动作完成前询问传感器 `ALLOW` 或 `DENY`。ESensor 对自保护相关事件以 AUTH 订阅并回答 `DENY`：
+
+| 事件 | 攻击形态 | 传感器响应 |
+| --- | --- | --- |
+| `signal` | 对采集器 `kill -9` | 内核拒绝 → `blocked` |
+| `file_unlink` | 删除 agent 二进制或配置 | 内核拒绝 → `blocked` |
+| `file_rename` | 把 agent 挪开 | 内核拒绝 → `blocked` |
+
+动作在设备上被阻止，同时仍产生完整遥测行，成为带完整归因的 `critical` / `blocked` 发现。
+
+<Warning>
+`blocked` 表示篡改 **失败** — agent 仍在运行。但成簇的 `critical` / `blocked` agent-tamper 发现是最强信号之一：主机上有东西在试图致盲传感器。
+</Warning>
+
+---
+
+## 与其他页面的关系
+
+- [检测总览](/zh/macos-collector/detections)
+- [ATT&CK](/zh/dashboard/frameworks/attack) — Defense Evasion 列
+- [持久化](/zh/macos-collector/detections/persistence) — 防御规避常与持久化同行
+- [血缘](/zh/dashboard/data-lineage)
+- [事件覆盖](/zh/macos-collector/event-coverage)
+
+本页为 **元数据而非内容**：展示隔离属性被移除、杀死被拒绝等事实，从不展示文件内容。

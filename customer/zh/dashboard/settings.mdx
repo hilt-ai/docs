@@ -1,67 +1,22 @@
 ---
 title: "设置"
 sidebarTitle: "设置"
-description: "管理你的账户密码、用户名和活跃会话。"
+description: "设置中心页地图：账户、运行状态、系统、团队、集成与管理。"
 ---
 
-设置页面是你的个人账户管理页面。所有已认证用户均可使用（在静态和演示模式下隐藏）。
+设置是带水平标签的单一中心页。原管理页已并入此处 — 侧边栏不再有独立的 Admin 区。
 
----
-
-## 账户身份
-
-页面顶部显示你的**用户名**和**角色**（Admin、Analyst、Responder、Viewer 或 Owner）。用户名下方有一行 **Password last changed** 显示你上次更新密码的时间（如果密码从未更改过则显示"not available yet"）。
-
-### 重命名用户名
-
-点击用户名旁边的铅笔图标进行编辑。输入新用户名并确认，或按 Escape 取消。
+从侧边栏底部齿轮打开 **Settings**。
 
 ---
 
-## 更改密码
+## 标签
 
-一个用于更新密码的表单。你必须提供**当前密码**，选择一个**新密码**，并**确认新密码**。新密码和确认密码必须匹配才能提交表单。
-
-### 密码要求
-
-密码强度指示器显示四个条件：
-
-| 指示器 | 要求 |
-| --- | --- |
-| **8+** | 至少 8 个字符 |
-| **Aa** | 混合大小写（大写和小写） |
-| **123** | 至少一个数字 |
-| **#!** | 至少一个特殊字符 |
-
-更改密码后，你将被注销并需要使用新凭据重新登录。
-
----
-
-## 活跃会话
-
-你在各设备上当前活跃会话的列表。每个会话显示：
-
-- **设备标识**：当前会话显示"This device"徽章。
-- **IP 地址/位置**：会话发起的位置（回环地址显示为"Local network"）。
-- **最近活动**：会话最近活跃的时间。
-
-### 全部注销
-
-**Sign out everywhere** 按钮会终止你在所有设备上的所有活跃会话。你将被重定向到登录页面。
-
----
-
-## 近期登录
-
-按时间顺序排列的近期登录事件列表，显示登录时间和 IP 地址。该部分初始显示 **5 条记录**。点击 **Show all (N)** 展开查看完整历史。
-
----
-
-## API 密钥
-
-创建和管理 [REST API](/zh/api/overview) 的 Bearer 密钥。表格列出每个密钥的名称、前缀（`hilt_live_…`）、权限范围、创建和最近使用时间、有效期以及状态（活跃、已吊销或已过期）。
-
-- **创建 API 密钥**会打开一个对话框：为密钥命名，选择**只读**或**读写**权限（读写额外允许接受/拒绝检测发现），并可选设置有效期（30 天、90 天或 1 年）。
-- 完整密钥仅在创建后**显示一次**——请在关闭对话框前复制；之后只显示短前缀。
-- **吊销**会立即使密钥失效：它的下一次 API 请求即被拒绝。
-- 每个账户最多可持有 20 个活跃密钥。密钥继承你自己的主机和团队限制——它们能访问的内容永远不会超过你的账户。
+| 标签 | 内容 | 文档 |
+| --- | --- | --- |
+| **Account** | 资料、密码、会话、API 密钥 | [账户](/zh/dashboard/settings-account) |
+| **Uptime** | 推理、流水线、数据库、集成健康 | [系统状态](/zh/administration/system-status)、[Prometheus](/zh/administration/prometheus) |
+| **System** | 模型、更新、数据导出、舰队行为 | [模型](/zh/on-prem/model-lifecycle)、[自动更新](/zh/on-prem/auto-update-overview)、[数据导出](/zh/on-prem/data-export-overview)、[舰队行为](/zh/dashboard/fleet-behavior) |
+| **Teams** | 团队、成员、身份映射 | [团队](/zh/administration/teams)、[成员](/zh/administration/user-management)、[身份映射](/zh/administration/identity-mappings) |
+| **Integrations** | Slack、Webhooks | [Slack](/zh/administration/slack-notifications)、[Webhooks](/zh/administration/webhooks) |
+| **Admin** | 云数据源、计费、存储、审计日志 | [云数据源](/zh/administration/cloud-sources)、[计费](/zh/administration/billing)、[存储](/zh/administration/storage)、[审计日志](/zh/administration/audit-log)、[ClickHouse](/zh/administration/clickhouse-tables)、[MCP](/zh/dashboard/mcp-server) |
