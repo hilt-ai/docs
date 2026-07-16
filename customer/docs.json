@@ -80,9 +80,14 @@
                   "dashboard/alerts",
                   "dashboard/exposure",
                   "dashboard/malware",
-                  "dashboard/frameworks",
-                  "dashboard/frameworks/attack",
-                  "dashboard/frameworks/kill-chain",
+                  {
+                    "group": "Frameworks",
+                    "pages": [
+                      "dashboard/frameworks",
+                      "dashboard/frameworks/attack",
+                      "dashboard/frameworks/kill-chain"
+                    ]
+                  },
                   "dashboard/quarantine"
                 ]
               },
@@ -96,7 +101,6 @@
               {
                 "group": "Settings",
                 "pages": [
-                  "dashboard/settings",
                   {
                     "group": "Account",
                     "pages": [
@@ -281,9 +285,14 @@
                   "zh/dashboard/alerts",
                   "zh/dashboard/exposure",
                   "zh/dashboard/malware",
-                  "zh/dashboard/frameworks",
-                  "zh/dashboard/frameworks/attack",
-                  "zh/dashboard/frameworks/kill-chain",
+                  {
+                    "group": "框架",
+                    "pages": [
+                      "zh/dashboard/frameworks",
+                      "zh/dashboard/frameworks/attack",
+                      "zh/dashboard/frameworks/kill-chain"
+                    ]
+                  },
                   "zh/dashboard/quarantine"
                 ]
               },
@@ -297,7 +306,6 @@
               {
                 "group": "设置",
                 "pages": [
-                  "zh/dashboard/settings",
                   {
                     "group": "账户",
                     "pages": [
