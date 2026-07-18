@@ -1,13 +1,96 @@
 ---
 title: "macOS"
 sidebarTitle: "macOS"
-description: "Hilt's macOS endpoint deployment."
+description: "Deploy Hilt on macOS endpoints: the system collector and managed Chromium browser extension."
 ---
 
 <Note>
 **Early access.** Contact your account team to enable macOS endpoint deployment for your environment.
 </Note>
 
-Hilt's macOS endpoint coverage extends Data Movement Governance to macOS endpoints using the Apple Endpoint Security framework and a managed Chrome extension, complementing the Linux collector that covers your server infrastructure.
+Hilt's macOS endpoint coverage has two parts that work together:
 
-This page will cover provisioning macOS endpoints, including MDM-based deployment of the system extension and the Chrome extension. For current capabilities, see the [macOS Collector](/macos-collector/layout) page.
+1. **macOS collector** — a notarized app with Apple **Endpoint Security** and **NetworkExtension** system extensions. This is the primary sensor for process, file, network, and persistence telemetry on the host.
+2. **Managed Chromium browser extension** — a force-installed extension on Chrome, Edge, and Brave that reports in-browser activity the kernel sensor cannot see (for example, file uploads into web-based AI services).
+
+Together they extend Data Movement Governance to employee Macs, complementing the [Linux collector](/linux-collector/layout) on your server infrastructure.
+
+For system-extension architecture, MDM rollout, event schemas, and troubleshooting, see the [macOS Collector](/macos-collector/layout) guide. This page covers what to deploy and how the two pieces fit.
+
+---
+
+## macOS collector (system extension)
+
+The collector ships as **Hilt EDR** (`EDRApp.app`), embedding:
+
+| Component | Role |
+| :-- | :-- |
+| **ESensor** | Endpoint Security telemetry — process, file, persistence, device events |
+| **NetFilter** | Per-flow network attribution for outbound connections |
+
+Deploy via MDM for a zero-touch fleet rollout, or via the standalone `.pkg` for pilots. Both paths require a one-time (or MDM-pre-granted) system extension approval and Full Disk Access for ESensor.
+
+- [Deploy via MDM](/macos-collector/deploy-mdm) — recommended for managed fleets
+- [Deploy standalone](/macos-collector/deploy-standalone) — pilots and individual machines
+- [Install flow](/macos-collector/install-flow) — what end users see
+
+The collector runs with **System Integrity Protection enabled** — no kernel extension, no `csrutil disable`.
+
+---
+
+## Managed Chromium browser extension
+
+### What it is for
+
+The browser extension closes a visibility gap on macOS: many sensitive data movements happen **inside the browser** (uploading a file to a SaaS or AI web app) without a corresponding kernel-level file event Hilt can attribute. The extension observes selected browser activity and ships it to the same Hilt ingest path, correlated to the Mac by `host_id` (the same hardware UUID the macOS collector uses).
+
+In the dashboard, browser telemetry feeds views such as [Activity](/dashboard/activity) (web-based file uploads) and AI-usage summaries. It does **not** replace the system collector — kernel telemetry and browser telemetry are complementary.
+
+### What it captures
+
+The extension reports structured browser events (not page content or keystrokes). Event kinds include page navigation, heartbeats, file uploads, downloads, and network requests to configured destinations. Exact event types and fields evolve during early access; your account team can share the current schema for your deployment.
+
+Browser events land in a dedicated `browser_events` table, separate from kernel `endpoint_events`. They do not flow through the same scoring pipeline as Endpoint Security events.
+
+### How it is deployed
+
+The extension is **force-installed** through your browser's enterprise policy layer — the same mechanism IT teams use for managed Chrome/Edge extensions:
+
+- **Chrome / Brave** — `ExtensionInstallForcelist` (or equivalent) via Google Admin, Jamf, Kandji, Intune, or another MDM
+- **Microsoft Edge** — Edge management policy via Intune or Group Policy
+
+Hilt provides the signed extension package (`.crx` or update URL) and the extension ID for your policy. Contact your **account team** to obtain the current build and a policy template for your MDM.
+
+The extension must be deployed **alongside** the macOS collector on each Mac. It posts to the same `edr-collector` ingest endpoint configured for the host forwarder.
+
+### Early-access caveats
+
+The browser extension is **early access** and coverage is still expanding:
+
+- Chromium browsers only (Chrome, Edge, Brave) — no Safari or Firefox extension today
+- Requires the macOS collector and a deployment with browser enrichment enabled on the data plane
+- Event types and dashboard surfacing may change between releases
+- Force-install policy and extension packaging are coordinated with your account team, not self-service in the dashboard
+
+If browser-based uploads or AI service usage are in scope for your deployment, confirm with your account team that browser enrichment is enabled before relying on Activity or AI-usage views.
+
+---
+
+## Deployment checklist
+
+| Step | Action |
+| :-- | :-- |
+| 1 | Contact your account team to enable macOS early access |
+| 2 | Deploy the macOS collector to pilot hosts ([MDM](/macos-collector/deploy-mdm) or [standalone](/macos-collector/deploy-standalone)) |
+| 3 | Confirm hosts appear in [Collectors](/dashboard/collectors) with a **macOS** badge |
+| 4 | Request the browser extension package and force-install policy from your account team |
+| 5 | Push the extension policy to the same fleet via MDM |
+| 6 | Verify browser events in [Activity](/dashboard/activity) or through your account team's validation steps |
+
+---
+
+## Related
+
+- Full collector guide → [macOS Collector](/macos-collector/layout)
+- Linux server deployment → [Linux Collector](/linux-collector/layout)
+- Trust and supply chain → [Security operations](/trust-security/operations)

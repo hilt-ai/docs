@@ -21,7 +21,7 @@ The collector is a single static Linux binary (~5 MB, zero dependencies) plus an
 The DMG Collector is strictly observational. It does **not**:
 
 - **Expose network services.** The agent only makes outbound HTTPS to your control plane defined as `DAG_SHIP_URL`. Nothing else opens a socket.
-- **Install kernel modules.** Everything rides CO-RE eBPF with BTF; there is no out-of-tree driver, no DKMS, no custom kernel build.
+- **Install kernel modules.** Everything rides eBPF (CO-RE with native or bundled BTF, depending on kernel version); there is no out-of-tree driver, no DKMS, no custom kernel build.
 - **Modify network traffic.** The agent observes; it never injects, drops, blocks, or alters packets. Quarantine (where used) is a separate control-plane action via AWS security groups, executed by the dashboard, not by the agent.
 - **Change host state.** No system modifications are made, aside from optionally writing a configuration file.
 - **Perform external callbacks.** No license checks, telemetry beacons, or "phone-home" behavior. The only outbound communication is the configured event stream.

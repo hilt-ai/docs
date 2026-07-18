@@ -95,7 +95,7 @@ macOS 的网络流直接存放在 `endpoint_events` 中（`event_type = 'net_flo
 | `dag_behavior_clusters` | 相似主机行为的命名聚类，包含规模、持续性与代表性特征 | 发现项上"对该主机而言不典型"的聚类徽章 |
 
 <Note>
-驱动检测的完整特征与评分向量（单个 z 分数、统计基线、GNN 溯源图，以及 TRACE 模型的内部状态）存放在本页未列出的其他 ClickHouse 表中。它们属于检测引擎的实现细节，不供直接查询，出于与检测规则逻辑相同的原因（它们描述了你的安全态势），本页以及[匿名数据导出](/zh/on-prem/data-export-overview)都刻意将其排除在外。
+检测在不同时间尺度上组合三条腿：统计 z 分数基线（`dag_anomaly_scores`、`dag_anomaly_alerts`）、TRACE token 模型评分（`dag_trace_scores`），以及（在启用 `GNN_ENABLED` 与边摄入时）GNN 图评分。Token 序列、图边与模型内部状态存放在本页未列出的其他 ClickHouse 表中。它们属于检测引擎的实现细节，不供直接查询，出于与检测规则逻辑相同的原因（它们描述了你的安全态势），本页以及[匿名数据导出](/zh/on-prem/data-export-overview)都刻意将其排除在外。
 </Note>
 
 ---

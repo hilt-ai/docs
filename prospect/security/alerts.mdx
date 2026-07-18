@@ -1,6 +1,32 @@
 ---
 title: "Alerts"
-description: "Deterministic rules, alert queue, and sensitive paths."
+description: "Rule-break queue, custom detection rules, and sensitive path registry."
 ---
 
-Alerts covers the rule-break queue, custom if-this-then-alert Rules, and Sensitivity paths that weight risk scoring.
+Alerts is the hub for deterministic detections. Three tabs: **Alerts**, **Rules**, and **Sensitivity**. ML triage lives on [Anomalies](/security/anomalies).
+
+---
+
+## Tab: Alerts
+
+The queue of rule breaks — severity, rule name, actor, host, and time. Open a row to see evidence and pivot into [Investigate](/data/investigate) or related [Anomalies](/security/anomalies).
+
+---
+
+## Tab: Rules
+
+Custom **if-this-then-alert** rules over live telemetry. **New Rule** and **Create with AI** open the builder. Rules can evaluate **per event** or as a **time aggregate** (count / sum / average over a window) with conditions on process, file, network, and identity fields.
+
+When a rule matches it raises a finding into the Alerts queue.
+
+---
+
+## Tab: Sensitivity
+
+Maintain the registry of sensitive file paths so scoring and rule evaluation treat those locations with higher weight.
+
+Operator reference: [Alerts on docs.hilt.ai](https://docs.hilt.ai/dashboard/alerts).
+
+<Card title="Integrations" icon="plug" href="/integrations">
+  Push alert delivery via API and webhooks.
+</Card>

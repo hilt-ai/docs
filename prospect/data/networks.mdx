@@ -1,6 +1,36 @@
 ---
 title: "Networks"
-description: "Fleet network signals on Linux; application egress on macOS."
+description: "Linux fleet network signals and host views, plus macOS application egress."
 ---
 
-Networks answers where bytes went. Linux views cover fleet signals, timelines, graphs, and maps. macOS views attribute outbound flows to applications and destinations.
+Networks shows how hosts talk to destinations. Use the **Linux | macOS** scope toggle — Linux covers cloud and server estates; macOS covers application-attributed egress on endpoints.
+
+---
+
+## Linux scope
+
+Fleet-level modes include:
+
+| Mode | What you see |
+| --- | --- |
+| **Fleet** | New processes, destinations, and volume spikes across hosts |
+| **Timeline** | Network activity over time |
+| **Graph** | Connection topology |
+| **Map** | Geographic or logical map of destinations |
+
+On a selected host you can filter **All / Internal / External** traffic, then pivot into [Investigate](/data/investigate) for the underlying flows.
+
+---
+
+## macOS scope
+
+Outbound connections by **application and destination** — Sankey / ribbon views ranking by bytes or flow count. Every flow is attributed to the responsible app via Endpoint Security and the Network Extension path.
+
+---
+
+## Related surfaces
+
+- File exfil paths → [Files](/data/files)
+- Third-party dependency behavior → [Exposure](/security/exposure)
+
+Operator reference: [Networks on docs.hilt.ai](https://docs.hilt.ai/dashboard/networks).

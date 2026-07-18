@@ -18,7 +18,7 @@ The Hilt macOS Collector is a notarized macOS app, **Hilt EDR** (bundle `EDRApp.
 - **No phone-home.** Outside the single outbound HTTPS stream to the configured ingest endpoint, the collector makes no network calls — no telemetry to Hilt, no license check-in, no beacon.
 - **No public DNS dependency for control.** The only name it resolves is your ingest endpoint.
 - **No auto-update channel (yet).** Early access builds do not self-update; there is no update-fetch path at runtime. New versions ship as a fresh notarized `.pkg`. See [Status](#requirements-and-status).
-- **No on-device response actions (yet).** ESensor subscribes to Apple Endpoint Security `NOTIFY` events only — it observes and reports. It does not block, kill, or quarantine on the host, so there is no inbound command channel to drive such actions.
+- **No arbitrary on-device response actions (yet).** Telemetry is overwhelmingly NOTIFY — ESensor observes and reports without blocking arbitrary user/process/network activity or performing on-device quarantine. A small AUTH set (`signal`, `file_unlink`, `file_rename`) denies unauthorized tampering with the agent in-kernel only; see [Event coverage](/zh/macos-collector/event-coverage) and [Tamper detection](/zh/macos-collector/detections/tamper). There is no inbound command channel to drive console-initiated quarantine or isolation.
 
 ## The Apple trust chain
 

@@ -1,6 +1,25 @@
 ---
 title: "Activity"
-description: "File actions by application — uploads, creates, deletes, and edits."
+description: "File actions by application — uploads, creates, deletes, and edits across the fleet."
 ---
 
-Activity lists file actions by application across the fleet. It is the upload/create/delete/edit surface — distinct from Users (identities) and Investigate (raw events).
+Activity shows **file actions by application** — uploads, creates, deletes, and edits across the fleet. It is the application-centric view of risky file movement, distinct from [Users](/data/users) (identities) and [Investigate](/data/investigate) (raw events).
+
+---
+
+## Filters
+
+| Control | Purpose |
+| --- | --- |
+| **Applications** | Narrow to specific apps |
+| **Actions** | Upload, create, delete, edit |
+| **Sort** | Newest or oldest |
+| **Time** | Window presets |
+
+---
+
+## From alert to evidence
+
+Rows are fleet file-action alerts. Open a row for a detail drawer with host, path, actor, and timing. Use that context to continue in [Investigate](/data/investigate) or [Files](/data/files).
+
+Operator reference: [Activity on docs.hilt.ai](https://docs.hilt.ai/dashboard/activity).

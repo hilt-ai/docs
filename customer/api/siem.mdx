@@ -1,0 +1,104 @@
+---
+title: "SIEM & SOAR integration"
+sidebarTitle: "SIEM integration"
+description: "Integrate Hilt with your SIEM or SOAR using the REST API and signed webhooks."
+---
+
+Hilt does not ship a vendor-specific Splunk or Sentinel connector. Instead, you integrate through the same **REST API** and **webhooks** that power the dashboard — pull data on a schedule, push events as they happen, or combine both.
+
+This page describes the integration pattern. Endpoint shapes, authentication, and pagination are in the [API Reference](/api/overview); webhook payloads and signature verification are in [Webhooks](/api/webhooks).
+
+---
+
+## Integration patterns
+
+| Pattern | When to use | Hilt surface |
+| :-- | :-- | :-- |
+| **Pull** | Batch export, scheduled sync, ad-hoc investigation | REST API (`GET /v1/...`) |
+| **Push** | Real-time alerting, SOAR playbooks, ticket creation | Webhooks (`finding.created`, etc.) |
+| **Hybrid** | Webhook triggers a playbook that pulls full context | Webhook + `GET /v1/findings/{id}` |
+
+Most production integrations use **webhooks for new findings** plus **periodic API polling** for hosts, raw events, and backfill.
+
+---
+
+## Pull: REST API
+
+Create a **read-only** or **read & write** API key from **Settings → Account → API keys**. Send it as a bearer token on every request:
+
+```bash
+curl "https://<your-dashboard-host>/v1/findings" \
+  -H "Authorization: Bearer hilt_live_a1b2c3d4e5f6..."
+```
+
+### What to pull
+
+| Resource | Endpoint | Typical SIEM use |
+| :-- | :-- | :-- |
+| **Findings** | [`GET /v1/findings`](/api/findings) | Anomaly and detection-rule alerts with narrative, severity, evidence, and review status |
+| **Raw events** | [`GET /v1/events`](/api/events) | Process, file, and network activity around a finding |
+| **Hosts** | [`GET /v1/hosts`](/api/hosts) | Fleet inventory, last-seen, collector health |
+| **Detection rules** | [`GET /v1/detection-rules`](/api/detection-rules) | Custom rule definitions that produced matches |
+
+List endpoints use **cursor pagination** — follow `next_cursor` until it is `null`. Timestamps in query parameters are RFC 3339; times in response bodies are Unix nanoseconds unless noted.
+
+API keys inherit the host and team scope of the user who created them. A key limited to specific teams only returns data for those hosts.
+
+### Push review decisions back
+
+If your workflow triages inside the SIEM and you want the decision reflected in Hilt, use a **read & write** key and call the finding review endpoint documented in [Findings](/api/findings#review-a-finding).
+
+---
+
+## Push: webhooks
+
+Register a webhook from **Settings → Integrations → Webhooks** (admin role required). Hilt delivers signed `POST` requests to your receiver as events occur.
+
+| Event | Fires when |
+| :-- | :-- |
+| `finding.created` | A new behavioral-anomaly finding is detected |
+| `finding.reviewed` | A finding is accepted or denied — via the dashboard or API |
+| `detection_rule.matched` | One of your custom detection rules fires |
+
+Subscribe to **both** `finding.created` and `detection_rule.matched` to cover everything that appears in `GET /v1/findings`. Detection-rule matches are not delivered as `finding.created`.
+
+Each delivery includes a JSON body with `id`, `type`, `created_at`, and a `data` object. Use `data.finding_id` with `GET /v1/findings/{id}` when you need the full finding object.
+
+### Verify signatures
+
+Every delivery carries `X-Hilt-Event-Id`, `X-Hilt-Event-Type`, `X-Hilt-Timestamp`, and `X-Hilt-Signature`. Recompute the HMAC-SHA256 over `"<timestamp>.<raw body>"` with your signing secret (`whsec_...`) and compare in constant time. See [Webhooks — Verifying signatures](/api/webhooks#verifying-signatures) for Python and JavaScript examples.
+
+Reject replays by checking that the timestamp is recent, and deduplicate on `X-Hilt-Event-Id` — delivery is at-least-once.
+
+Webhooks only receive events for hosts the registering user can see. A newly registered webhook does not replay historical findings.
+
+---
+
+## End-to-end example
+
+The [Worked example](/api/worked-example) walks through the full triage loop from a terminal: pull today's critical findings, inspect one, and push a review decision back. The same steps map directly to a SOAR playbook.
+
+At a high level:
+
+1. **Webhook** receives `finding.created` with `finding_id`
+2. **Playbook** calls `GET /v1/findings/{id}` for narrative and evidence
+3. **Playbook** calls `GET /v1/events` with host and time window for surrounding activity
+4. **Analyst or automation** calls the review endpoint to accept or deny
+
+---
+
+## Operational notes
+
+- **Rate and volume.** Use cursor pagination and time-bounded `since`/`until` filters. Poll findings on an interval that matches your SLA; use webhooks for latency-sensitive alerting.
+- **Scope.** Service accounts should use API keys created by a user with the fleet scope you need, or by a dedicated integration user limited to the right teams.
+- **Platform logs.** Infrastructure and collector logs live in your cloud account and can be routed to your existing log pipeline independently. See [Security operations — Logging](/trust-security/operations#logging).
+- **Dashboard webhooks UI.** The in-product setup page at [Webhooks](/administration/webhooks) links to the same API reference and delivery log.
+
+---
+
+## Related
+
+- API authentication and errors → [Overview & Auth](/api/overview)
+- Webhook payloads and retries → [Webhooks](/api/webhooks)
+- In-product webhook setup → [Webhooks (Settings)](/administration/webhooks)
+- Triage walkthrough → [Worked example](/api/worked-example)

@@ -1,0 +1,104 @@
+---
+title: "SIEM 与 SOAR 集成"
+sidebarTitle: "SIEM 集成"
+description: "使用 REST API 与签名 Webhook 将 Hilt 接入 SIEM 或 SOAR。"
+---
+
+Hilt 不提供针对 Splunk 或 Sentinel 等厂商的专用连接器。请通过驱动仪表盘的同一套 **REST API** 与 **Webhook** 集成 — 按计划拉取数据、在事件发生时推送，或两者结合。
+
+本页描述集成模式。接口形态、认证与分页见 [API 参考](/zh/api/overview)；Webhook 负载与签名校验见 [Webhooks](/zh/api/webhooks)。
+
+---
+
+## 集成模式
+
+| 模式 | 适用场景 | Hilt 接口 |
+| :-- | :-- | :-- |
+| **拉取** | 批量导出、定时同步、临时调查 | REST API（`GET /v1/...`） |
+| **推送** | 实时告警、SOAR 剧本、工单创建 | Webhook（`finding.created` 等） |
+| **混合** | Webhook 触发剧本后拉取完整上下文 | Webhook + `GET /v1/findings/{id}` |
+
+多数生产集成对**新检测发现使用 Webhook**，并对主机、原始事件与补数**定期 API 轮询**。
+
+---
+
+## 拉取：REST API
+
+在 **设置 → 账户 → API 密钥** 创建**只读**或**读写** API 密钥，在每次请求中以 Bearer 令牌发送：
+
+```bash
+curl "https://<your-dashboard-host>/v1/findings" \
+  -H "Authorization: Bearer hilt_live_a1b2c3d4e5f6..."
+```
+
+### 拉取内容
+
+| 资源 | 接口 | 典型 SIEM 用途 |
+| :-- | :-- | :-- |
+| **检测发现** | [`GET /v1/findings`](/zh/api/findings) | 异常与规则告警，含叙述、严重度、证据与审核状态 |
+| **原始事件** | [`GET /v1/events`](/zh/api/events) | 检测发现周边的进程、文件与网络活动 |
+| **主机** | [`GET /v1/hosts`](/zh/api/hosts) | 舰队清单、最后上报时间、采集器健康 |
+| **检测规则** | [`GET /v1/detection-rules`](/zh/api/detection-rules) | 产生匹配的自定义规则定义 |
+
+列表接口使用**游标分页** — 在 `next_cursor` 为 `null` 前持续跟随。查询参数中的时间为 RFC 3339；响应体中的时间默认为 Unix 纳秒。
+
+API 密钥继承创建用户的 host 与团队范围。限定团队的密钥仅返回对应主机的数据。
+
+### 回写审核决定
+
+若工作流在 SIEM 内分诊并需同步回 Hilt，使用**读写**密钥调用 [检测发现](/zh/api/findings) 文档中的审核接口。
+
+---
+
+## 推送：Webhook
+
+在 **设置 → 集成 → Webhooks**（需管理员角色）注册 Webhook。Hilt 在事件发生时向你的接收端发送带签名的 `POST`。
+
+| 事件 | 触发时机 |
+| :-- | :-- |
+| `finding.created` | 检测到新的行为异常发现 |
+| `finding.reviewed` | 检测发现被接受或拒绝 — 无论通过仪表盘还是 API |
+| `detection_rule.matched` | 某条自定义检测规则触发 |
+
+请同时订阅 **`finding.created`** 与 **`detection_rule.matched`**，以覆盖 `GET /v1/findings` 中的全部内容。规则匹配不会以 `finding.created` 投递。
+
+每次投递包含 `id`、`type`、`created_at` 与 `data` 对象的 JSON 正文。需要完整检测发现对象时，用 `data.finding_id` 调用 `GET /v1/findings/{id}`。
+
+### 校验签名
+
+每次投递携带 `X-Hilt-Event-Id`、`X-Hilt-Event-Type`、`X-Hilt-Timestamp` 与 `X-Hilt-Signature`。使用签名密钥（`whsec_...`）对 `"<timestamp>.<原始正文>"` 计算 HMAC-SHA256 并常量时间比较。Python 与 JavaScript 示例见 [Webhooks — 校验签名](/zh/api/webhooks#校验签名)。
+
+通过检查时间戳是否新近来拒绝重放，并以 `X-Hilt-Event-Id` 去重 — 投递为至少一次语义。
+
+Webhook 仅接收注册用户可见主机的事件。新注册的 Webhook 不会重放历史检测发现。
+
+---
+
+## 端到端示例
+
+[完整示例](/zh/api/worked-example) 在终端中走完分诊闭环：拉取当日严重检测发现、检查一条并回写审核决定。相同步骤可直接映射到 SOAR 剧本。
+
+概要流程：
+
+1. **Webhook** 收到带 `finding_id` 的 `finding.created`
+2. **剧本** 调用 `GET /v1/findings/{id}` 获取叙述与证据
+3. **剧本** 以 host 与时间窗口调用 `GET /v1/events` 获取周边活动
+4. **分析师或自动化** 调用审核接口接受或拒绝
+
+---
+
+## 运维说明
+
+- **速率与体量。** 使用游标分页与时间边界 `since`/`until` 过滤。按 SLA 间隔轮询检测发现；对延迟敏感的告警使用 Webhook。
+- **范围。** 服务账号应使用具备所需舰队范围的用户创建的 API 密钥，或使用限定团队的专用集成用户。
+- **平台日志。** 基础设施与采集器日志位于你的云账户，可独立路由到现有日志管道。见 [安全运维 — 日志](/zh/trust-security/operations#日志)。
+- **仪表盘 Webhook 界面。** [Webhooks](/zh/administration/webhooks) 设置页链接同一 API 参考与投递日志。
+
+---
+
+## 相关
+
+- API 认证与错误 → [概览与认证](/zh/api/overview)
+- Webhook 负载与重试 → [Webhooks](/zh/api/webhooks)
+- 产品内 Webhook 配置 → [Webhooks（设置）](/zh/administration/webhooks)
+- 分诊演练 → [完整示例](/zh/api/worked-example)

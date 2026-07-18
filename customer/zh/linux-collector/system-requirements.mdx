@@ -5,7 +5,16 @@ description: "DMG 采集器对内核、架构、特权、网络及资源的要�
 
 ## 内核
 
-Linux 5.8\+ 且启用 BTF（`CONFIG_DEBUG_INFO_BTF=y`）。`/sys/kernel/btf/vmlinux` 必须存在，`install.sh` 会检查这一点，若缺失则会立即失败退出。
+Linux 内核 **4.18+**（RHEL/CentOS/Rocky 8、Ubuntu 20.04 或更新版本）。
+
+- **5.8+** 且启用原生 BTF（`CONFIG_DEBUG_INFO_BTF=y`）：直接使用 `/sys/kernel/btf/vmlinux` —— 这是首选的 CO-RE 路径。
+- **4.18–5.7**：发布 tarball 在 `btf/` 目录下包含捆绑的最小 BTF 文件；当原生 BTF 不存在时，代理会使用这些文件。
+
+启动时代理会自动检测内核版本并选择 BPF 后端（**5.11+** 使用现代后端，**4.18–5.10** 使用传统后端）。同时支持 cgroup v1 和 v2。
+
+<Note>
+`openat2` 文件打开事件类型仅在内核 **5.6+** 上可用。在较旧的内核上，标准的 `openat` 事件类型覆盖所有文件打开操作 —— 检测覆盖范围等价，但事件类型不同。
+</Note>
 
 ## 架构
 
@@ -30,14 +39,14 @@ Linux 5.8\+ 且启用 BTF（`CONFIG_DEBUG_INFO_BTF=y`）。`/sys/kernel/btf/vmli
 
 ## 支持的发行版
 
-BTF 的可用性覆盖了生产环境中的每一个主流发行版：
+统一代理支持生产环境中的每一个主流发行版：
 
-- Amazon Linux 2023
+- Amazon Linux 2（内核 5.10）和 Amazon Linux 2023
 - Ubuntu 20.04\+（HWE）/ 22.04 / 24.04
-- RHEL 9\+
+- RHEL 8\+ / Rocky / Alma
 - Debian 11\+
 - Bottlerocket
 - Flatcar
 - EKS 优化版 AMI
 
-对于 AL2（内核 5.10 回移植版本），Hilt 可应请求提供一个开箱即用的 BTF tarball。
+优先使用带原生 BTF 的 **5.8+** 内核。**4.18–5.7** 内核依赖发布 tarball 中捆绑的 BTF —— 对于受支持的传统内核，无需单独安装 BTF 包。

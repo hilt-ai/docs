@@ -1,6 +1,31 @@
 ---
 title: "Files"
-description: "File telemetry and path exploration, including removable media on Mac."
+description: "File telemetry and path explorer for Linux and macOS, including removable media on Mac."
 ---
 
-Files is the path explorer for opens, writes, renames, and deletes. On macOS it also surfaces removable-media and related exfil vectors with application attribution.
+Files is the fleet file explorer. Use the **Linux | macOS** scope toggle to browse opens, writes, renames, and deletes across your estate.
+
+---
+
+## Linux scope
+
+Browse hosts that report file activity. Drill from fleet overview into a host path browser and per-file detail, then into [Investigate](/data/investigate) for the responsible process.
+
+---
+
+## macOS scope
+
+Telemetry comes from Endpoint Security with code-signing provenance: where a file came from, who wrote it, and whether quarantine flags were stripped.
+
+### Removable media
+
+The Files hub includes **removable media** context — USB volumes, mounts, and AirDrop-related activity. Writes under `/Volumes` are attributed to the application that performed them.
+
+---
+
+## Related surfaces
+
+- Upload / create / delete alerts by app → [Activity](/data/activity)
+- Credential store file access → [Credentials](/data/credentials)
+
+Operator reference: [Files on docs.hilt.ai](https://docs.hilt.ai/dashboard/files).

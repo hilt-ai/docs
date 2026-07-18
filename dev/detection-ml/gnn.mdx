@@ -4,20 +4,22 @@ description: "Graph neural network anomaly detection: status, tables, training, 
 sidebarTitle: "GNN"
 ---
 
-GNN (graph neural network) detection is a **draft proof-of-concept**, not production scoring. TRACE remains the sole online detector. This page tracks research status, schema, and the planned Phase 4 inference path.
+GNN (graph neural network) detection is the **graph-based leg** of the detection ensemble. **Statistical enrichment scoring** (`dag_anomaly_scores` / `dag_anomaly_alerts`) and **TRACE** (`dag_trace_scores`) are live in production. GNN edge ingestion is opt-in and online GNN inference is phased — `GNN_ENABLED` defaults to `false`, so GNN alerts are not part of default prod. This page tracks GNN status, schema, and the inference rollout path.
 
 ## Status summary
 
 | Capability | Status |
 | --- | --- |
+| Statistical enrichment scoring | Prod (`dag_anomaly_scores` / `dag_anomaly_alerts`) |
+| TRACE online scoring | Prod (`dag_trace_scores`) |
 | Edge ingestion (`dag_gnn_*`) | Opt-in via enrichment (`DAG_GNN_EDGES_ENABLED`) |
 | Offline training (AWS Batch) | Research pipeline exists |
-| Live GNN inference service | Not built (Phase 4) |
-| Anomalies UI for GNN scores | Not wired |
+| Live GNN inference service | Phased; `GNN_ENABLED=false` by default |
+| Anomalies UI for GNN scores | Not wired in default prod |
 
 ## Why GNN
 
-TRACE scores per-host temporal surprise. GNN research explores cross-host and cross-process structure: shared binaries, parent/child process trees, and operational dependencies encoded as a fleet graph.
+TRACE scores per-host temporal surprise over 5-minute epochs (60s sub-epochs). Statistical enrichment baselines operate over longer rolling windows on numeric features. GNN research explores cross-host and cross-process structure at graph scale: shared binaries, parent/child process trees, and operational dependencies encoded as a fleet graph.
 
 ## Enrichment inputs (opt-in)
 
@@ -91,23 +93,27 @@ Phase naming in repo docs uses P1/P2/P3 for milestones; **Phase 4** specifically
 
 ## Known limitations
 
-- No promoted artifact in `ENABLED_MODELS` and no poll-loop writer for GNN scores; a working research pipeline is not "GNN alerts in prod"
-- No `dag_gnn_scores` table or backend handler in prod today
+- `GNN_ENABLED` defaults to `false`; even though `ENABLED_MODELS` includes a `gnn` entry, the scoring loop does not start without an explicit enable and a loaded bundle — not "GNN alerts in prod" today
+- No `dag_gnn_scores` table or backend handler wired in default prod
 - Graph freshness depends on enrichment edge writer lag
-- Evaluation harness is offline only; no dashboard TTD or narratives path for GNN
-- TRACE and GNN would coexist as separate finding sources if inference ships later
+- Evaluation harness is offline only; no dashboard TTD or narratives path for GNN yet
+- TRACE, statistical enrichment, and GNN operate at different epoch/window lengths; they coexist as separate finding sources in the ensemble vision
 
-## TRACE vs GNN
+## Ensemble: TRACE vs statistical vs GNN
 
 ```mermaid
 flowchart LR
+  subgraph stat [Statistical enrichment prod]
+    sIn[Numeric features] --> sScore[z-score baselines]
+    sScore --> sOut[dag_anomaly_scores alerts]
+  end
   subgraph trace [TRACE prod]
     tIn[Tokens + numerics] --> tModel[GRU TRACE]
     tModel --> tOut[dag_trace_scores]
   end
-  subgraph gnn [GNN research]
+  subgraph gnn [GNN phased]
     gIn[Graph edges ops procs] --> gModel[GNN encoder]
-    gModel --> gOut[Offline scores TBD]
+    gModel --> gOut[Node scores when GNN_ENABLED]
   end
 ```
 

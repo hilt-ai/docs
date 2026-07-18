@@ -1,6 +1,34 @@
 ---
 title: "Lineage"
-description: "Process and data-flow lineage for cloud workloads and macOS exec trees."
+description: "Process and data-flow lineage for Linux estates, and exec-based process lineage for macOS."
 ---
 
-Lineage shows who launched what and how data flowed between processes. Linux estates get data-flow and session graphs; macOS estates get exec-based process trees with code-signing context.
+Lineage answers *who launched what* and how data moved between processes. Use the **Linux | macOS** scope toggle — the two estates share the hub but render different graphs.
+
+---
+
+## Linux scope
+
+When a host is selected you can switch between views:
+
+| View | Purpose |
+| --- | --- |
+| **Data Flow** | Process and data topology for the host |
+| **Sessions** | Session-oriented graphs |
+
+Without a host focused, you see a fleet overview of relationships. Drill into a node to continue in [Investigate](/data/investigate).
+
+---
+
+## macOS scope
+
+The graph is built from Endpoint Security `exec` / fork telemetry — every process spawn the kernel sees, with code-signing trust on edges where available. Focus a Mac from the collector sidebar or host picker to narrow the graph.
+
+---
+
+## Related surfaces
+
+- Raw events for the same window → [Investigate](/data/investigate)
+- Network edges → [Networks](/data/networks)
+
+Operator reference: [Data Lineage on docs.hilt.ai](https://docs.hilt.ai/dashboard/data-lineage).

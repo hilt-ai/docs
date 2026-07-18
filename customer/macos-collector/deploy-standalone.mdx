@@ -113,7 +113,7 @@ If `systemextensionsctl list` shows ESensor as `[activated waiting for user]`, t
 - **No kernel extension.** Both components are user-space System Extensions; nothing loads into the kernel.
 - **No inbound listener and no phone-home.** The only network egress is outbound HTTPS to your configured ingest endpoint.
 - **No file contents.** ESensor captures event metadata (paths, signing identity, attribution), not the contents of files.
-- **No blocking or quarantine response.** The standalone collector is strictly observational; on-device quarantine response is not yet available on macOS (early access).
+- **No arbitrary blocking or quarantine response.** Telemetry is overwhelmingly NOTIFY; a small AUTH self-protection set denies unauthorized tampering with the agent in-kernel (see [Event coverage](/macos-collector/event-coverage)). Console-driven on-device quarantine response is not yet available on macOS (early access).
 - **No auto-update.** Upgrades are performed by re-running a newer `.pkg`; in-place auto-update is not yet available on macOS.
 
 ## Upgrade

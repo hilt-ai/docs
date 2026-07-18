@@ -10,13 +10,15 @@ Detection ML sits in the middle of a multi-writer ClickHouse schema. This page l
 
 ```mermaid
 flowchart LR
-  enrich[dag-enrichment] --> scores[(dag_anomaly_scores)]
+  enrich --> scores[(dag_anomaly_scores)]
+  enrich --> alerts[(dag_anomaly_alerts)]
   enrich --> tokens[(dag_epoch_tokens)]
   enrich --> gnn[(dag_gnn_edges ops procs)]
   ml[dag-detectionML] --> trace[(dag_trace_scores)]
   ml --> ttd[(dag_ttd)]
   ml --> cal[(dag_ttd_calibrator)]
   trace --> backend[dag-backend]
+  alerts --> backend
   tokens --> backend
   ttd --> backend
   backend --> narr[(dag_alert_narratives)]
@@ -26,9 +28,10 @@ flowchart LR
 
 | Table | Writer | Reader | Purpose |
 | --- | --- | --- | --- |
-| `dag_anomaly_scores` | enrichment | ML poll | 20-D features per host/epoch |
+| `dag_anomaly_scores` | enrichment | ML poll, backend | 20-D features + z-scores per host/epoch (statistical ensemble leg) |
+| `dag_anomaly_alerts` | enrichment | backend | Thresholded statistical anomalies per host/epoch |
 | `dag_epoch_tokens` | enrichment | ML + backend | Token arrays and evidence |
-| `dag_trace_scores` | ML | backend, frontend | Production findings |
+| `dag_trace_scores` | ML | backend, frontend | TRACE findings (ML ensemble leg) |
 | `dag_ttd` | ML | backend (primary alerts path) | Time-to-detection |
 | `dag_ttd_calibrator` | ML | backend | TTD display calibration |
 
@@ -48,7 +51,7 @@ Always confirm the latest migration ID in infra before citing a number in runboo
 | `dag_gnn_ops` | enrichment | Operational nodes |
 | `dag_gnn_procs` | enrichment | Process nodes |
 
-ML training reads these offline; no online GNN score writer yet.
+ML training reads these offline; online GNN score writer is gated by `GNN_ENABLED` (defaults off).
 
 ## Legacy / auxiliary
 

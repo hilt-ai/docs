@@ -1,6 +1,31 @@
 ---
 title: "Exposure"
-description: "Third-party dependencies: grant versus observed behavior."
+description: "Third-party dependency landscape: grant versus observed behavior, and intervention policy."
 ---
 
-Exposure compares what you granted a dependency to how it actually behaves, then lets you set intervention policy per dependency.
+Exposure tracks third-party dependencies: what you granted versus how they actually behave. Evidence is endpoint-flavored (Endpoint Security / Network Extension). There is no Linux/macOS hub toggle on this page.
+
+Two hub tabs: **Landscape** and **Intervention**.
+
+---
+
+## Tab: Landscape
+
+Each dependency shows drift between expected scope and observed behavior — erratic or out-of-policy access. Open a dependency for scopes, evidence, and actions such as blocking.
+
+Filters commonly include **All / Needs attention / Blocked / In baseline**.
+
+---
+
+## Tab: Intervention
+
+Configure how Hilt should respond when a dependency drifts — per-dependency policy board for automated or guided intervention.
+
+---
+
+## Related surfaces
+
+- Network behavior → [Networks](/data/networks)
+- Contain a host → [Quarantine](/security/quarantine)
+
+Operator reference: [Exposure on docs.hilt.ai](https://docs.hilt.ai/dashboard/exposure).
