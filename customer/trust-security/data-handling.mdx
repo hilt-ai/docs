@@ -37,7 +37,7 @@ The collector is not a content inspection tool. It never captures:
 | **Credentials** | No passwords, keys, or token values |
 | **Anything beyond standard tools** | Nothing past what `ps`, `lsof`, or `ss` would expose |
 
-The macOS collector follows the same design: it does not read file contents, capture keystrokes or screen content, or capture packet payloads, and it operates strictly observationally. See [macOS Collector](/macos-collector/layout).
+The macOS collector follows the same design: it does not read file contents, capture keystrokes or screen content, or capture packet payloads. Telemetry is overwhelmingly NOTIFY; the only AUTH path is agent self-protection (deny unauthorized kill/delete/rename of the collector). See [macOS Collector](/macos-collector/layout).
 
 ---
 

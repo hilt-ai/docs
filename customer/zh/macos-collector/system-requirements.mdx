@@ -124,7 +124,7 @@ Consistent with the [Linux Collector](/zh/linux-collector/event-data-model), the
 - **Does not read file contents** — only path, operation type, and metadata.
 - **Does not capture packet payloads** — only flow metadata (destination, ports, bytes, owning bundle id).
 - **Does not capture keystrokes or screen content** — it does not request Screen Recording.
-- **Does not block or modify activity** — it is strictly observational. On-device quarantine response is not yet available on macOS.
+- **Does not block or quarantine arbitrary activity** — telemetry is overwhelmingly NOTIFY. A small AUTH self-protection set (`signal`, `file_unlink`, `file_rename`) denies unauthorized tampering with the agent in-kernel; see [Event coverage](/zh/macos-collector/event-coverage). Console-driven on-device quarantine response is not yet available on macOS.
 
 ## Status
 

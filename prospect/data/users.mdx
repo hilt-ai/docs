@@ -1,6 +1,31 @@
 ---
 title: "Users"
-description: "User Timeline — identity activity across your infrastructure."
+description: "User Timeline — track identity and activity across your infrastructure."
 ---
 
-Users (User Timeline) tracks identities across hosts: who was present, what they did, and who looks at risk. Drill from an identity into Investigate for the underlying events.
+In the sidebar this page is labeled **Users**. The page title is **User Timeline** — identity-centric activity across SSH, Teleport, username sources, and related presence.
+
+There is no Linux/macOS scope toggle. The view follows identities, not hosts.
+
+---
+
+## List and risk filters
+
+| Filter | Meaning |
+| --- | --- |
+| **All** | Full identity roster |
+| **At risk** | Identities with elevated risk signals |
+
+Each row summarizes risk, recent presence, and key events. Open a user for **summary** then **timeline** detail, with host and time filters.
+
+---
+
+## Drill-down
+
+From a user's timeline, jump into [Investigate](/data/investigate) scoped to that identity's activity, or into related [Anomalies](/security/anomalies).
+
+<Note>
+**Users** tracks identities. [Activity](/data/activity) tracks file actions by application. [Investigate](/data/investigate) is the raw event stream. All three connect, but they answer different questions.
+</Note>
+
+Operator reference: [User Timeline on docs.hilt.ai](https://docs.hilt.ai/dashboard/users).

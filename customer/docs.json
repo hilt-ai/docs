@@ -168,6 +168,7 @@
               "api/hosts",
               "api/detection-rules",
               "api/webhooks",
+              "api/siem",
               "api/worked-example"
             ]
           },
@@ -373,6 +374,7 @@
               "zh/api/hosts",
               "zh/api/detection-rules",
               "zh/api/webhooks",
+              "zh/api/siem",
               "zh/api/worked-example"
             ]
           },

@@ -3,9 +3,11 @@ title: "故障排查"
 description: "常见的 DMG 采集器故障及其解决方法。"
 ---
 
-## 安装时缺少 BTF
+## 安装时 BTF / BPF 加载失败
 
-如果安装时 `/sys/kernel/btf/vmlinux` 缺失，说明内核在构建时未启用 `CONFIG_DEBUG_INFO_BTF=y`。请升级到启用了 BTF 支持的较新内核。对于 Amazon Linux 2 等较旧的发行版，如有需要，可安装一个相匹配的外部 BTF 包。
+**内核 5.8+：** 如果 `/sys/kernel/btf/vmlinux` 缺失，说明内核在构建时未启用 `CONFIG_DEBUG_INFO_BTF=y`。请升级到带原生 BTF 的内核，或使用已内置 BTF 的发行版（参见[系统要求](/zh/linux-collector/system-requirements)）。
+
+**内核 4.18–5.7：** 不需要原生 BTF。请确保已完整解压发布 tarball，使 `btf/` 目录与二进制文件位于同一目录。如果安装仍然失败，请验证捆绑的 BTF 是否与当前运行的内核匹配。
 
 ## DaemonSet 因 BPF 加载失败陷入 CrashLoopBackOff
 

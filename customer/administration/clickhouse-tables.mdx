@@ -95,7 +95,7 @@ The output of the scoring pipeline. Scoring runs on a 5-minute epoch cadence per
 | `dag_behavior_clusters` | Named clusters of similar host behavior, with size, persistence, and representative features | The "atypical for this host" cluster badge on findings |
 
 <Note>
-The full feature and score vectors that drive detection (individual z-scores, statistical baselines, the GNN provenance graph, and the TRACE token model's internal state) live in additional ClickHouse tables not listed here. They are implementation detail for the detection engine, not intended for direct query, and are deliberately excluded from this reference and from the [anonymized export](/on-prem/data-export-overview) for the same reason detection rule logic is excluded — they describe your security posture.
+Detection combines three legs at different time scales: statistical z-score baselines (`dag_anomaly_scores`, `dag_anomaly_alerts`), TRACE token-model scores (`dag_trace_scores`), and (when `GNN_ENABLED` and edge ingestion are on) GNN graph scoring. Token sequences, graph edges, and internal model state live in additional ClickHouse tables not listed here. They are implementation detail for the detection engine, not intended for direct query, and are deliberately excluded from this reference and from the [anonymized export](/on-prem/data-export-overview) for the same reason detection rule logic is excluded — they describe your security posture.
 </Note>
 
 ---

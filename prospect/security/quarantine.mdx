@@ -1,6 +1,30 @@
 ---
 title: "Quarantine"
-description: "Host isolation and blast-radius assessment."
+description: "Host isolation, blast-radius assessment, and fleet containment posture."
 ---
 
-Quarantine isolates hosts and shows blast radius when data movement must stop. Containment is host network isolation — not inline blocking of individual users.
+Quarantine isolates hosts and shows blast radius when you need to stop data movement quickly. Hilt contains by **host network isolation**, not inline blocking of individual users.
+
+---
+
+## Active quarantines
+
+The list shows isolated and pending hosts. Expand a host for:
+
+- **Blast radius** — what else is in scope
+- **Network mini-map** — blocked or relevant traffic
+- **Readiness** — whether isolation can proceed cleanly
+
+Fleet posture controls let you quarantine or release hosts from this page.
+
+---
+
+## When to use it
+
+Pair quarantine with [Investigate](/data/investigate) and [Anomalies](/security/anomalies) so you know why a host was cut off. Exposure intervention and malware findings often lead here.
+
+Operator reference: [Quarantine on docs.hilt.ai](https://docs.hilt.ai/dashboard/quarantine).
+
+<Card title="How it works" icon="arrow-right" href="/how-it-works">
+  Collection through containment in the Hilt DMG loop.
+</Card>

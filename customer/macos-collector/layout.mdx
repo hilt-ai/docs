@@ -21,7 +21,7 @@ The macOS collector is a single notarized macOS application, **Hilt EDR** (bundl
 | Component | Type | Bundle id | Role |
 | :-- | :-- | :-- | :-- |
 | **EDRApp.app** | Notarized macOS app | — | Host container for the System Extensions; signed with a Developer ID Application certificate, Hardened Runtime, notarized and stapled by Apple. |
-| **ESensor** | Endpoint Security (ES) system extension | `Hilt.EDRApp.ESensor` | The telemetry sensor. Subscribes to Apple Endpoint Security NOTIFY events for process, file, persistence, device, and network activity. |
+| **ESensor** | Endpoint Security (ES) system extension | `Hilt.EDRApp.ESensor` | The telemetry sensor. Subscribes to Apple Endpoint Security events (overwhelmingly NOTIFY; a small AUTH set for agent self-protection) for process, file, persistence, device, and network activity. |
 | **NetFilter** | NetworkExtension content-filter system extension | `Hilt.EDRApp.NetFilter` | Per-flow network attribution. Maps outbound flows to the owning process and bundle id. |
 
 The key story is what makes this possible on a normal, hardened Mac:
@@ -44,11 +44,11 @@ This means a query like "which **unsigned** app read `~/.ssh`" is a single `WHER
 
 ## What the collector does _not_ do
 
-The macOS collector is strictly observational. It does **not**:
+The macOS collector is **overwhelmingly observational** (NOTIFY telemetry). It does **not**:
 
 - **Read file contents.** It captures only metadata — path, operation type, size, and the signing/attribution fields above. It never opens or reads the bytes of your files.
 - **Capture keystrokes or screen content.** There is no input monitoring, no screen recording, no clipboard capture.
-- **Block, modify, or alter activity.** ESensor subscribes only to Apple Endpoint Security **NOTIFY** events (never AUTH/blocking events), and NetFilter observes flows for attribution without dropping or rewriting them. The collector observes; it never injects, drops, or blocks. On-device quarantine response is not available on macOS during early access.
+- **Block, modify, or quarantine arbitrary activity.** Telemetry is overwhelmingly NOTIFY — the collector does not perform inline user/process/network blocking or on-device quarantine of arbitrary activity. **Exception:** a small AUTH set (`signal`, `file_unlink`, `file_rename`) denies unauthorized kill/delete/rename of the agent itself in-kernel; those denials surface as `blocked` findings. See [Event coverage](/macos-collector/event-coverage) and [Tamper detection](/macos-collector/detections/tamper). NetFilter observes flows for attribution without dropping or rewriting them. Console-driven on-device quarantine response is not yet available on macOS during early access.
 - **Capture packet payloads.** Network events carry connection metadata only — destination, ports, byte counts, and the owning bundle id — not the contents of the traffic.
 - **Install a kernel extension.** Everything rides Apple's user-space System Extensions on the Endpoint Security and NetworkExtension frameworks. There is no kext, no `csrutil disable`, and SIP stays enabled.
 - **Expose network services.** The collector only makes outbound HTTPS to your configured ingest endpoint. There are no inbound sockets.

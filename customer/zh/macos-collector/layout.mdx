@@ -16,6 +16,8 @@ macOS 采集器能力与配置可能随版本演进。部分 Linux 上可用的�
 
 采集器是已公证的 macOS 应用，订阅 Apple Endpoint Security 与 Network Extension，在本机评估检测规则，并将元数据级遥测与发现发送到你的摄取端点。
 
+遥测**以 NOTIFY 观察为主** — 采集器不对任意用户/进程/网络活动做内联阻断，也不执行设备端隔离。**例外：** 少量 AUTH 事件（`signal`、`file_unlink`、`file_rename`）仅用于 agent 自保护，在内核中拒绝未授权的 kill/delete/rename，并以 `blocked` 发现上报。详见[事件覆盖](/zh/macos-collector/event-coverage)与[篡改检测](/zh/macos-collector/detections/tamper)。NetFilter 仅做流归因，不丢弃或改写流量。控制台驱动的设备端隔离响应在 macOS 上尚未提供。
+
 ## 本指南内容
 
 - 系统要求、发布产物与安装流程

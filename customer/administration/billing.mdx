@@ -1,16 +1,83 @@
 ---
 title: "Billing"
 sidebarTitle: "Billing"
-description: "Subscription and billing for your Hilt deployment."
+description: "Subscription, collector usage, and invoice history in the Hilt console."
 ---
 
-Billing lives under **Settings → Admin**.
+Billing lives under **Settings → Admin → Billing**.
 
-Use this section to review plan and billing details for your deployment. Pricing for new customers is discussed on [hilt.ai](https://hilt.ai); this page is the in-product billing surface for an existing tenant.
+Use this page to review your plan, current collector usage, referral credits, and invoice history. Pricing for new customers is discussed on [hilt.ai](https://hilt.ai) — this page is the in-product billing surface for an existing tenant.
+
+---
+
+## What you can see
+
+The Billing page is organized into three areas:
+
+### Collector usage
+
+The main card shows how your deployment is metered:
+
+- **In use now** — collectors currently reporting telemetry
+- **Billed peak** — the highest concurrent collector count reached during the current contract term; this is the number your annual invoice is based on
+- **Annual** — total contract value for the term at the billed peak (amounts may be masked in the UI depending on your role)
+
+A usage bar compares in-use collectors against the billed peak. Below it, a monthly chart shows how peak concurrent collectors trended through the year — the highest bar is what the account is invoiced against.
+
+Billing follows **peak concurrent collector count** for the term, not average daily hosts or storage volume. Linux collectors, macOS collectors, and other enrolled data sources each count as a collector when active.
+
+### Plan
+
+Shows your current plan tier (for example **Business** or **Enterprise**). If you are on Business, Enterprise may appear as an upgrade option with a contact-sales action.
+
+Plan names and entitlements are set at contract time. Contact your account team to change tier or add capacity.
+
+### Referrals
+
+If your organization participates in Hilt's referral program, a referrals card tracks introduced companies, their pipeline stage, and any credits applied to your account (for example, pilot-month credits or collector credits when a referral becomes a customer).
+
+### Invoice history
+
+A table lists past invoices and credits:
+
+| Column | Meaning |
+| :-- | :-- |
+| **Invoice** | Invoice or credit reference ID |
+| **Issued** | Date the document was issued |
+| **Service period** | Contract window the charge covers |
+| **Data collectors** | Collector count the line item is based on (annual term, prorated increment, or credit detail) |
+| **Amount** | Charge or credit applied |
+| **Status** | Payment state (for example **Paid** or **Credited**) |
+
+Mid-term capacity increases appear as prorated invoices for the incremental collectors through the end of the term.
+
+---
+
+## What billing does not cover
+
+**Telemetry storage** is tracked separately on the [Storage](/administration/storage) page under **Settings → Admin → Storage**. Storage shows hot/cold tier usage, daily growth, per-dataset retention, and lifecycle policies — it is an operational capacity view, not the subscription invoice.
+
+Infrastructure costs in your own cloud account (compute, databases, object storage for a BYOC deployment) are outside this billing page. See your cloud provider's cost tools and your Hilt agreement for how those are handled.
+
+---
+
+## Permissions
+
+Billing requires an admin role. Users without admin access do not see the Billing section in Settings.
+
+---
+
+## New customers and pricing
+
+Hilt pricing is commercial and depends on deployment size, plan tier, and term. List prices are not published in product documentation.
+
+- Visit [hilt.ai](https://hilt.ai) for product and pricing inquiries
+- Contact your Hilt account representative for quotes, capacity changes, and contract amendments
 
 ---
 
 ## Related
 
-- Settings map → [Settings](/dashboard/settings)
-- Storage usage → [Storage](/administration/storage)
+- Settings map → [Settings](/dashboard/settings-account)
+- Telemetry storage usage → [Storage](/administration/storage)
+- Collector fleet health → [Collectors](/dashboard/collectors)

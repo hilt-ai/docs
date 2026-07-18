@@ -1,6 +1,44 @@
 ---
 title: "Investigate"
-description: "Time-bounded event investigation across Linux and macOS."
+description: "Time-bounded event investigation with Linux and macOS scope, structured filters, and anomaly overlays."
 ---
 
-Investigate is the deep-dive event explorer. Scope Linux or macOS, filter by process/file/network, and scrub a timeline with anomaly overlays. It is where lineage, alerts, and user timelines hand off for forensics.
+Investigate is the primary event deep-dive in Hilt. Scope a time window and hosts, narrow with structured filters, and read process-grouped events chronologically. Most investigation links from [Lineage](/data/lineage), [Networks](/data/networks), [Anomalies](/security/anomalies), and [Users](/data/users) land here.
+
+Use the **Linux | macOS** scope toggle in the hub bar. Linux shows the eBPF event stream from cloud workloads and servers; macOS shows Endpoint Security events with the same chrome.
+
+---
+
+## Scope and filters
+
+Time presets and a custom range bound the investigation. Fresh visits often auto-select active hosts.
+
+| Tab | What you filter on |
+| --- | --- |
+| **Event** | Process, file, network, and workload event types |
+| **Process** | Command, parent, PIDs, UID, user, workload |
+| **Network** | IPs, ports, protocol, bytes |
+| **File** | Path prefix, flags, permissions |
+| **Topology** | Program / session / process instance IDs |
+| **Location** | Hosts, boot ID, container, pod |
+| **User / Application** | macOS only |
+
+Active filters appear as removable chips. Context banners appear when you arrive from Lineage, Networks, Sessions, or Files.
+
+---
+
+## Timeline and pivots
+
+An **Activity** histogram sits above the event list. Drag to zoom; amber bands mark windows that overlap anomaly findings. Expand a row for forensic fields and pivots into Connections, Files, or Lineage.
+
+From Investigate you can also open the natural-language **Ask** flow in the top bar to hand off into Query.
+
+---
+
+## Operator reference
+
+Full runbook: [Investigate on docs.hilt.ai](https://docs.hilt.ai/dashboard/investigate).
+
+<Card title="See the platform" icon="layout-dashboard" href="/platform">
+  How Investigate fits the Hilt console.
+</Card>

@@ -4,7 +4,7 @@ description: "Platform role of dag-detectionML: TRACE prod scoring, data flow, a
 sidebarTitle: "Overview"
 ---
 
-Detection ML writes anomaly scores to ClickHouse. The backend exposes them on the [Anomalies](https://docs.hilt.ai/dashboard/anomalies) page and, through fusion, on LLM [narratives](https://docs.hilt.ai/dashboard/anomalies). This section walks engineers through the full flow. Model math lives in the [dag-detectionML](https://github.com/hilt-ai/dag-detectionML/tree/dev/docs) repo.
+Detection ML is one leg of a multi-model **ensemble**. **dag-enrichment** writes per-host statistical baselines and z-scores to `dag_anomaly_scores` (and thresholded rows to `dag_anomaly_alerts`) on every 5-minute epoch. **dag-detectionML** (`dag-classification`) polls those rows plus token sequences and runs **TRACE** online scoring → `dag_trace_scores`. A **GNN** graph leg is architected for cross-host provenance (edge tables opt-in; online inference gated by `GNN_ENABLED`, off by default). The backend exposes findings on the [Anomalies](https://docs.hilt.ai/dashboard/anomalies) page and, through fusion, on LLM [narratives](https://docs.hilt.ai/dashboard/anomalies). Model math lives in the [dag-detectionML](https://github.com/hilt-ai/dag-detectionML/tree/dev/docs) repo.
 
 ## Service identity
 
@@ -16,13 +16,15 @@ Entrypoint: [`src/main.py`](https://github.com/hilt-ai/dag-detectionML/blob/dev/
 
 | Capability | Status | Notes |
 | --- | --- | --- |
-| TRACE online scoring | Prod | Sole entry in `config.ENABLED_MODELS` (`trace`): a hardcoded dict, not an env var |
+| Statistical enrichment scoring | Prod | Per-host z-score baselines over longer rolling windows → `dag_anomaly_scores` / `dag_anomaly_alerts` in [`dag-enrichment/internal/scoring/`](https://github.com/hilt-ai/dag-enrichment/tree/dev/internal/scoring) |
+| TRACE online scoring | Prod | Always-on poll loop; `ENABLED_MODELS["trace"]` (hardcoded dict, not an env var). 5-min epochs with 60s sub-epochs |
 | ACI + CCT alerting | Prod | Adaptive conformal inference (ACI) + Cauchy-combined test (CCT); `is_anomaly` when `cct_p_value < ACI_ALPHA` |
 | TTD (time-to-detection) | Prod | `dag_ttd` and `dag_ttd_calibrator` tables |
 | HDBSCAN feature-cluster refit | Prod auxiliary | Fleet-behavior clustering via refit artifacts; not the primary detector. Legacy `dag_ml_scores` is not written by current ML |
-| GNN training pipeline | Research (draft) | AWS Batch, offline only; see [GNN](/detection-ml/gnn) |
-| GNN live inference | Not built | Inference service is Phase 4; edge tables exist when enrichment opt-in is enabled |
-| TS-VAE + Isolation Forest | Deprecated | Removed from runtime; the repo README still mentions TS-VAE/IF and `dag_ml_scores`, but production scoring uses TRACE and writes `dag_trace_scores` |
+| GNN edge ingestion | Opt-in | `DAG_GNN_EDGES_ENABLED=true` in enrichment; tables empty until enabled |
+| GNN online inference | Phased / off by default | `ENABLED_MODELS` includes a `gnn` entry but `GNN_ENABLED` defaults to `false`; no GNN alerts in default prod |
+| GNN training pipeline | Research | AWS Batch, offline; see [GNN](/detection-ml/gnn) |
+| TS-VAE + Isolation Forest | Deprecated | Removed from runtime; legacy `dag_ml_scores` is no longer written (see [README deprecated appendix](https://github.com/hilt-ai/dag-detectionML/blob/dev/README.md)) |
 
 ## Platform flow
 
@@ -32,6 +34,7 @@ flowchart LR
   ingest --> kafka[Kafka MSK]
   kafka --> enrich[dag-enrichment]
   enrich --> scores[(dag_anomaly_scores)]
+  enrich --> alerts[(dag_anomaly_alerts)]
   enrich --> tokens[(dag_epoch_tokens)]
   enrich --> gnnTables[(dag_gnn_edges ops procs)]
   scores --> ml[dag-detectionML dag-classification]
@@ -39,10 +42,11 @@ flowchart LR
   ml --> traceScores[(dag_trace_scores)]
   ml --> ttd[(dag_ttd)]
   traceScores --> backend[dag-backend]
+  alerts --> backend
   tokens --> backend
   backend --> narratives[(dag_alert_narratives)]
   backend --> frontend[Anomalies UI]
-  gnnTables -.future.-> gnnInfer[GNN inference TBD]
+  gnnTables -.opt-in GNN_ENABLED.-> gnnInfer[GNN inference phased]
 ```
 
 GNN edge tables are written only when `DAG_GNN_EDGES_ENABLED=true` in enrichment (off by default).
@@ -53,10 +57,10 @@ See [Inference](/detection-ml/inference) for the poll loop and scoring path, and
 
 Before ML runs, **dag-enrichment** builds two inputs per host per 5-minute epoch:
 
-- **Numeric features** (20-D vector) to `dag_anomaly_scores` via [`internal/scoring/`](https://github.com/hilt-ai/dag-enrichment/tree/dev/internal/scoring)
+- **Numeric features and statistical baselines** (20-D vector, z-scores over rolling windows) to `dag_anomaly_scores` and thresholded rows to `dag_anomaly_alerts` via [`internal/scoring/`](https://github.com/hilt-ai/dag-enrichment/tree/dev/internal/scoring) — this is a first-class detection leg, not just preprocessing for TRACE
 - **Token sequences** to `dag_epoch_tokens` via [`internal/features/token_writer.go`](https://github.com/hilt-ai/dag-enrichment/blob/dev/internal/features/token_writer.go)
 
-The statistical baseline and feature builder in enrichment produce the numeric vector TRACE fuses with token embeddings. ML polls `dag_anomaly_scores` for new epochs; it does not recompute enrichment features.
+TRACE fuses token embeddings with the numeric vector from enrichment. ML polls `dag_anomaly_scores` for new epochs; it does not recompute enrichment features.
 
 ## Auxiliary: feature-cluster refit
 

@@ -3,9 +3,11 @@ title: "Troubleshooting"
 description: "Common DMG Collector failures and how to resolve them."
 ---
 
-## Missing BTF at install time
+## BTF / BPF load failures at install time
 
-If `/sys/kernel/btf/vmlinux` is missing at install time, the kernel was built without `CONFIG_DEBUG_INFO_BTF=y`. Upgrade to a newer kernel with BTF support enabled. For older distributions such as Amazon Linux 2, a matching external BTF bundle can be installed if needed.
+**Kernels 5.8+:** If `/sys/kernel/btf/vmlinux` is missing, the kernel was built without `CONFIG_DEBUG_INFO_BTF=y`. Upgrade to a kernel with native BTF, or use a distribution that ships it (see [System requirements](/linux-collector/system-requirements)).
+
+**Kernels 4.18–5.7:** Native BTF is not required. Ensure you extracted the full release tarball so the `btf/` directory is present alongside the binary. If install still fails, verify the bundled BTF matches your running kernel.
 
 ## DaemonSet CrashLoopBackOff with BPF load failure
 

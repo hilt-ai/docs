@@ -5,7 +5,16 @@ description: "Kernel, architecture, privileges, network, and resource requiremen
 
 ## Kernel
 
-Linux 5.8\+ with BTF (`CONFIG_DEBUG_INFO_BTF=y`). `/sys/kernel/btf/vmlinux` must exist, `install.sh` checks this and fails fast if missing.
+Linux kernel **4.18+** (RHEL/CentOS/Rocky 8, Ubuntu 20.04, or newer).
+
+- **5.8+** with native BTF (`CONFIG_DEBUG_INFO_BTF=y`): `/sys/kernel/btf/vmlinux` is used directly — the preferred CO-RE path.
+- **4.18–5.7**: the release tarball includes bundled minimal BTF files under `btf/`; the agent uses these when native BTF is absent.
+
+At startup the agent auto-detects the kernel version and selects the BPF backend (modern for **5.11+**, legacy for **4.18–5.10**). Cgroup v1 and v2 are both supported.
+
+<Note>
+The `openat2` file-open event type is only available on kernel **5.6+**. On older kernels, the standard `openat` event type covers all file opens — coverage is equivalent for detection, but event typing differs.
+</Note>
 
 ## Architecture
 
@@ -30,14 +39,14 @@ Measured in production: 4–6 MB RSS steady state.
 
 ## Supported distributions
 
-BTF availability covers every major distribution in production:
+The unified agent supports every major distribution in production:
 
-- Amazon Linux 2023
+- Amazon Linux 2 (kernel 5.10) and Amazon Linux 2023
 - Ubuntu 20.04\+ (HWE) / 22.04 / 24.04
-- RHEL 9\+
+- RHEL 8\+ / Rocky / Alma
 - Debian 11\+
 - Bottlerocket
 - Flatcar
 - EKS-optimized AMIs
 
-For AL2 (kernel 5.10 backport), Hilt ships a drop-in BTF tarball on request.
+Kernels **5.8+** with native BTF are preferred. Kernels **4.18–5.7** rely on the bundled BTF in the release tarball — no separate BTF drop-in is required for supported legacy kernels.

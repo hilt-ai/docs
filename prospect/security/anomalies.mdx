@@ -1,6 +1,39 @@
 ---
 title: "Anomalies"
-description: "Behavioral ML findings and suppression windows."
+description: "ML finding queue and Anomaly Windows for behavioral suppression."
 ---
 
-Anomalies is the triage queue for behavioral findings, with investigation chapters and graph/tree views. Anomaly Windows hide ML noise during known maintenance periods.
+Anomalies is the triage surface for behavioral (ML) findings. The hub has two tabs: **Anomalies** and **Anomaly Windows**. Host-type filters can narrow Linux vs macOS collectors without a hub scope toggle.
+
+Rule-based alerts are managed under [Alerts](/security/alerts), not here.
+
+---
+
+## Tab: Anomalies
+
+Switch between **Graph** and **Tree** layouts. Selecting a finding opens the investigation center with evidence chapters, session tree, and graph views.
+
+Findings are ordered for review (risk, time, confidence, urgency). Typical actions:
+
+| Action | Effect |
+| --- | --- |
+| **Accept** | Confirm as a real anomaly |
+| **Deny** | Mark benign / false positive |
+| **Suppress** | Deny and suppress matching future patterns |
+
+Use host and time filters to focus the queue.
+
+---
+
+## Tab: Anomaly Windows
+
+Schedule recurring windows where **behavioral (ML) anomalies are hidden for all hosts** — useful for known-noisy maintenance or batch jobs.
+
+---
+
+## Related surfaces
+
+- Custom deterministic rules → [Alerts](/security/alerts)
+- Deep event context → [Investigate](/data/investigate)
+
+Operator reference: [Anomalies on docs.hilt.ai](https://docs.hilt.ai/dashboard/anomalies).

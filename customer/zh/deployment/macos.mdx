@@ -1,13 +1,96 @@
 ---
 title: "MacOS"
 sidebarTitle: "MacOS"
-description: "Hilt 的 macOS 端点部署。"
+description: "在 macOS 端点部署 Hilt：系统采集器与托管 Chromium 浏览器扩展。"
 ---
 
 <Note>
-即将推出。macOS 端点部署预计将于 2026 年 7 月初推出。
+**早期访问。** 请联系客户团队为你的环境启用 macOS 端点部署。
 </Note>
 
-Hilt 的 macOS 端点覆盖使用 Apple Endpoint Security 框架和托管的 Chrome 扩展，将数据检测与响应扩展到 macOS 端点，作为覆盖您服务器基础设施的 Linux 采集器的补充。
+Hilt 的 macOS 端点覆盖由两部分协同工作：
 
-正式发布后，本页面将介绍如何预配 macOS 端点，包括通过 MDM 部署系统扩展和 Chrome 扩展。有关当前功能，请参阅 [macOS 采集器](/zh/macos-collector)。
+1. **macOS 采集器** — 经 Apple 公证的应用，嵌入 **Endpoint Security** 与 **NetworkExtension** 系统扩展，是主机上进程、文件、网络与持久化遥测的主要传感器。
+2. **托管 Chromium 浏览器扩展** — 通过企业策略强制安装到 Chrome、Edge 和 Brave，上报内核传感器无法看到的浏览器内活动（例如向网页版 AI 服务上传文件）。
+
+两者共同将数据检测与响应延伸到员工 Mac，作为覆盖服务器基础设施的 [Linux 采集器](/zh/linux-collector/layout) 的补充。
+
+系统扩展架构、MDM 部署、事件模型与故障排查，请参阅 [macOS 采集器](/zh/macos-collector/layout) 指南。本页说明需要部署什么，以及两部分如何配合。
+
+---
+
+## macOS 采集器（系统扩展）
+
+采集器以 **Hilt EDR**（`EDRApp.app`）形式交付，嵌入：
+
+| 组件 | 作用 |
+| :-- | :-- |
+| **ESensor** | Endpoint Security 遥测 — 进程、文件、持久化、设备事件 |
+| **NetFilter** | 出站连接的逐流网络归因 |
+
+通过 MDM 实现零接触批量部署，或通过独立 `.pkg` 进行试点。两种路径均需一次性（或由 MDM 预先授予）系统扩展批准，以及为 ESensor 授予完全磁盘访问权限。
+
+- [通过 MDM 部署](/zh/macos-collector/deploy-mdm) — 托管设备舰队推荐
+- [独立部署](/zh/macos-collector/deploy-standalone) — 试点与单机
+- [安装流程](/zh/macos-collector/install-flow) — 终端用户所见步骤
+
+采集器在 **系统完整性保护（SIP）保持启用** 的情况下运行 — 无需内核扩展，无需 `csrutil disable`。
+
+---
+
+## 托管 Chromium 浏览器扩展
+
+### 用途
+
+浏览器扩展弥补 macOS 上的可见性缺口：许多敏感数据移动发生在**浏览器内部**（向 SaaS 或 AI 网页应用上传文件），而不会产生 Hilt 可归因的内核级文件事件。扩展观测选定的浏览器活动，并发送到同一 Hilt 采集路径，通过 `host_id`（与 macOS 采集器相同的硬件 UUID）与 Mac 关联。
+
+在仪表盘中，浏览器遥测支撑 [活动](/zh/dashboard/activity)（基于网页的文件上传）和 AI 使用摘要等视图。它**不能**替代系统采集器 — 内核遥测与浏览器遥测互为补充。
+
+### 采集内容
+
+扩展上报结构化的浏览器事件（非页面正文或按键内容）。事件类型包括页面导航、心跳、文件上传、下载，以及对配置目标的网络请求。早期访问期间事件类型与字段可能变化；客户团队可提供你当前部署的 schema。
+
+浏览器事件写入独立的 `browser_events` 表，与内核 `endpoint_events` 分离，不经过与 Endpoint Security 事件相同的评分流水线。
+
+### 部署方式
+
+扩展通过浏览器的**企业策略**强制安装 — 与 IT 团队管理 Chrome/Edge 扩展的机制相同：
+
+- **Chrome / Brave** — 通过 Google Admin、Jamf、Kandji、Intune 或其他 MDM 配置 `ExtensionInstallForcelist`（或等效策略）
+- **Microsoft Edge** — 通过 Intune 或组策略的 Edge 管理策略
+
+Hilt 提供已签名的扩展包（`.crx` 或更新 URL）及扩展 ID 供策略引用。请联系**客户团队**获取当前构建与 MDM 策略模板。
+
+扩展须与 macOS 采集器**一并**部署到每台 Mac，并向为该主机 forwarder 配置的同一 `edr-collector` 采集端点上报。
+
+### 早期访问限制
+
+浏览器扩展处于**早期访问**阶段，覆盖范围仍在扩展：
+
+- 仅支持 Chromium 系浏览器（Chrome、Edge、Brave）— 暂无 Safari 或 Firefox 扩展
+- 需要 macOS 采集器，且数据平面已启用浏览器 enrichment
+- 事件类型与仪表盘展示可能随版本变化
+- 强制安装策略与扩展包由客户团队协调，仪表盘内不可自助配置
+
+若部署范围包含基于浏览器的上传或 AI 服务使用，请在依赖活动页或 AI 使用视图前，与客户团队确认已启用浏览器 enrichment。
+
+---
+
+## 部署清单
+
+| 步骤 | 操作 |
+| :-- | :-- |
+| 1 | 联系客户团队启用 macOS 早期访问 |
+| 2 | 向试点主机部署 macOS 采集器（[MDM](/zh/macos-collector/deploy-mdm) 或[独立](/zh/macos-collector/deploy-standalone)） |
+| 3 | 确认主机在 [采集器](/zh/dashboard/collectors) 中以 **macOS** 标识出现 |
+| 4 | 向客户团队索取浏览器扩展包与强制安装策略 |
+| 5 | 通过 MDM 将扩展策略推送到同一舰队 |
+| 6 | 在 [活动](/zh/dashboard/activity) 中验证浏览器事件，或按客户团队提供的验证步骤确认 |
+
+---
+
+## 相关
+
+- 完整采集器指南 → [macOS 采集器](/zh/macos-collector/layout)
+- Linux 服务器部署 → [Linux 采集器](/zh/linux-collector/layout)
+- 信任与供应链 → [安全运维](/zh/trust-security/operations)

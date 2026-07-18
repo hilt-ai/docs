@@ -21,8 +21,9 @@ matrix.
 
 ## Per-endpoint event rates
 
-The macOS collector subscribes to **12 Apple Endpoint Security (ES) NOTIFY events**
-plus a per-flow network source, and emits them as JSON lines that the forwarder ships
+The macOS collector subscribes to **12 Apple Endpoint Security (ES) event types**
+(mostly NOTIFY; a few AUTH for agent self-protection) plus a per-flow network source,
+and emits them as JSON lines that the forwarder ships
 to the Hilt `edr-collector`. The volume is **heavily dominated by `file_open`** — a
 single macOS host routinely emits **thousands of ES events per minute**, and the vast
 majority are file opens. Apple's own framework guidance describes macOS as emitting
