@@ -141,6 +141,7 @@
                     "group": "Integrations",
                     "pages": [
                       "administration/slack-notifications",
+                      "administration/google-workspace",
                       "administration/webhooks"
                     ]
                   },
@@ -347,6 +348,7 @@
                     "group": "集成",
                     "pages": [
                       "zh/administration/slack-notifications",
+                      "zh/administration/google-workspace",
                       "zh/administration/webhooks"
                     ]
                   },
