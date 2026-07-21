@@ -1,0 +1,78 @@
+---
+title: "Google Workspace"
+sidebarTitle: "Google Workspace"
+description: "连接 Google Workspace 目录，让 Hilt 对照员工花名册衡量安装覆盖率。"
+---
+
+连接 Google Workspace 后，Hilt 可同步你的目录，并显示哪些用户已安装 Agent。配置使用带有全域委托（domain-wide delegation）的 Google Cloud 服务账号——终端用户无需 OAuth 授权界面。
+
+在仪表盘打开 **设置 → 集成（Integrations）→ Google Workspace**，然后按下列步骤操作。同一套引导也可在应用内的 Google Workspace 设置面板中查看。
+
+<Note>
+在保存有效的服务账号 JSON 密钥并将集成设为 **On** 之前，同步不会运行。请像对待密码一样保管 JSON 密钥——任何人持有该密钥且已配置全域委托，都能以你选择的管理员身份读取目录。
+</Note>
+
+---
+
+## 你需要准备
+
+- 可创建服务账号并下载 JSON 密钥的 Google Cloud 项目
+- Google Workspace 超级管理员（用于授权全域委托）
+- 要同步的 Workspace 域名（例如 `hilt.ai`）
+- 该域名上可供服务账号模拟的管理员邮箱
+
+Hilt 仅请求 Directory 用户列表的只读权限（`admin.directory.user.readonly`）。不会读取 Gmail，也不会修改 Workspace 设置。
+
+---
+
+## 设置步骤
+
+<Steps>
+  <Step title="在 Google Cloud 中启用 Admin SDK">
+    打开 [Google Cloud Console](https://console.cloud.google.com/)，选择或创建项目。进入 **APIs & Services → Library**，搜索 **Admin SDK API** 并启用。未启用该 API 时，Directory 同步无法运行。
+  </Step>
+
+  <Step title="创建服务账号并下载 JSON 密钥">
+    进入 **IAM & Admin → Service Accounts → Create service account**。起一个可识别的名称，例如 `hilt-workspace-sync`。Directory 同步无需在 GCP 项目上授予角色。打开新服务账号 → **Keys → Add key → Create new key → JSON**，然后下载文件。该文件即粘贴到 Hilt 的内容。
+  </Step>
+
+  <Step title="在 Google Workspace 中授权全域委托">
+    在服务账号详情中复制 **Client ID**（数字 ID，不是邮箱）。以超级管理员身份打开 [Google Admin Console](https://admin.google.com/) → **Security → Access and data control → API controls → Manage Domain Wide Delegation → Add new**。粘贴 Client ID，并在一行中授权以下 OAuth scope：
+
+    `https://www.googleapis.com/auth/admin.directory.user.readonly`
+
+    GCP 步骤与此 Workspace 授权缺一不可。
+  </Step>
+
+  <Step title="在 Hilt 中完成配置">
+    打开 **设置 → 集成 → Google Workspace**。填写 Workspace **域名**（例如 `hilt.ai`）、服务账号可模拟的 **管理员邮箱**（真实 Workspace 管理员，例如 `you@hilt.ai`），并将下载的 JSON 密钥全文粘贴到 **Service account JSON**。点击 **Save connection**，再将集成设为 **On**。Hilt 会同步目录并显示这些用户的安装覆盖情况。
+  </Step>
+</Steps>
+
+---
+
+## 安全
+
+<Warning>
+请像对待密码一样保管服务账号 JSON。任何人持有该密钥，且已为对应 Client ID 配置全域委托，都能以你配置的管理员身份读取 Workspace 目录。Hilt 会加密存储该密钥，且不会再次明文展示。轮换时，在 Google Cloud 创建新密钥，粘贴到此处，并吊销旧密钥。
+</Warning>
+
+---
+
+## 故障排除
+
+| 现象 | 建议 |
+| :-- | :-- |
+| 保存拒绝 JSON | 确认粘贴的是完整密钥文件（含花括号），而不是仅 private key 字段。 |
+| 打开后同步失败 | 复查 Admin SDK 已启用、全域委托使用数字 Client ID，且 scope 完全一致。 |
+| 权限 / 模拟错误 | 在 **Admin email to impersonate** 中使用真实超级管理员（或具备 Directory 读取权限的管理员）邮箱，并确认该用户属于同一域名。 |
+| 覆盖率为空 | 等待首次同步完成，然后点击 **Sync now**。覆盖率会将 Workspace 用户与 Hilt 已从 Agent 观察到的身份进行比对。 |
+| 轮换凭证 | 在 Google Cloud 创建新 JSON 密钥，在 Hilt 中粘贴并保存，然后在 Google Cloud 删除旧密钥。 |
+
+---
+
+## 相关
+
+- Slack 通知 → [Slack](/zh/administration/slack-notifications)
+- 出站 Webhooks → [Webhooks](/zh/administration/webhooks)
+- 身份映射（Okta）→ [身份映射](/zh/administration/identity-mappings)

@@ -1,0 +1,78 @@
+---
+title: "Google Workspace"
+sidebarTitle: "Google Workspace"
+description: "Connect Google Workspace Directory so Hilt can measure install coverage against your employee roster."
+---
+
+Connect Google Workspace so Hilt can sync your directory and show which users have the agent installed. Setup uses a Google Cloud service account with domain-wide delegation — there is no OAuth consent screen for end users.
+
+Open **Settings → Integrations → Google Workspace** in the dashboard, then follow the steps below. The same walkthrough is available in-app from the Google Workspace setup panel.
+
+<Note>
+Sync stays off until you save a valid service-account JSON key and turn the integration **On**. Treat the JSON key like a password — anyone with it and domain-wide delegation can read your directory as the admin you choose.
+</Note>
+
+---
+
+## What you need
+
+- A Google Cloud project where you can create a service account and download a JSON key
+- A Google Workspace Super Admin (to authorize domain-wide delegation)
+- The Workspace domain you want to sync (for example `hilt.ai`)
+- An admin email on that domain for the service account to impersonate
+
+Hilt only requests read access to the Directory user list (`admin.directory.user.readonly`). It does not read Gmail or modify Workspace settings.
+
+---
+
+## Setup
+
+<Steps>
+  <Step title="Enable the Admin SDK in Google Cloud">
+    Open the [Google Cloud Console](https://console.cloud.google.com/) and pick or create a project. Go to **APIs & Services → Library**, search for **Admin SDK API**, and enable it. Without this API, Directory sync cannot run.
+  </Step>
+
+  <Step title="Create a service account and download a JSON key">
+    Go to **IAM & Admin → Service Accounts → Create service account**. Name it something recognizable, for example `hilt-workspace-sync`. You do not need to grant roles on the GCP project for Directory sync. Open the new service account → **Keys → Add key → Create new key → JSON**, then download the file. That file is what you paste into Hilt.
+  </Step>
+
+  <Step title="Authorize domain-wide delegation in Google Workspace">
+    In the service account details, copy the **Client ID** (numeric, not the email). Open the [Google Admin Console](https://admin.google.com/) as a Super Admin → **Security → Access and data control → API controls → Manage Domain Wide Delegation → Add new**. Paste the Client ID and authorize this OAuth scope on one line:
+
+    `https://www.googleapis.com/auth/admin.directory.user.readonly`
+
+    Both the GCP steps and this Workspace authorization are required.
+  </Step>
+
+  <Step title="Finish in Hilt">
+    Open **Settings → Integrations → Google Workspace**. Enter your Workspace **domain** (for example `hilt.ai`), an **admin email** the service account can impersonate (a real Workspace admin such as `you@hilt.ai`), and paste the full contents of the downloaded JSON key into **Service account JSON**. Click **Save connection**, then turn the integration **On**. Hilt syncs the directory and shows install coverage for those users.
+  </Step>
+</Steps>
+
+---
+
+## Security
+
+<Warning>
+Treat the service-account JSON like a password. Anyone who has it, plus domain-wide delegation for that client ID, can read your Workspace directory as the admin you configured. Hilt stores the key encrypted and never shows it again. To rotate, create a new key in Google Cloud, paste it here, and revoke the old key.
+</Warning>
+
+---
+
+## Troubleshooting
+
+| Symptom | What to try |
+| :-- | :-- |
+| Save rejects the JSON | Confirm you pasted the full key file (including braces), not only the private key field. |
+| Sync fails after turning On | Re-check Admin SDK is enabled, domain-wide delegation uses the numeric Client ID, and the scope matches exactly. |
+| Permission / impersonation errors | Use a real Super Admin (or admin with Directory read) email in **Admin email to impersonate**, and confirm that user is on the same domain. |
+| Coverage looks empty | Wait for the first sync to finish, then click **Sync now**. Coverage compares Workspace users to identities Hilt has already seen from agents. |
+| Rotating credentials | Create a new JSON key in Google Cloud, paste and save it in Hilt, then delete the old key in Google Cloud. |
+
+---
+
+## Related
+
+- Slack notifications → [Slack](/administration/slack-notifications)
+- Outbound webhooks → [Webhooks](/administration/webhooks)
+- Identity mapping (Okta) → [Identity mappings](/administration/identity-mappings)
