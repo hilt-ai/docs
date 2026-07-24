@@ -1,87 +1,87 @@
 ---
 title: "网络与信任模型"
 sidebarTitle: "网络与安全"
-description: "Outbound HTTPS posture, the Apple trust chain (Developer ID, notarization, Hardened Runtime, the ES entitlement, SIP), the two runtime gates, and System Extension tamper-resistance."
+description: "出站 HTTPS 状态、Apple 信任链（Developer ID、公证、Hardened Runtime、ES 授权、SIP）、两道运行时关卡，以及系统扩展的防篡改能力。"
 ---
 
-The Hilt macOS Collector is a notarized macOS app, **Hilt EDR** (bundle `EDRApp.app`, team Cybe Corporation / `MVMB6LCP2A`), that embeds two Apple System Extensions: **ESensor** (the Endpoint Security telemetry sensor, bundle id `Hilt.EDRApp.ESensor`) and **NetFilter** (a NetworkExtension content filter for per-flow attribution, bundle id `Hilt.EDRApp.NetFilter`). There is **no kernel extension** — the collector is pure user-space on Apple's modern System Extension frameworks. This page covers the network surface it presents and the Apple trust chain that lets it run on a normal, hardened Mac.
+Hilt macOS 采集器是一个经过公证的 macOS 应用 **Hilt EDR**（bundle `EDRApp.app`，团队 Cybe Corporation / `MVMB6LCP2A`），其中内嵌两个 Apple 系统扩展：**ESensor**（Endpoint Security 遥测传感器，bundle id `Hilt.EDRApp.ESensor`）和 **NetFilter**（用于逐流量归因的 NetworkExtension 内容过滤器，bundle id `Hilt.EDRApp.NetFilter`）。它**不含内核扩展**——采集器完全运行在用户空间，基于 Apple 现代的系统扩展框架。本页介绍它对外呈现的网络面，以及让它能在正常、加固的 Mac 上运行的 Apple 信任链。
 
-## Outbound
+## 出站
 
-- **One destination only.** `ESensor` emits events as JSON lines to a local forwarder LaunchDaemon, which ships them over **outbound HTTPS** to the Hilt `edr-collector` ingest endpoint. From there the collector routes to MSK Kafka and the enrichment pipeline — see [Data flow](/zh/macos-collector/data-flow).
-- **HTTPS / TCP 443.** Traffic is standard TLS to the configured ingest endpoint. The forwarder is the only component that opens a socket to the network; the System Extensions themselves never talk to the internet.
-- **Firewall rule:** allow the Mac's source range to reach the ingest endpoint on TCP/443. Nothing else needs to be opened — inbound or outbound.
+- **仅一个目标。** `ESensor` 将事件以 JSON 行形式发送到本地转发器 LaunchDaemon，后者通过**出站 HTTPS** 将其送往 Hilt `edr-collector` 摄取端点。采集器从那里路由到 MSK Kafka 和富化流水线——参见[数据流](/zh/macos-collector/data-flow)。
+- **HTTPS / TCP 443。** 流量是发往所配置摄取端点的标准 TLS。转发器是唯一向网络打开 socket 的组件；系统扩展本身从不与互联网通信。
+- **防火墙规则：** 允许该 Mac 的源地址范围通过 TCP/443 访问摄取端点。无需开放其他任何端口——无论入站或出站。
 
-## What it does NOT do
+## 它不做的事
 
-- **No inbound sockets.** The collector never listens for connections. There is no management port, no remote shell, no agent API surface on the host.
-- **No phone-home.** Outside the single outbound HTTPS stream to the configured ingest endpoint, the collector makes no network calls — no telemetry to Hilt, no license check-in, no beacon.
-- **No public DNS dependency for control.** The only name it resolves is your ingest endpoint.
-- **No auto-update channel (yet).** Early access builds do not self-update; there is no update-fetch path at runtime. New versions ship as a fresh notarized `.pkg`. See [Status](#requirements-and-status).
-- **No arbitrary on-device response actions (yet).** Telemetry is overwhelmingly NOTIFY — ESensor observes and reports without blocking arbitrary user/process/network activity or performing on-device quarantine. A small AUTH set (`signal`, `file_unlink`, `file_rename`) denies unauthorized tampering with the agent in-kernel only; see [Event coverage](/zh/macos-collector/event-coverage) and [Tamper detection](/zh/macos-collector/detections/tamper). There is no inbound command channel to drive console-initiated quarantine or isolation.
+- **无入站 socket。** 采集器从不监听连接。主机上没有管理端口、没有远程 shell、没有 agent API 面。
+- **无回连（phone-home）。** 除了发往所配置摄取端点的那一条出站 HTTPS 流之外，采集器不进行任何网络调用——不向 Hilt 发送遥测、不做许可证签入、不发信标。
+- **控制层不依赖公共 DNS。** 它唯一解析的名称就是你的摄取端点。
+- **暂无自动更新通道。** 早期访问版本不会自我更新；运行时没有更新拉取路径。新版本以全新的经过公证的 `.pkg` 形式发布。参见[状态](#requirements-and-status)。
+- **暂无任意设备端响应动作。** 遥测绝大多数为 NOTIFY——ESensor 观测并上报，不会阻断任意用户/进程/网络活动，也不执行设备端隔离（quarantine）。一小组 AUTH（`signal`、`file_unlink`、`file_rename`）仅在内核层拒绝对 agent 的未授权篡改；参见[事件覆盖](/zh/macos-collector/event-coverage)和[篡改检测](/zh/macos-collector/detections/tamper)。它没有可由控制台发起隔离或隔离处置的入站命令通道。
 
-## The Apple trust chain
+## Apple 信任链
 
-The headline is that the collector runs on a **normal, hardened Mac with System Integrity Protection (SIP) enabled** — no `csrutil disable`, no developer mode, no kext. That is only possible because the app and its extensions satisfy Apple's full trusted-execution chain end to end.
+关键在于，采集器运行在**启用了系统完整性保护（SIP）的正常、加固的 Mac 上**——无需 `csrutil disable`、无需开发者模式、无需 kext。这之所以可能，是因为应用及其扩展从头到尾满足了 Apple 完整的可信执行链。
 
-| Layer | What it provides | How the collector satisfies it |
+| 层级 | 提供的能力 | 采集器如何满足 |
 | :-- | :-- | :-- |
-| **Developer ID Application signing** | Code is signed by an Apple-verified developer identity (team `MVMB6LCP2A`), not ad-hoc. | App + both extensions signed with a Developer ID Application certificate. |
-| **Notarization + stapling** | Apple scans the build for malware and known issues and issues a ticket; Gatekeeper trusts it offline. | Build is submitted with `notarytool`, then the ticket is **stapled** to the bundle. |
-| **Hardened Runtime** | Restricts code injection, unsigned memory execution, and DYLD overrides; required by the notary service. | Enabled on the app and extensions (a notarization requirement). |
-| **Embedded provisioning profile** | An Apple-issued profile that explicitly allowlists the restricted ES entitlement, embedded in the signed bundle. | Each bundle carries a profile authorizing its capability; without it, AMFI rejects the entitlement under SIP. |
-| **Endpoint Security entitlement** | The restricted `com.apple.developer.endpoint-security.client` capability, granted to the team by Apple. | Carried by the `ESensor` extension and authorized by the embedded profile. |
-| **System Integrity Protection (SIP)** | Kernel-level protection of system files and trusted execution; the default secure posture. | Left **enabled**. The full chain above is what lets the ES client load with SIP on. |
+| **Developer ID Application 签名** | 代码由经 Apple 验证的开发者身份签名（团队 `MVMB6LCP2A`），而非临时（ad-hoc）签名。 | 应用 + 两个扩展均使用 Developer ID Application 证书签名。 |
+| **公证 + 装订（stapling）** | Apple 扫描构建以查找恶意软件和已知问题并签发票据；Gatekeeper 可离线信任它。 | 构建通过 `notarytool` 提交，随后票据被**装订**到 bundle 上。 |
+| **Hardened Runtime** | 限制代码注入、未签名内存执行和 DYLD 覆盖；公证服务要求必备。 | 在应用和扩展上启用（公证的必要条件）。 |
+| **内嵌配置描述文件（provisioning profile）** | 由 Apple 签发的描述文件，显式将受限的 ES 授权加入允许列表，内嵌于已签名的 bundle 中。 | 每个 bundle 都携带一份授权其能力的描述文件；没有它，AMFI 会在 SIP 下拒绝该授权。 |
+| **Endpoint Security 授权** | 受限的 `com.apple.developer.endpoint-security.client` 能力，由 Apple 授予该团队。 | 由 `ESensor` 扩展携带，并由内嵌描述文件授权。 |
+| **系统完整性保护（SIP）** | 在内核层保护系统文件和可信执行；默认的安全状态。 | 保持**启用**。正是上述完整链条，让 ES 客户端能在 SIP 开启时加载。 |
 
-A few details that matter:
+几个重要细节：
 
-- **The entitlement grant alone changes nothing.** With SIP on, the kernel's trusted-execution layer (AMFI) only honors `com.apple.developer.endpoint-security.client` when an Apple-issued provisioning profile that allowlists it is embedded in a properly signed bundle. That is exactly why the ES client lives inside a **System Extension bundle** rather than a bare command-line binary — a loose binary has nowhere to carry the profile.
-- **The ES extension must not use the App Sandbox.** App Sandbox is incompatible with an Endpoint Security client: `es_new_client()` fails with `ERR_NOT_PERMITTED` when the host is sandboxed. ESensor therefore runs un-sandboxed (but still under the Hardened Runtime and SIP).
-- **Notarization is a malware scan, not an activation.** A stapled, notarized build still has to be *approved* before the extension loads — either by the user in System Settings or by an MDM System Extensions payload. See [Install flow](/zh/macos-collector/install-flow).
+- **仅有授权本身不改变任何事。** 在 SIP 开启时，内核的可信执行层（AMFI）只有在一份将 `com.apple.developer.endpoint-security.client` 加入允许列表的 Apple 签发描述文件被内嵌于正确签名的 bundle 中时，才会认可该授权。这正是 ES 客户端置于**系统扩展 bundle** 而非裸命令行二进制文件中的原因——松散的二进制文件无处携带该描述文件。
+- **ES 扩展不能使用 App Sandbox。** App Sandbox 与 Endpoint Security 客户端不兼容：当宿主处于沙箱中时，`es_new_client()` 会以 `ERR_NOT_PERMITTED` 失败。因此 ESensor 以非沙箱方式运行（但仍处于 Hardened Runtime 和 SIP 之下）。
+- **公证是恶意软件扫描，而非激活。** 一个已装订、经过公证的构建在扩展加载前仍需被*批准*——要么由用户在系统设置中批准，要么通过 MDM 系统扩展负载批准。参见[安装流程](/zh/macos-collector/install-flow)。
 
-## The two runtime gates
+## 两道运行时关卡
 
-Two **independent** gates decide whether ESensor's Endpoint Security client comes up. They fail with different error codes and have different fixes — keep them straight.
+有两道**相互独立**的关卡决定 ESensor 的 Endpoint Security 客户端能否启动。它们失败时返回不同的错误码，修复方式也不同——请务必区分清楚。
 
-| Gate | What it checks | Failure code | How it passes |
+| 关卡 | 检查内容 | 失败码 | 如何通过 |
 | :-- | :-- | :-- | :-- |
-| **1. Entitlement / profile** | The embedded provisioning profile in the signed bundle authorizes the ES entitlement (enforced by AMFI under SIP). | `ES_NEW_CLIENT_RESULT_ERR_NOT_ENTITLED` | Apple's team grant + explicit App ID with the ES capability + embedded provisioning profile + Apple-issued-certificate signing. |
-| **2. Full Disk Access** | The host process holds TCC **Full Disk Access**. | `ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED` | The user grants FDA, the extension inherits it, or an MDM PPPC profile pre-grants it. |
+| **1. 授权 / 描述文件** | 已签名 bundle 中的内嵌配置描述文件授权了 ES 授权（在 SIP 下由 AMFI 强制执行）。 | `ES_NEW_CLIENT_RESULT_ERR_NOT_ENTITLED` | Apple 的团队授予 + 带 ES 能力的显式 App ID + 内嵌配置描述文件 + 使用 Apple 签发证书的签名。 |
+| **2. Full Disk Access** | 宿主进程持有 TCC **Full Disk Access**。 | `ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED` | 用户授予 FDA、扩展继承它，或由 MDM PPPC 描述文件预先授予。 |
 
-- **`ERR_NOT_ENTITLED` is the trust/SIP path.** It means the entitlement is not *authorized* — a missing or invalid embedded profile, an ad-hoc signature, or SIP rejecting it. A correctly signed and profiled build run on a SIP-enabled Mac clears this gate.
-- **`ERR_NOT_PERMITTED` is the Full Disk Access path.** A fully profiled, Apple-signed ES client still fails with `ERR_NOT_PERMITTED` until it has Full Disk Access. **Full Disk Access is required for every Endpoint Security client** — there is no configuration that avoids it.
+- **`ERR_NOT_ENTITLED` 属于信任/SIP 路径。** 它意味着授权未被*授权*——缺失或无效的内嵌描述文件、临时（ad-hoc）签名，或 SIP 拒绝了它。一个正确签名并带描述文件的构建在启用 SIP 的 Mac 上运行即可通过此关卡。
+- **`ERR_NOT_PERMITTED` 属于 Full Disk Access 路径。** 即便是完整带描述文件、由 Apple 签名的 ES 客户端，在获得 Full Disk Access 之前仍会以 `ERR_NOT_PERMITTED` 失败。**每个 Endpoint Security 客户端都必须具备 Full Disk Access**——没有任何配置可以绕过它。
 
 <Note>
-Because these gates are independent, an extension can clear the entitlement gate and still not start. In standalone installs the Full Disk Access entry appears under the sensor's identity — **ESensor / "Hilt EDR Sensor"**, not "EDRApp" — which is the toggle that clears Gate 2. See [Install flow](/zh/macos-collector/install-flow).
+由于这两道关卡相互独立，一个扩展可能通过了授权关卡却仍无法启动。在独立安装（standalone）中，Full Disk Access 条目显示在传感器的身份下——**ESensor /「Hilt EDR Sensor」**，而非「EDRApp」——那才是能通过关卡 2 的开关。参见[安装流程](/zh/macos-collector/install-flow)。
 </Note>
 
-## Tamper-resistance
+## 防篡改
 
-System Extensions are protected by macOS itself, not by a self-defense agent:
+系统扩展受 macOS 本身保护，而非依赖自卫式 agent：
 
-- **Cannot be unloaded without admin and the app.** A System Extension is registered with the OS and can only be deactivated by the **owning app** (`EDRApp.app`) issuing a deactivation request, and that request requires **administrator authorization**. A standard user cannot stop or remove the sensor; `kill`-ing the process simply lets `launchd` relaunch it.
-- **SIP protects the on-disk bundle.** With SIP enabled, the activated extension's files in the system extensions store are protected from tampering by non-system processes.
-- **Removal is deliberate.** Uninstalling means the app deactivates the extension (admin prompt) or, on managed fleets, MDM withdraws the System Extensions configuration profile. There is no silent "just delete the binary" path.
-- **Self-healing under launchd.** ESensor is run by `launchd`; if it exits — for example after being denied Full Disk Access — it is relaunched in roughly ten seconds and picks up the grant the moment it is added, with no app restart.
+- **未经管理员和应用无法卸载。** 系统扩展已在操作系统中注册，只能由**所属应用**（`EDRApp.app`）发出停用请求来停用，且该请求需要**管理员授权**。标准用户无法停止或移除传感器；`kill` 掉该进程只会让 `launchd` 重新拉起它。
+- **SIP 保护磁盘上的 bundle。** 在 SIP 启用时，已激活扩展位于系统扩展存储中的文件受保护，非系统进程无法篡改。
+- **移除是有意为之的动作。** 卸载意味着应用停用扩展（弹出管理员提示），或在受管理的机群中由 MDM 撤回系统扩展配置描述文件。不存在「直接删掉二进制文件」的静默路径。
+- **launchd 下的自愈。** ESensor 由 `launchd` 运行；若它退出——例如在被拒绝 Full Disk Access 之后——大约十秒内即被重新拉起，并在授权被添加的那一刻立即接管，无需重启应用。
 
-## Trust as first-class telemetry
+## 信任作为一等遥测
 
-Beyond the host posture, code-signing trust is also captured in **every event** the collector emits, which is the macOS differentiator versus the Linux collector:
+除主机状态之外，代码签名信任也被记录在采集器发出的**每一个事件**中，这正是 macOS 相较 Linux 采集器的差异化之处：
 
-- **`code_signature`** verdict — one of `platform`, `developer_id`, `adhoc`, or `unsigned_or_invalid`.
-- **`signing_id`** — the bundle identifier of the running code (e.g. `com.google.Chrome`).
-- **`team_id`** — the Apple developer Team ID behind the signature.
-- **`cdhash`** — the code-directory hash (binary integrity) recorded on `exec`.
+- **`code_signature`** 判定——为 `platform`、`developer_id`、`adhoc` 或 `unsigned_or_invalid` 之一。
+- **`signing_id`**——运行中代码的 bundle 标识符（例如 `com.google.Chrome`）。
+- **`team_id`**——签名背后的 Apple 开发者 Team ID。
+- **`cdhash`**——在 `exec` 时记录的 code-directory 哈希（二进制完整性）。
 
-This means a query like *"which **unsigned** application read `~/.ssh`?"* is a single `WHERE` clause — an expression the Linux collector cannot form. See [Event data model](/zh/macos-collector/event-data-model) for the full schema.
+这意味着诸如*「哪个**未签名**的应用读取了 `~/.ssh`？」*这样的查询只需一个 `WHERE` 子句——这是 Linux 采集器无法构造的表达式。完整 schema 参见[事件数据模型](/zh/macos-collector/event-data-model)。
 
-## Data residency
+## 数据驻留
 
-Events travel from the Mac over outbound HTTPS to **your** ingest endpoint, into your MSK Kafka and ClickHouse (`endpoint_events`). Hilt does not receive, mirror, or hold out-of-band access to host events.
+事件从 Mac 经出站 HTTPS 传送到**你的**摄取端点，进入你的 MSK Kafka 和 ClickHouse（`endpoint_events`）。Hilt 不接收、不镜像，也不持有对主机事件的带外访问权限。
 
-## Requirements and status
+## 要求与状态
 
-- **macOS 13.0 (Ventura) or later.** Background Task Management persistence events (`btm_add`) require macOS 13+. Universal binary: Apple Silicon and Intel.
-- **Status: early access.** The notarized `.pkg` with SIP-on install described here is the shipping model. Auto-update and on-device quarantine response are **not yet available** on macOS — which is why there is no inbound channel and no self-update path today.
+- **macOS 13.0（Ventura）或更高版本。** 后台任务管理（Background Task Management）持久化事件（`btm_add`）需要 macOS 13+。通用二进制：Apple Silicon 和 Intel。
+- **状态：早期访问。** 本文所述的经过公证、SIP 开启即可安装的 `.pkg` 就是正式发布模式。自动更新和设备端隔离响应在 macOS 上**尚不可用**——这也是当前没有入站通道、没有自更新路径的原因。
 
-For the full Apple trust chain in deployment terms, see [Install flow](/zh/macos-collector/install-flow). For where macOS hosts surface in the product, see [Data flow](/zh/macos-collector/data-flow).
+完整的 Apple 信任链在部署层面的说明，参见[安装流程](/zh/macos-collector/install-flow)。关于 macOS 主机在产品中的呈现位置，参见[数据流](/zh/macos-collector/data-flow)。

@@ -72,13 +72,13 @@ No copy of this data is sent to or stored by Hilt. See [Architecture and data fl
 
 ## Collector privilege
 
-The collector requires elevated privileges to read kernel telemetry. The exact requirement depends on the deployment path (root for systemd, a privileged DaemonSet on Kubernetes). These privileges grant observation only; the collector does not modify host state, terminate processes, or block activity. The privilege model is documented in [Networking and security](/linux-collector/networking-security).
+The collector requires elevated privileges to read kernel telemetry. The exact requirement depends on the deployment path (root for systemd, a privileged DaemonSet on Kubernetes). These privileges grant observation only; the collector does not modify host state, terminate processes, or block arbitrary activity. The privilege model is documented in [Networking and security](/linux-collector/networking-security).
 
 ---
 
 ## Retention
 
-Telemetry retention is set per deployment. The analytics database and object storage are sized to your agreed retention window, and you control retention because the storage lives in your account. Confirm the configured retention period for your deployment with your Hilt representative.
+Telemetry retention is set per deployment. The analytics database and object storage are sized to your agreed retention window, and you control retention because the storage lives in your account. Default retention windows are shown per dataset on the [Storage](/administration/storage) and [ClickHouse tables](/administration/clickhouse-tables) pages; confirm the configured retention period for your deployment with your Hilt representative.
 
 When you delete a dashboard user, their account and sessions are removed; audit history keeps entries under the username so the record of past actions is preserved. See [User Management](/administration/user-management).
 
@@ -86,6 +86,6 @@ When you delete a dashboard user, their account and sessions are removed; audit 
 
 ## Anonymized data export
 
-The only path by which any data leaves your account is the anonymized export pipeline, a core component of every deployment. It exports aggregate numeric features, derived statistics, and abstracted activity tokens, never file paths, IP addresses, hostnames, usernames, cloud resource IDs, or detection rule logic. Identifying values are stripped or remapped before export, exports are rejected below a minimum host threshold, and you review a manifest and sample and approve each transfer.
+The only path by which any data leaves your account is the anonymized export pipeline, a core component of every deployment. It exports aggregate numeric features, derived statistics, and abstracted activity tokens, never file paths, IP addresses, hostnames, usernames, cloud resource IDs, or detection rule logic. Identifying values are stripped or remapped before export, exports are rejected below a minimum host threshold, and — when approval is enabled (the default) — you review a manifest and sample and approve each transfer.
 
 For the full data catalog, anonymization method, and customer controls, see [Anonymized data export](/on-prem/data-export-overview).

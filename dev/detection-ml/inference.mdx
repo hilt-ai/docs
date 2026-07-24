@@ -32,7 +32,7 @@ Poll source is `dag_anomaly_scores`, not token rows alone. See [TRACE inference 
 
 | Table | Writer | ML use |
 | --- | --- | --- |
-| `dag_anomaly_scores` | [`scorewriter.go`](https://github.com/hilt-ai/dag-enrichment/blob/dev/internal/scoring/scorewriter.go) | 20-D numeric vector per host/epoch |
+| `dag_anomaly_scores` | [`scorewriter.go`](https://github.com/hilt-ai/dag-enrichment/blob/dev/internal/scoring/scorewriter.go) | 24 raw numeric features + 32 derived features + 21 per-feature z-scores per host/epoch (named columns) |
 | `dag_epoch_tokens` | [`token_writer.go`](https://github.com/hilt-ai/dag-enrichment/blob/dev/internal/features/token_writer.go) | Token arrays, side features, evidence JSON |
 
 ## Epoch timing

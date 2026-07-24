@@ -8,7 +8,7 @@ This walkthrough goes from zero to a completed triage loop using only `curl` and
 
 ## 1. Create a key
 
-In the dashboard: **Settings → API keys → Create API key**, scope **Read & write** (we'll push a review decision in step 4). Export it:
+In the dashboard: **Settings → Account → API keys → Create API key**, scope **Read & write** (we'll push a review decision in step 4). Export it:
 
 ```bash
 export HILT="https://<your-dashboard-host>"
@@ -68,7 +68,7 @@ The finding now shows **accepted** in the dashboard with your key owner's userna
 
 ## 5. Close the loop with webhooks
 
-Instead of polling step 2 on a schedule, register a webhook (**Admin → Webhooks**) for `finding.created` and let Hilt call you. A minimal receiver:
+Instead of polling step 2 on a schedule, register a webhook (**Settings → Integrations → Webhooks**) for `finding.created` and let Hilt call you. A minimal receiver:
 
 ```python
 from flask import Flask, request, abort

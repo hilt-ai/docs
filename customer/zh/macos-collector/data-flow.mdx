@@ -1,177 +1,177 @@
 ---
 title: "端到端数据流"
 sidebarTitle: "数据流"
-description: "How a macOS endpoint event travels from the ESensor system extension, through the local forwarder and edge collector, into MSK and enrichment, and onto ClickHouse and the dashboard."
+description: "一条 macOS 端点事件如何从 ESensor 系统扩展出发，经本机转发器与边缘采集器，进入 MSK 与富化，最终到达 ClickHouse 和仪表盘。"
 ---
 
-Every event observed on a Mac follows one path from the kernel to the dashboard. The macOS collector is the notarized **Hilt EDR** app (`EDRApp.app`, Team ID `MVMB6LCP2A`), which embeds the **ESensor** Endpoint Security system extension as the telemetry source. ESensor emits JSON, a local forwarder LaunchDaemon batches and ships it over outbound HTTPS, and the same Hilt control plane that serves the Linux collector enriches and stores it — the only platform-specific divergence is the enrichment profile and the destination table.
+在 Mac 上观察到的每一条事件，都沿同一条路径从内核抵达仪表盘。macOS 采集器就是已公证的 **Hilt EDR** 应用（`EDRApp.app`，Team ID `MVMB6LCP2A`），它内嵌 **ESensor** Endpoint Security 系统扩展作为遥测来源。ESensor 发出 JSON，本机转发器 LaunchDaemon 将其批量打包并经出站 HTTPS 发送，而服务于 Linux 采集器的同一套 Hilt 控制平面对其进行富化与存储 — 唯一的平台差异在于富化配置和目标表。
 
-This page traces a single event end to end. For the on-host architecture see [the collector overview](/zh/macos-collector/layout); for what is captured and the column schema see [the event data model](/zh/macos-collector/event-data-model).
+本页端到端地追踪单条事件。关于主机侧架构见[采集器概览](/zh/macos-collector/layout)；关于采集内容与列式模式见[事件数据模型](/zh/macos-collector/event-data-model)。
 
-## Pipeline at a glance
+## 管道全景
 
 <Steps>
   <Step title="ESensor (Endpoint Security extension)">
-    The ESensor system extension subscribes to Apple Endpoint Security `NOTIFY` events and emits each one as a single JSON line, stamped with code-signing trust and application attribution. No kernel extension is involved — ESensor is a pure user-space System Extension running on Apple's modern frameworks.
+    ESensor 系统扩展订阅 Apple Endpoint Security 的 `NOTIFY` 事件，并将每一条事件作为单行 JSON 发出，同时打上代码签名信任与应用归因信息。不涉及任何内核扩展 — ESensor 是运行在 Apple 现代框架之上的纯用户态 System Extension。
   </Step>
   <Step title="Local forwarder (LaunchDaemon)">
-    A small forwarder LaunchDaemon tails the ESensor JSON stream, batches events, and HTTP-POSTs them over outbound HTTPS to the configured Hilt ingest endpoint. If the endpoint is unreachable it spools events to disk and drains them when connectivity returns.
+    一个小型转发器 LaunchDaemon 跟踪 ESensor 的 JSON 流，将事件批量打包，并经出站 HTTPS 以 HTTP-POST 发送到配置的 Hilt 摄取端点。若端点不可达，它会将事件溢写到磁盘，并在连接恢复时排空。
   </Step>
   <Step title="edr-collector /ingest (edge VPC)">
-    The collector terminates the HTTPS POST at its `/ingest` endpoint, validates the batch, and routes each event to a Kafka topic by event class. It lives alone in a public edge VPC so roaming Macs can reach it directly over the internet — no VPN.
+    采集器在其 `/ingest` 端点终结 HTTPS POST，校验批次，并按事件类别将每条事件路由到对应的 Kafka 主题。它独立部署在公网边缘 VPC 中，因此漫游中的 Mac 可直接通过互联网到达 — 无需 VPN。
   </Step>
   <Step title="MSK Kafka (dag.endpoint.*)">
-    The collector produces events to the core Amazon MSK cluster on the `dag.endpoint.exec`, `dag.endpoint.file`, and `dag.endpoint.net` topics, which buffer the stream and decouple ingest from enrichment.
+    采集器将事件生产到核心 Amazon MSK 集群的 `dag.endpoint.exec`、`dag.endpoint.file` 与 `dag.endpoint.net` 主题上，这些主题缓冲事件流，并将摄取与富化解耦。
   </Step>
   <Step title="Enrichment (ENRICH_PLATFORM=macos)">
-    The enrichment service consumes the `dag.endpoint.*` topics with the macOS profile. It resolves each event's `responsible_pid` into an owning application and a per-instance session, normalizes the code-signing identity, and writes typed rows.
+    富化服务以 macOS 配置消费 `dag.endpoint.*` 主题。它将每条事件的 `responsible_pid` 解析为归属应用与逐实例会话，规范化代码签名标识，并写入带类型的行。
   </Step>
   <Step title="ClickHouse (endpoint_events)">
-    Enriched rows land in the purpose-built, macOS-native ClickHouse table `endpoint_events`, typed by `event_class` / `event_type`, carrying the code-signing and application-attribution columns plus an `attrs` map for the security long tail.
+    富化后的行落入专门构建的 macOS 原生 ClickHouse 表 `endpoint_events`，按 `event_class` / `event_type` 定型，携带代码签名列与应用归因列，外加用于安全长尾的 `attrs` 映射。
   </Step>
   <Step title="Dashboard">
-    macOS hosts surface in the Collectors fleet with a macOS host-type badge, and their events appear across the Investigate, Networks, Files, and Users views — queryable by signing trust and owning application.
+    macOS 主机以 macOS 主机类型徽章出现在采集器机群中，其事件遍布 Investigate、Networks、Files 与 Users 视图 — 可按签名信任与归属应用查询。
   </Step>
 </Steps>
 
 ---
 
-## Stage 1 — ESensor emits JSON
+## 阶段 1 — ESensor 发出 JSON
 
-ESensor is an **Endpoint Security (ES) system extension** (bundle id `Hilt.EDRApp.ESensor`) embedded in the Hilt EDR app. It opens an ES client, subscribes to a fixed set of `NOTIFY` events, applies aggressive userspace filtering, and writes each surviving event as a single JSON line.
+ESensor 是一个内嵌于 Hilt EDR 应用的 **Endpoint Security (ES) 系统扩展**（bundle id `Hilt.EDRApp.ESensor`）。它打开一个 ES 客户端，订阅一组固定的 `NOTIFY` 事件，施加激进的用户态过滤，并将每条幸存事件写为单行 JSON。
 
-**What it subscribes to.** ESensor captures process, file, persistence, device, and network telemetry:
+**订阅内容。** ESensor 采集进程、文件、持久化、设备与网络遥测：
 
 | Class | Event types |
 | :-- | :-- |
-| **process** | `exec` (with `argv` + signing identity), `fork`, `signal` (kill attempts) |
-| **file** | `file_open` (open/create), `file_unlink`, `file_rename`, `file_chmod`, `xattr_set` / `xattr_delete` (Gatekeeper quarantine tamper) |
-| **persistence** | `btm_add` — launch agent/daemon/login item installed (macOS 13+ Background Task Management) |
-| **device** | `mount` — removable media |
-| **network** | `net_flow` — outbound TCP flow with destination, ports, bytes, and bundle id |
+| **process** | `exec`（含 `argv` + 签名标识）、`fork`、`signal`（kill 尝试） |
+| **file** | `file_open`（open/create）、`file_unlink`、`file_rename`、`file_chmod`、`xattr_set` / `xattr_delete`（Gatekeeper 隔离篡改） |
+| **persistence** | `btm_add` — 安装 launch agent/daemon/登录项（macOS 13+ Background Task Management） |
+| **device** | `mount` — 可移动介质 |
+| **network** | `net_flow` — 出站 TCP 流，含目的地、端口、字节数与 bundle id |
 
-**Volume reality.** `file_open` dominates the stream at roughly 95%+ of all events, so ESensor filters aggressively in userspace before anything is emitted. Only the security-relevant remainder is written to the JSON stream and handed to the forwarder.
+**流量现实。** `file_open` 主导整个流，约占全部事件的 95%+，因此 ESensor 在发出任何内容前会在用户态激进过滤。只有与安全相关的剩余部分才被写入 JSON 流并交给转发器。
 
 <Note>
-  The network source is the per-flow Network Extension content filter (`Hilt.EDRApp.NetFilter`, with an `lsof` fallback), not Endpoint Security. ES has no network events; this is why network attribution arrives as `net_flow` rather than an ES `NOTIFY` type. See [event data model](/zh/macos-collector/event-data-model).
+  网络来源是逐流的 Network Extension 内容过滤器（`Hilt.EDRApp.NetFilter`，带 `lsof` 回退），而非 Endpoint Security。ES 没有网络事件；这正是网络归因以 `net_flow` 而非某个 ES `NOTIFY` 类型出现的原因。见[事件数据模型](/zh/macos-collector/event-data-model)。
 </Note>
 
-### Trust and attribution stamped at the source
+### 信任与归因在源头打戳
 
-The defining property of the macOS collector is that **every event** carries first-class code-signing trust and application attribution — fields the Linux collector cannot express. These are resolved from the Endpoint Security process record at emit time, not bolted on later:
+macOS 采集器的决定性特性在于：**每一条事件**都携带一等的代码签名信任与应用归因 — 这些是 Linux 采集器无法表达的字段。它们在发出时从 Endpoint Security 进程记录中解析而来，而非事后附加：
 
 | Field | Meaning |
 | :-- | :-- |
-| `code_signature` | Trust verdict: `platform`, `developer_id`, `adhoc`, or `unsigned_or_invalid` |
-| `signing_id` | Bundle id of the acting binary, e.g. `com.google.Chrome` |
-| `team_id` | Apple developer Team ID (empty for Apple platform binaries, which is correct) |
-| `cdhash` | Code-directory hash — binary integrity, set on `exec` |
-| `application_id` / `application_display_name` | Owning app — helpers fold to the parent (e.g. `Google Chrome Helper` → `Google Chrome`) |
-| `responsible_pid` | Apple ES "responsible process" — the basis for application and session attribution |
-| `session_id` | Per app-instance session |
-| `device_name` | The human-readable Mac name |
+| `code_signature` | 信任判定：`platform`、`developer_id`、`adhoc` 或 `unsigned_or_invalid` |
+| `signing_id` | 执行二进制的 bundle id，例如 `com.google.Chrome` |
+| `team_id` | Apple 开发者 Team ID（对 Apple 平台二进制为空，这是正确的） |
+| `cdhash` | 代码目录哈希 — 二进制完整性，在 `exec` 时设置 |
+| `application_id` / `application_display_name` | 归属应用 — 辅助进程折叠回父应用（例如 `Google Chrome Helper` → `Google Chrome`） |
+| `responsible_pid` | Apple ES 的"responsible process" — 应用与会话归因的依据 |
+| `session_id` | 逐应用实例的会话 |
+| `device_name` | 人类可读的 Mac 名称 |
 
-Because trust and application identity travel with the event, a query like "which **unsigned** app read `~/.ssh`" is a single `WHERE` clause downstream.
+由于信任与应用标识随事件一同传递，像"哪个**未签名**应用读取了 `~/.ssh`"这样的查询，在下游只是单个 `WHERE` 子句。
 
 ---
 
-## Stage 2 — Local forwarder batches and ships over HTTPS
+## 阶段 2 — 本机转发器批量打包并经 HTTPS 发送
 
-The forwarder is a lightweight LaunchDaemon installed alongside the Hilt EDR app. It owns the network path; ESensor itself opens no sockets.
+转发器是与 Hilt EDR 应用一同安装的轻量 LaunchDaemon。它掌管网络路径；ESensor 本身不打开任何 socket。
 
-- **Tails and batches.** It reads ESensor's JSON line stream, accumulates events into batches, and POSTs them to the collector's `/ingest` endpoint.
-- **Outbound HTTPS only.** The single destination is the configured Hilt ingest endpoint, reached over outbound HTTPS. There are **no inbound sockets and no phone-home** — the host initiates every connection.
-- **Roaming-friendly.** Because the collector lives in a public edge VPC, the forwarder reaches it directly over the internet from wherever the Mac is. No VPN or corporate network is required.
+- **跟踪与批处理。** 它读取 ESensor 的 JSON 行流，将事件累积成批，并 POST 到采集器的 `/ingest` 端点。
+- **仅出站 HTTPS。** 唯一目的地是配置的 Hilt 摄取端点，经出站 HTTPS 到达。**没有入站 socket，也不回连（phone-home）** — 每个连接都由主机发起。
+- **漫游友好。** 由于采集器位于公网边缘 VPC，转发器无论 Mac 身处何地都能直接通过互联网到达。无需 VPN 或企业网络。
 
-### Spool on disconnect
+### 断连时溢写
 
-When the ingest endpoint is unreachable — a closed laptop, a flaky network, a captive portal — the forwarder does not drop events. It **spools them to disk locally** and continues accepting new events from ESensor. When connectivity returns, the spool is drained to the collector in order, so a Mac that was offline backfills its timeline rather than leaving a gap.
+当摄取端点不可达时 — 合上的笔记本、不稳定的网络、强制门户（captive portal）— 转发器不会丢弃事件。它**将事件在本地溢写到磁盘**，并继续接收来自 ESensor 的新事件。连接恢复后，溢写会按顺序排空到采集器，因此曾离线的 Mac 会回填其时间线，而不会留下空白。
 
 <Note>
-  Spooling makes the macOS collector resilient to the intermittent connectivity that is normal for laptops. The trade-off is that an event's appearance in the dashboard reflects when the host reconnected, not necessarily when the activity occurred — the event's own kernel timestamp remains the source of truth for ordering.
+  溢写让 macOS 采集器能够耐受笔记本常见的间歇性连接。代价是：事件在仪表盘中出现的时刻反映的是主机重新连接的时间，未必是活动实际发生的时间 — 事件自身的内核时间戳仍是排序的权威来源。
 </Note>
 
 ---
 
-## Stage 3 — edr-collector /ingest
+## 阶段 3 — edr-collector /ingest
 
-The **edr-collector** is the edge ingest service. It runs alone in a **public edge VPC** so roaming Macs can reach it over the internet, and it is the only component the host ever talks to.
+**edr-collector** 是边缘摄取服务。它独立运行在**公网边缘 VPC** 中，以便漫游中的 Mac 能通过互联网到达，也是主机唯一会对话的组件。
 
-- **Receives** the batched HTTPS POST at `/ingest`, validates the payload, and acknowledges the batch so the forwarder can release it from the spool.
-- **Routes by class.** It maps each event to a Kafka topic — process events to `dag.endpoint.exec`, file events to `dag.endpoint.file`, and network flows to `dag.endpoint.net`.
-- **Produces** to the core MSK cluster through a write-only path: the collector can publish to the `dag.endpoint.*` topics but cannot read back or reach anything else in the core network.
+- **接收** 批量的 HTTPS POST 于 `/ingest`，校验载荷，并确认批次，使转发器能将其从溢写中释放。
+- **按类别路由。** 它将每条事件映射到一个 Kafka 主题 — 进程事件到 `dag.endpoint.exec`，文件事件到 `dag.endpoint.file`，网络流到 `dag.endpoint.net`。
+- **生产** 到核心 MSK 集群，走一条只写路径：采集器可以向 `dag.endpoint.*` 主题发布，但不能回读，也不能到达核心网络中的任何其他内容。
 
-The collector holds no long-term state and performs no enrichment; it is a routing and buffering hop between the public internet and the internal Kafka bus. See [networking and security](/zh/macos-collector/networking-security) for the trust boundary.
+采集器不持有长期状态，也不执行富化；它只是公网互联网与内部 Kafka 总线之间的一个路由与缓冲跳。关于信任边界见[网络与安全](/zh/macos-collector/networking-security)。
 
 ---
 
-## Stage 4 — MSK Kafka (dag.endpoint.*)
+## 阶段 4 — MSK Kafka (dag.endpoint.*)
 
-Events are buffered on **Amazon MSK** across three topics, partitioned by event class:
+事件在 **Amazon MSK** 上跨三个主题缓冲，按事件类别分区：
 
 | Topic | Carries |
 | :-- | :-- |
-| `dag.endpoint.exec` | process events — `exec`, `fork`, `signal` |
-| `dag.endpoint.file` | file events — `file_open`, `file_unlink`, `file_rename`, `file_chmod`, `xattr_set`, `xattr_delete` |
-| `dag.endpoint.net` | network events — `net_flow` |
+| `dag.endpoint.exec` | 进程事件 — `exec`、`fork`、`signal` |
+| `dag.endpoint.file` | 文件事件 — `file_open`、`file_unlink`、`file_rename`、`file_chmod`、`xattr_set`、`xattr_delete` |
+| `dag.endpoint.net` | 网络事件 — `net_flow` |
 
-Kafka decouples ingest from enrichment: the collector can keep accepting events even if enrichment is briefly behind, and enrichment can be restarted or scaled without losing the stream. The same `dag.endpoint.*` topics carry the Linux collector's endpoint stream — the platform is distinguished downstream, not by topic.
-
----
-
-## Stage 5 — Enrichment (ENRICH_PLATFORM=macos)
-
-A dedicated, fault-isolated enrichment deployment consumes the `dag.endpoint.*` topics with **`ENRICH_PLATFORM=macos`**. This profile is what makes the rows macOS-native rather than Linux-shaped:
-
-- **Resolves `responsible_pid` → application + session.** Apple's ES "responsible process" is turned into the owning `application_id` / `application_display_name` and a per-instance `session_id`, folding helper processes back to their parent app. This is the step that lets the dashboard group activity by application instead of by raw process.
-- **Normalizes code-signing identity.** The `code_signature` verdict, `signing_id`, `team_id`, and `cdhash` are validated and written as first-class, typed columns.
-- **Types the event.** Each event is keyed by `event_class` / `event_type` so file, process, persistence, device, and network events share one table without Linux cgroup/k8s/container clutter.
-- **Preserves the long tail.** Security-relevant attributes that don't warrant their own column (e.g. `xattr` name on a quarantine strip, removable-media flags on a `mount`) are written into an `attrs` map.
-
-The macOS enrichment runs as a separate consumer from the Linux endpoint path so that a problem on one platform's stream cannot stall the other.
+Kafka 将摄取与富化解耦：即使富化短暂落后，采集器也能持续接收事件；而富化可以重启或扩缩容而不丢失流。同样的 `dag.endpoint.*` 主题也承载 Linux 采集器的端点流 — 平台的区分在下游完成，而非靠主题区分。
 
 ---
 
-## Stage 6 — ClickHouse (endpoint_events)
+## 阶段 5 — 富化 (ENRICH_PLATFORM=macos)
 
-Enriched rows are written to the purpose-built ClickHouse table **`endpoint_events`** — the live macOS telemetry table. It is macOS-native by design:
+一个专用、故障隔离的富化部署以 **`ENRICH_PLATFORM=macos`** 消费 `dag.endpoint.*` 主题。正是这一配置让行成为 macOS 原生，而非 Linux 形态：
 
-- typed by `event_class` / `event_type` rather than cloned from the Linux schema;
-- carries the code-signing identity columns (`code_signature`, `signing_id`, `team_id`, `cdhash`) and application-attribution columns (`application_id`, `application_display_name`, `responsible_pid`, `session_id`, `device_name`) as first-class fields;
-- includes an `attrs` map for the security long tail;
-- omits Linux-only concepts (cgroup, container, pod, node, k8s) entirely.
+- **解析 `responsible_pid` → 应用 + 会话。** Apple ES 的"responsible process"被转换为归属的 `application_id` / `application_display_name` 以及逐实例的 `session_id`，将辅助进程折叠回其父应用。正是这一步让仪表盘能按应用而非原始进程对活动分组。
+- **规范化代码签名标识。** `code_signature` 判定、`signing_id`、`team_id` 与 `cdhash` 被校验并作为一等的带类型列写入。
+- **为事件定型。** 每条事件以 `event_class` / `event_type` 为键，因此文件、进程、持久化、设备与网络事件共享同一张表，而不带 Linux 的 cgroup/k8s/container 杂项。
+- **保留长尾。** 那些不值得单列的安全相关属性（例如隔离剥离时的 `xattr` 名称、`mount` 上的可移动介质标志）被写入 `attrs` 映射。
 
-The single table is the join-free backing store for every macOS view in the dashboard — `device_name` means no host-inventory join is needed to render a host.
+macOS 富化作为独立于 Linux 端点路径的消费者运行，从而使一个平台流上的问题不会拖垮另一个。
+
+---
+
+## 阶段 6 — ClickHouse (endpoint_events)
+
+富化后的行被写入专门构建的 ClickHouse 表 **`endpoint_events`** — 实时的 macOS 遥测表。它在设计上即为 macOS 原生：
+
+- 按 `event_class` / `event_type` 定型，而非从 Linux 模式克隆而来；
+- 将代码签名标识列（`code_signature`、`signing_id`、`team_id`、`cdhash`）与应用归因列（`application_id`、`application_display_name`、`responsible_pid`、`session_id`、`device_name`）作为一等字段携带；
+- 包含用于安全长尾的 `attrs` 映射；
+- 完全省略仅 Linux 的概念（cgroup、container、pod、node、k8s）。
+
+这张单一的表是仪表盘中每个 macOS 视图的免连接（join-free）后备存储 — `device_name` 意味着渲染一台主机无需做主机清单连接。
 
 <Note>
-  Earlier macOS rows were written to a clone of the Linux schema (`dag_events_endpoint`); that table is retired and is no longer written. `endpoint_events` is the authoritative destination. See [the event data model](/zh/macos-collector/event-data-model) for the full column list.
+  早期的 macOS 行曾写入 Linux 模式的克隆表（`dag_events_endpoint`）；该表已退役，不再写入。`endpoint_events` 是权威目标。完整列清单见[事件数据模型](/zh/macos-collector/event-data-model)。
 </Note>
 
 ---
 
-## Stage 7 — Dashboard views
+## 阶段 7 — 仪表盘视图
 
-macOS hosts and their events surface across the dashboard:
+macOS 主机及其事件遍布仪表盘：
 
-- **Collectors fleet** — each enrolled Mac appears with a **macOS host-type badge**, identified by its `device_name`, alongside Linux collectors in the same fleet view.
-- **Investigate** — process, file, and persistence activity, filterable by signing trust (`code_signature`) and owning application (`application_display_name`).
-- **Networks** — outbound `net_flow` activity attributed to the responsible application and bundle id.
-- **Files** — file opens, deletes, renames, chmods, and quarantine-tamper events.
-- **Users** — activity grouped by the acting user and session.
+- **采集器机群** — 每台已注册的 Mac 都带 **macOS 主机类型徽章**出现，由其 `device_name` 标识，与同一机群视图中的 Linux 采集器并列。
+- **Investigate** — 进程、文件与持久化活动，可按签名信任（`code_signature`）与归属应用（`application_display_name`）过滤。
+- **Networks** — 出站 `net_flow` 活动，归因到 responsible 应用与 bundle id。
+- **Files** — 文件的 open、delete、rename、chmod 与隔离篡改事件。
+- **Users** — 按执行用户与会话分组的活动。
 
-Because trust and application identity are columns rather than derived fields, the dashboard supports queries the Linux collector cannot express — for example, surfacing every `developer_id`-but-not-`platform` binary that touched a sensitive path, or every app whose `code_signature` is `unsigned_or_invalid`.
+由于信任与应用标识是列而非派生字段，仪表盘支持 Linux 采集器无法表达的查询 — 例如，找出每一个触及敏感路径的 `developer_id` 但非 `platform` 二进制，或每一个 `code_signature` 为 `unsigned_or_invalid` 的应用。
 
 ---
 
-## What this data flow does not do
+## 此数据流不做什么
 
-The macOS collector observes system activity at the metadata level only. The data flow explicitly does **not** include:
+macOS 采集器仅在元数据级别观察系统活动。该数据流明确**不**包含：
 
-- **Inbound connections or a phone-home.** The forwarder makes only outbound HTTPS to the configured ingest endpoint; nothing listens for inbound sockets.
-- **File contents, packet payloads, memory, or environment variables.** Events carry metadata only — paths, identifiers, signing identity, and flow tuples — never the data a process reads or writes.
-- **A kernel extension.** ESensor and NetFilter are user-space System Extensions; there is no kext and no `csrutil disable`. The collector runs with **System Integrity Protection enabled**. See [system requirements](/zh/macos-collector/system-requirements).
-- **On-device response or auto-update.** During early access the pipeline is telemetry-only; auto-update and on-device quarantine response are not yet available on macOS.
+- **入站连接或回连（phone-home）。** 转发器只做到配置的摄取端点的出站 HTTPS；没有任何组件监听入站 socket。
+- **文件内容、报文载荷、内存或环境变量。** 事件仅携带元数据 — 路径、标识符、签名标识与流元组 — 从不携带进程读取或写入的数据本身。
+- **内核扩展。** ESensor 与 NetFilter 都是用户态 System Extension；没有 kext，也无需 `csrutil disable`。采集器在**启用 System Integrity Protection** 的情况下运行。见[系统要求](/zh/macos-collector/system-requirements)。
+- **设备端响应或自动更新。** 在早期访问期间，管道仅做遥测；自动更新与设备端隔离响应在 macOS 上尚未提供。
 
 <Note>
-  **Status: early access.** The notarized `.pkg` with SIP-on install and the data flow described here are the shipping model. On-device response and agent auto-update are planned but not yet available on macOS.
+  **状态：早期访问。** 已公证的、以 SIP 开启方式安装的 `.pkg`，以及本页所述的数据流，即为交付模型。设备端响应与 agent 自动更新已在规划中，但在 macOS 上尚未提供。
 </Note>

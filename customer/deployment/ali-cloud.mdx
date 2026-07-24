@@ -12,9 +12,9 @@ Hilt runs as a single-tenant platform inside your own Ali Cloud account. A manag
 
 | Service | Role |
 | :-- | :-- |
-| ACK | Managed Kubernetes for all platform services (collector, enrichment, classification, dashboard) |
+| ACK | Managed Kubernetes for all platform services (ingest, enrichment, classification, dashboard) |
 | AliCloud ECS (VM) or ApsaraDB ClickHouse Enterprise | Analytics database (three deployment modes: self-managed ECS, managed Enterprise Edition, or ClickHouse Cloud via PrivateLink) |
-| Message Queue for Apache Kafka | Event streaming between collector and enrichment |
+| Message Queue for Apache Kafka | Event streaming between ingest and enrichment |
 | PrivateLink | Private ingest endpoint: collectors connect without traversing the public internet |
 | OSS | Terraform remote state, app configuration, and data-export staging |
 | ApsaraDB RDS (PostgreSQL) | Dashboard auth/HITL database |
@@ -55,7 +55,7 @@ Hilt provisions your Ali Cloud deployment using Terraform. The typical process:
 2. Hilt applies the Terraform configuration to create all infrastructure (ACK, ClickHouse, Message Queue for Apache Kafka, ApsaraDB RDS, OSS, NAS, CAS, PrivateLink, and networking)
 3. PrivateLink connectivity is established between your workload VPCs and the platform VPC
 4. The Postgres auth database is seeded with the initial schema
-5. Collectors are deployed to your hosts using the guides in this documentation
+5. Collectors are deployed to your hosts using the [Linux](/linux-collector/layout) and [macOS](/macos-collector/layout) collector guides
 
 ## Image delivery
 

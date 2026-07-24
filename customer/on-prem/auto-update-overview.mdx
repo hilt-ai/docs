@@ -18,9 +18,9 @@ The auto-update agent is a lightweight container deployed as a Kubernetes CronJo
 
 ## Dashboard view
 
-The Admin UI provides a management panel for the auto-update agent:
+**Settings → System** provides a management panel for the auto-update agent:
 
-- **Current version** — the active release tag (e.g., `v1.04.28`).
+- **Current version** — the active release tag (e.g., `v2026.04.28`).
 - **Previous tag** — the release tag that was active before the last update.
 - **Last updated** — the timestamp and actor (user or system) of the most recent update.
 - **Automatic updates toggle** — an on/off switch to enable or disable automatic updates.
@@ -37,12 +37,12 @@ Disabling updates via the **dashboard toggle** keeps the CronJob scheduled but c
 
 ### Version policy
 
-Release tags follow the format `vMAJOR.MINOR.PATCH` (e.g. `v1.04.27`). The agent uses a **prefix-based minor update policy**:
+Release tags follow a CalVer format `vYEAR.MONTH.DAY` (e.g. `v2026.04.27`). The agent uses a **prefix-based patch update policy**:
 
 | Current tag | Auto-update scope | Example match |
 | :-- | :-- | :-- |
-| `v1.04.27` | Same `vMAJOR.MINOR.*` prefix | `v1.04.28`, `v1.04.30` |
-| `v1.04.27` | Blocked | `v1.05.01` (minor bump) |
-| `v1.04.27` | Blocked | `v2.01.01` (major bump) |
+| `v2026.04.27` | Same `vYEAR.MONTH.*` prefix | `v2026.04.28`, `v2026.04.30` |
+| `v2026.04.27` | Blocked | `v2026.05.01` (next month) |
+| `v2026.04.27` | Blocked | `v2027.01.01` (next year) |
 
-The scope is configurable. An operator can set `UPDATE_POLICY=patch` (default), `UPDATE_POLICY=minor`, or `UPDATE_POLICY=any` (any newer tag). Major version jumps always require explicit operator action unless `UPDATE_POLICY=any`.
+The scope is configurable. An operator can set `UPDATE_POLICY=patch` (default; same-month day updates), `UPDATE_POLICY=minor` (same-year month updates), or `UPDATE_POLICY=any` (any newer tag). Year (major) jumps always require explicit operator action unless `UPDATE_POLICY=any`. The Terraform variable `auto_update_policy` sets this container `UPDATE_POLICY` value.

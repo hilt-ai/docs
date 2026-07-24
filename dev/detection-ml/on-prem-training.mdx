@@ -4,7 +4,7 @@ description: "How TRACE trains, gates, promotes, and rolls back itself at a cust
 sidebarTitle: "On-prem training"
 ---
 
-On-prem deployments train TRACE **on the customer's own cluster**. No telemetry, parquet, or model artifact leaves the site. Unlike cloud training, there is no human in the loop by default: a scheduled job decides when to train, trains, gates the result, and promotes or rolls back on its own. This page covers how that loop works and what controls it. Full design: [53-onprem-autonomous-lifecycle-handoff.md](https://github.com/hilt-ai/dag-detectionML/blob/dev/docs/trace/53-onprem-autonomous-lifecycle-handoff.md).
+On-prem deployments train TRACE **on the customer's own cluster**. No telemetry, parquet, or model artifact from the training pipeline leaves the site. (A separate, approval-gated anonymized data-export pipeline can still send aggregate statistical features to Hilt for cross-fleet model improvement — see [Anonymized data export](https://docs.hilt.ai/on-prem/data-export-overview).) Unlike cloud training, there is no human in the loop by default: a scheduled job decides when to train, trains, gates the result, and promotes or rolls back on its own. This page covers how that loop works and what controls it. Full design: [53-onprem-autonomous-lifecycle-handoff.md](https://github.com/hilt-ai/dag-detectionML/blob/dev/docs/trace/53-onprem-autonomous-lifecycle-handoff.md).
 
 ## On-prem vs cloud training
 

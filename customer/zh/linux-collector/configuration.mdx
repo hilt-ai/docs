@@ -7,7 +7,7 @@ description: "DMG 采集器的 CLI 标志、环境变量与配置文件键。"
 
 | CLI | 环境变量 | 配置键 | 默认值 | 用途 |
 | :-- | :-- | :-- | :-- | :-- |
-| `-s` | `DAG_SHIP_URL` | `ship_url` | 未设置 = 文件模式 | HTTPS 采集器 URL。 |
+| `-s` | `DAG_SHIP_URL` | `ship_url` | 未设置 = 文件模式 | 完整的 HTTPS 接入 URL，需包含 `/ingest` 路径（例如 `https://<name>-ingest.hilt.ai/ingest`）；采集器会原样 POST 到该 URL。 |
 | `-o` | `DAG_OUTPUT_PATH` | `output_path` | `/var/log/dag-agent/events.jsonl` | JSONL 输出。设为 `-` 可显式输出到 stdout。 |
 | `-n` | `DAG_NODE_ID` | `node_id` | `$(hostname)` / K8s 上为 `spec.nodeName` | 在仪表盘上显示的字符串主机标签。 |
 | `-b` | n/a | n/a | 关闭 | 基准测试模式；仅发送。 |

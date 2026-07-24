@@ -35,7 +35,7 @@ macOS 采集器内嵌设备端检测引擎，在事件发生时于本机评估�
 | `alerted` | 操作已完成；升高严重度的发现待审阅 |
 | `logged` | 记录用于上下文与关联 |
 
-严重度随行动者的代码签名判定缩放。agent 保护自身 bundle、更新程序与 launch items — 未授权的 kill/delete/rename 会被拒绝并作为 blocked 篡改发现上报。
+严重度随行动者的代码签名判定缩放。采集器保护自身应用 bundle 与扩展 — 未授权的 kill/delete/rename 会在内核中被拒绝并作为 blocked 篡改发现上报。
 
 ---
 

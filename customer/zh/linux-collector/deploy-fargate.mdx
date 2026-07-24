@@ -54,7 +54,7 @@ Fargate 采集器（`dag-fargate-agent`）作为 **应用容器内的 PID 1** �
     dag-taskdef-inject \
       --in taskdef.json \
       --out taskdef-injected.json \
-      --ship-url https://<name>-ingest.hilt.ai/v1/events
+      --ship-url https://<name>-ingest.hilt.ai/ingest
     ```
 
     该工具是幂等的——对已经注入过的任务定义再次运行不会产生任何效果。
@@ -77,7 +77,7 @@ Fargate 采集器（`dag-fargate-agent`）作为 **应用容器内的 PID 1** �
 module "dag_fargate" {
   source                = "github.com/hilt-ai/data-access-governance//deploy/fargate/terraform"
   container_definitions = jsonencode(local.my_containers)
-  ship_url              = "https://<name>-ingest.hilt.ai/v1/events"
+  ship_url              = "https://<name>-ingest.hilt.ai/ingest"
 }
 
 resource "aws_ecs_task_definition" "app" {
@@ -137,7 +137,7 @@ Copilot 会从 `manifest.yml` 生成任务定义，因此这条路径只涉及�
 dag-taskdef-inject \
   --in taskdef.cfn.yaml \
   --format cloudformation \
-  --ship-url https://<name>-ingest.hilt.ai/v1/events \
+  --ship-url https://<name>-ingest.hilt.ai/ingest \
   --out taskdef-injected.cfn.yaml
 ```
 

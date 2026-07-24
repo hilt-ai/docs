@@ -11,7 +11,7 @@ TRACE (Temporal Reconstruction And Contextual Encoding) is the production anomal
 | Property | Value |
 | --- | --- |
 | Status | Production (`ENABLED_MODELS = {"trace": ...}`) |
-| Input | 20-D numeric vector + token sequence per host/epoch |
+| Input | 20-D numeric vector (20 features selected from the 32-element `derived_features`) + token sequence per host/epoch |
 | Output | Raw head scores → ACI (adaptive conformal inference) / CCT (Cauchy-combined test) alert path + Fisher calibration columns |
 | State | Per-host GRU hidden state across epochs |
 | Artifact bundle | `model_scripted.pt`, `metadata.json`, `calibration.npz`, `calibration.json` |

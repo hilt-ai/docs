@@ -54,7 +54,7 @@ Pick whichever surface matches how you manage task definitions today. All four p
     dag-taskdef-inject \
       --in taskdef.json \
       --out taskdef-injected.json \
-      --ship-url https://<name>-ingest.hilt.ai/v1/events
+      --ship-url https://<name>-ingest.hilt.ai/ingest
     ```
 
     The tool is idempotent — running it again on an already-injected task definition is a no-op.
@@ -77,7 +77,7 @@ You can also point the CLI at a live task definition family with `--from-aws <fa
 module "dag_fargate" {
   source                = "github.com/hilt-ai/data-access-governance//deploy/fargate/terraform"
   container_definitions = jsonencode(local.my_containers)
-  ship_url              = "https://<name>-ingest.hilt.ai/v1/events"
+  ship_url              = "https://<name>-ingest.hilt.ai/ingest"
 }
 
 resource "aws_ecs_task_definition" "app" {
@@ -137,7 +137,7 @@ If your task definition is authored as raw CloudFormation, the CLI can emit a pa
 dag-taskdef-inject \
   --in taskdef.cfn.yaml \
   --format cloudformation \
-  --ship-url https://<name>-ingest.hilt.ai/v1/events \
+  --ship-url https://<name>-ingest.hilt.ai/ingest \
   --out taskdef-injected.cfn.yaml
 ```
 

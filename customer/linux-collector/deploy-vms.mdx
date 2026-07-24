@@ -57,7 +57,7 @@ install -m 644 dag-agent.service /etc/systemd/system/dag-agent.service
 mkdir -p /etc/dag-agent /var/log/dag-agent
 
 cat > /etc/dag-agent/config.yaml <<'YAML'
-ship_url: "https://<name>-ingest.hilt.ai"
+ship_url: "https://<name>-ingest.hilt.ai/ingest"
 output_path: "/var/log/dag-agent/events.jsonl"
 node_id: "${NODE_ID}"
 YAML
@@ -76,7 +76,7 @@ systemctl enable --now dag-agent
 
 ## Service configuration
 
-The systemd unit (`deploy/dag-agent.service`) is minimal:
+The systemd unit (`dag-agent.service`) is minimal:
 
 ```ini
 [Unit]
@@ -110,7 +110,7 @@ Expected output:
 
 ```text
 dag-agent v<X> starting
-Ship mode: https://<name>-ingest.hilt.ai
+Ship mode: https://<name>-ingest.hilt.ai/ingest
 BPF object loaded; attached N programs
 ```
 
