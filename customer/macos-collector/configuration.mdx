@@ -93,7 +93,7 @@ The macOS Collector deliberately exposes a narrow configuration surface. The fol
 - **No inbound listener.** There is no port to open, no bind address, no phone-home. The only network activity is the forwarder's outbound HTTPS POST to `EDR_COLLECTOR_URL`.
 - **No SIP or developer-mode toggle.** The collector runs with SIP enabled because the app and extensions are Developer ID-signed, carry an embedded provisioning profile for the Endpoint Security entitlement, use the Hardened Runtime, and are notarized and stapled by Apple. There is nothing to disable.
 - **No kernel extension to load.** The collector is pure user-space System Extensions on Apple's modern frameworks. There is no kext, no `kextload`, no approval of a legacy KEXT.
-- **No sampling or rule configuration on-device.** Userspace event filtering (chiefly the high-volume `file_open` events, which dominate at ~95%+) is built into the sensor, not a tunable. Detection and scoring happen downstream in enrichment, not on the Mac.
+- **No sampling or rule configuration on-device.** Userspace event filtering (chiefly the high-volume `file_open` events, which dominate at ~95%+) is built into the sensor, not a tunable. Anomaly scoring and severity happen downstream in enrichment; the only on-device enforcement is the fixed ESensor AUTH self-protection set, which denies tampering with the collector in-kernel.
 - **No event-content toggles.** The collector captures metadata only — process, file, and network event headers plus code-signing and application attribution fields. It never captures file contents, packet payloads, memory, or credentials.
 
 ## See also

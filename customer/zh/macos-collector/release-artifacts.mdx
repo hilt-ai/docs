@@ -1,24 +1,24 @@
 ---
 title: "发布产物"
 sidebarTitle: "发布产物"
-description: "What ships in a macOS release: a notarized, Developer ID-signed .pkg embedding EDRApp.app (ESensor + NetFilter) and the forwarder, with code-signing, notarization, and Hardened Runtime details plus how to verify a build."
+description: "macOS 发布版本中包含的内容：一个经过公证、以 Developer ID 签名的 .pkg，内嵌 EDRApp.app（ESensor + NetFilter）与转发器，并涵盖代码签名、公证、Hardened Runtime 详情以及如何验证构建。"
 ---
 
-Every release of the Hilt macOS Collector ships as a single **notarized, Developer ID-signed `.pkg`**. The package installs one universal app bundle, `EDRApp.app` ("Hilt EDR"), into `/Applications`, plus a small forwarder `LaunchDaemon`. Unlike the Linux collector — which ships static tarballs and a container image — the macOS collector is a single Apple-signed installer, because the headline property of this build is that it runs on a normal, hardened Mac with **System Integrity Protection (SIP) enabled**: no `csrutil disable`, no developer mode.
+Hilt macOS 采集器的每个发布版本都以单个 **经过公证、以 Developer ID 签名的 `.pkg`** 形式发布。该安装包将一个通用应用捆绑包 `EDRApp.app`（“Hilt EDR”）安装到 `/Applications`，并附带一个小型转发器 `LaunchDaemon`。与 Linux 采集器不同——后者发布静态 tarball 和一个容器镜像——macOS 采集器是单个由 Apple 签名的安装程序，因为此构建的核心特性是它能在一台开启了 **系统完整性保护（SIP）** 的正常、加固的 Mac 上运行：无需 `csrutil disable`，无需开发者模式。
 
-That property is not a packaging convenience. macOS only honors the restricted Endpoint Security entitlement when the code carrying it is signed with an Apple-issued certificate, carries an embedded Apple provisioning profile that authorizes the entitlement, uses the Hardened Runtime, and has been notarized by Apple. The release artifact exists to satisfy all four of those gates at once. This page covers what the artifact *is* and how to verify it; see [Networking and trust model](/zh/macos-collector/networking-security) for the runtime trust story and [Install Flow (Standalone)](/zh/macos-collector/install-flow) for what the user does after the package lands.
+这一特性并非只是打包上的便利。仅当承载受限 Endpoint Security 授权（entitlement）的代码满足以下条件时，macOS 才会认可该授权：使用 Apple 签发的证书签名、内嵌授权该 entitlement 的 Apple 描述文件（provisioning profile）、启用 Hardened Runtime，并已通过 Apple 公证。发布产物的存在正是为了一次性满足这四道关卡。本页介绍该产物 *是什么* 以及如何验证它；运行时信任机制参见 [Networking and trust model](/zh/macos-collector/networking-security)，安装包落地后用户的操作参见 [Install Flow (Standalone)](/zh/macos-collector/install-flow)。
 
 ## Artifacts
 
 | Artifact | Purpose |
 | :-- | :-- |
-| `Hilt-EDR-v<YYYY.MM.DD>-<sha>.pkg` | Notarized, Developer ID Installer-signed flat package. The only thing you download and run. |
-| `EDRApp.app` | Universal (Apple Silicon + Intel) app bundle, "Hilt EDR", team `MVMB6LCP2A`. Installed to `/Applications`. Embeds both System Extensions. |
-| `Hilt.EDRApp.ESensor.systemextension` | Endpoint Security system extension — the telemetry sensor. Embedded inside `EDRApp.app`. Carries `com.apple.developer.endpoint-security.client`. |
-| `Hilt.EDRApp.NetFilter.systemextension` | NetworkExtension content-filter system extension — per-flow network attribution. Embedded inside `EDRApp.app`. |
-| `com.hilt.edr.forwarder` | Forwarder `LaunchDaemon` that reads ESensor's JSON-line output and ships it over outbound HTTPS to the Hilt `edr-collector`. |
+| `Hilt-EDR-v<YYYY.MM.DD>-<sha>.pkg` | 经过公证、以 Developer ID Installer 签名的扁平安装包。你唯一需要下载并运行的东西。 |
+| `EDRApp.app` | 通用（Apple Silicon + Intel）应用捆绑包，“Hilt EDR”，团队 `MVMB6LCP2A`。安装到 `/Applications`。内嵌两个系统扩展。 |
+| `Hilt.EDRApp.ESensor.systemextension` | Endpoint Security 系统扩展——遥测传感器。内嵌于 `EDRApp.app` 中。承载 `com.apple.developer.endpoint-security.client`。 |
+| `Hilt.EDRApp.NetFilter.systemextension` | NetworkExtension 内容过滤系统扩展——按流进行网络归因。内嵌于 `EDRApp.app` 中。 |
+| `com.hilt.edr.forwarder` | 转发器 `LaunchDaemon`，读取 ESensor 的 JSON 行输出，并通过出站 HTTPS 将其发送到 Hilt `edr-collector`。 |
 
-The two system extensions are not separate downloads. They live inside `EDRApp.app/Contents/Library/SystemExtensions/` and are activated at runtime by an `OSSystemExtensionRequest` from the host app. The `.pkg` is the unit of distribution; everything else is nested inside it.
+这两个系统扩展并非单独下载项。它们位于 `EDRApp.app/Contents/Library/SystemExtensions/` 内，由宿主应用发起的 `OSSystemExtensionRequest` 在运行时激活。`.pkg` 是分发单元；其余一切都嵌套在其中。
 
 ## Bundle layout
 
@@ -35,68 +35,68 @@ EDRApp.app/
 │   └── embedded.provisionprofile        # authorizes the ES entitlement (app level)
 ```
 
-Each nested `.systemextension` is itself a signed bundle with its own `Info.plist`, `Contents/MacOS/<exe>`, and — for ESensor — its own `embedded.provisionprofile` carrying the Endpoint Security capability. The forwarder daemon binary and its `LaunchDaemon` plist are placed on the host by the installer's postinstall step, not embedded in the app.
+每个嵌套的 `.systemextension` 本身都是一个已签名的捆绑包，拥有自己的 `Info.plist`、`Contents/MacOS/<exe>`，并且——对 ESensor 而言——拥有自己承载 Endpoint Security 能力的 `embedded.provisionprofile`。转发器守护进程二进制文件及其 `LaunchDaemon` plist 由安装程序的 postinstall 步骤放置到主机上，并未嵌入应用中。
 
 ## Code signing
 
-Every Mach-O in the artifact is signed; the notary service rejects the build otherwise. Two certificate types are used, both issued to the **Cybe Corporation** team (`MVMB6LCP2A`):
+产物中的每个 Mach-O 都经过签名；否则公证服务会拒绝该构建。使用了两种证书类型，均签发给 **Cybe Corporation** 团队（`MVMB6LCP2A`）：
 
 | Certificate | Signs | Notes |
 | :-- | :-- | :-- |
-| **Developer ID Application** | `EDRApp.app`, both embedded `.systemextension` bundles, the forwarder binary | Every nested executable is signed independently. |
-| **Developer ID Installer** | the `.pkg` itself | A flat package signed with the Installer cert; required for Gatekeeper to trust the installer. |
+| **Developer ID Application** | `EDRApp.app`、两个内嵌的 `.systemextension` 捆绑包、转发器二进制文件 | 每个嵌套的可执行文件都独立签名。 |
+| **Developer ID Installer** | `.pkg` 本身 | 使用 Installer 证书签名的扁平安装包；Gatekeeper 信任该安装程序所必需。 |
 
-Signing requirements the notary service enforces (and that the build pipeline guarantees):
+公证服务强制要求（且构建流水线保证满足）的签名要求：
 
-- **Hardened Runtime** is enabled on the app and every extension.
-- A **secure timestamp** is present on each signature.
-- There is **no** `com.apple.security.get-task-allow = true` anywhere in the build.
-- Every nested executable carries a valid signature with `--options=runtime` — including prebuilt embedded binaries, which Xcode occasionally skips.
+- 应用及每个扩展都启用了 **Hardened Runtime**。
+- 每个签名上都有 **安全时间戳**。
+- 构建中任何地方都 **不存在** `com.apple.security.get-task-allow = true`。
+- 每个嵌套的可执行文件都带有以 `--options=runtime` 签发的有效签名——包括预构建的内嵌二进制文件，Xcode 有时会跳过它们。
 
 <Note>
-ESensor does **not** use the App Sandbox. An Endpoint Security client that runs sandboxed fails `es_new_client()` with `ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED`. The sandbox entitlement is deliberately absent from the ESensor extension.
+ESensor **不** 使用 App Sandbox。以沙盒方式运行的 Endpoint Security 客户端会在 `es_new_client()` 处失败并返回 `ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED`。ESensor 扩展中刻意省略了沙盒 entitlement。
 </Note>
 
 ## Embedded provisioning profile
 
-The restricted entitlement `com.apple.developer.endpoint-security.client` is what lets ESensor observe process, file, and network events. With SIP on, macOS's trusted-execution (AMFI) layer only honors that entitlement if an **Apple-issued provisioning profile that allowlists it is embedded in the signed bundle**. A bare command-line binary has nowhere to carry that profile — which is exactly why the legacy daemon needed `csrutil disable`.
+受限 entitlement `com.apple.developer.endpoint-security.client` 让 ESensor 得以观察进程、文件和网络事件。在 SIP 开启的情况下，macOS 的可信执行（AMFI）层仅当 **已签名的捆绑包中内嵌了将其列入允许列表的 Apple 签发描述文件** 时，才会认可该 entitlement。裸命令行二进制文件无处承载该描述文件——这正是旧版守护进程需要 `csrutil disable` 的原因。
 
-In the release artifact:
+在发布产物中：
 
-- The **app** carries `com.apple.developer.system-extension.install` (it activates extensions).
-- The **ESensor extension** carries `com.apple.developer.endpoint-security.client` and an `embedded.provisionprofile` issued against the explicit `Hilt.EDRApp.ESensor` App ID with the Endpoint Security capability enabled.
-- The matching `com.apple.application-identifier` is present on each bundle; without it the bundle hits a Trusted Execution crash at launch.
+- **应用** 承载 `com.apple.developer.system-extension.install`（它负责激活扩展）。
+- **ESensor 扩展** 承载 `com.apple.developer.endpoint-security.client`，以及一个针对明确的 `Hilt.EDRApp.ESensor` App ID、启用了 Endpoint Security 能力签发的 `embedded.provisionprofile`。
+- 每个捆绑包上都存在匹配的 `com.apple.application-identifier`；缺少它，捆绑包会在启动时触发可信执行崩溃。
 
-The profile must be a **Developer ID** profile type (not App Store), because the collector is distributed directly, not through the Mac App Store — Endpoint Security clients aren't permitted on the App Store at all.
+该描述文件必须是 **Developer ID** 类型（而非 App Store），因为采集器是直接分发的，而非通过 Mac App Store——Endpoint Security 客户端在 App Store 上根本不被允许。
 
 ## Notarization and stapling
 
-After signing, the entire `.pkg` is submitted to Apple's notary service with `notarytool` (the modern tool; `altool` has been rejected since November 2023). Apple scans it for malware and confirms every signature, then issues a notarization ticket. The pipeline then **staples** that ticket to the `.pkg` with `stapler`, so Gatekeeper can verify the build offline — the installed Mac does not need to reach Apple at install time.
+签名之后，整个 `.pkg` 会用 `notarytool`（现代工具；`altool` 自 2023 年 11 月起已被弃用）提交给 Apple 的公证服务。Apple 会扫描其中的恶意软件并确认每个签名，然后签发一张公证票据（notarization ticket）。随后流水线用 `stapler` 将该票据 **附加（staple）** 到 `.pkg` 上，使 Gatekeeper 能够离线验证该构建——已安装的 Mac 无需在安装时连接 Apple。
 
 <Note>
-Notarization satisfies Gatekeeper's malware and signature check. It does **not** activate the system extension. The user (one-time approval) or MDM (a System Extensions configuration profile) still has to approve the extension before ESensor loads. See [Install Flow (Standalone)](/zh/macos-collector/install-flow) and [Deploy via MDM](/zh/macos-collector/deploy-mdm).
+公证满足了 Gatekeeper 的恶意软件与签名检查。它 **不会** 激活系统扩展。仍需由用户（一次性批准）或 MDM（一个系统扩展配置描述文件）在 ESensor 加载前批准该扩展。参见 [Install Flow (Standalone)](/zh/macos-collector/install-flow) 和 [Deploy via MDM](/zh/macos-collector/deploy-mdm)。
 </Note>
 
 ## Versioning
 
-Releases use a **date-plus-commit** scheme:
+发布版本采用 **日期加提交** 的方案：
 
 ```text
 v<YYYY.MM.DD>-<sha>
 ```
 
-For example, `v2026.06.22-a1b9f3c`. The date is the build date; the `<sha>` is the short Git commit the artifact was built from. The same string appears in:
+例如 `v2026.06.22-a1b9f3c`。日期是构建日期；`<sha>` 是产物构建所基于的短 Git 提交号。同一字符串会出现在：
 
-- the `.pkg` filename,
-- the app's `CFBundleShortVersionString` / `CFBundleVersion` in `Info.plist`,
-- the version reported by the forwarder daemon at startup,
-- the host-detail panel in the dashboard Collectors fleet.
+- `.pkg` 文件名中，
+- 应用 `Info.plist` 中的 `CFBundleShortVersionString` / `CFBundleVersion`，
+- 转发器守护进程在启动时报告的版本，
+- 仪表盘 Collectors 主机群中的主机详情面板。
 
-Because the `<sha>` is embedded, any installed Mac can be traced back to an exact source commit. There is no separate semantic-version line; the date ordering is the release ordering.
+由于 `<sha>` 被嵌入其中，任何已安装的 Mac 都能追溯到确切的源代码提交。没有单独的语义化版本号；日期排序即为发布排序。
 
 ## Verifying a build
 
-Run these against the downloaded `.pkg` and the installed app before trusting a build. All three should pass on any release artifact.
+在信任某个构建之前，对下载的 `.pkg` 和已安装的应用运行以下命令。所有三项在任何发布产物上都应通过。
 
 <Steps>
 <Step title="Confirm the app's signature and Team ID">
@@ -105,7 +105,7 @@ Run these against the downloaded `.pkg` and the installed app before trusting a 
 codesign -dv --verbose=4 /Applications/EDRApp.app
 ```
 
-Look for `Authority=Developer ID Application: Cybe Corporation (MVMB6LCP2A)`, `TeamIdentifier=MVMB6LCP2A`, the `runtime` flag in `CodeDirectory` (Hardened Runtime), and an `Identifier=Hilt.EDRApp`. Repeat against the nested extensions to confirm ESensor and NetFilter are independently signed:
+查找 `Authority=Developer ID Application: Cybe Corporation (MVMB6LCP2A)`、`TeamIdentifier=MVMB6LCP2A`、`CodeDirectory` 中的 `runtime` 标志（Hardened Runtime），以及 `Identifier=Hilt.EDRApp`。对嵌套扩展重复此操作，以确认 ESensor 和 NetFilter 都是独立签名的：
 
 ```bash
 codesign -dv --verbose=4 \
@@ -120,7 +120,7 @@ spctl --assess --type install --verbose=4 Hilt-EDR-v<YYYY.MM.DD>-<sha>.pkg
 spctl --assess --type execute --verbose=4 /Applications/EDRApp.app
 ```
 
-A trusted build reports `accepted` with `source=Notarized Developer ID`. A `rejected` result means the signature, notarization, or staple is missing or broken — do not install it.
+受信任的构建会报告 `accepted`，并附带 `source=Notarized Developer ID`。`rejected` 结果意味着签名、公证或附加的票据缺失或损坏——不要安装它。
 
 </Step>
 <Step title="Confirm the notarization ticket is stapled">
@@ -129,7 +129,7 @@ A trusted build reports `accepted` with `source=Notarized Developer ID`. A `reje
 stapler validate Hilt-EDR-v<YYYY.MM.DD>-<sha>.pkg
 ```
 
-`The validate action worked!` confirms the ticket is stapled, so Gatekeeper can verify the build without contacting Apple at install time.
+`The validate action worked!` 确认票据已附加，因此 Gatekeeper 无需在安装时联系 Apple 即可验证该构建。
 
 </Step>
 <Step title="Inspect the embedded entitlements (optional)">
@@ -139,28 +139,28 @@ codesign -d --entitlements - \
   /Applications/EDRApp.app/Contents/Library/SystemExtensions/Hilt.EDRApp.ESensor.systemextension
 ```
 
-The ESensor extension should show `com.apple.developer.endpoint-security.client` and **no** `com.apple.security.app-sandbox`. The host app should show `com.apple.developer.system-extension.install`.
+ESensor 扩展应显示 `com.apple.developer.endpoint-security.client`，且 **不含** `com.apple.security.app-sandbox`。宿主应用应显示 `com.apple.developer.system-extension.install`。
 
 </Step>
 </Steps>
 
-After install, confirm the extension actually loaded:
+安装后，确认扩展确实已加载：
 
 ```bash
 systemextensionsctl list
 ```
 
-Both `Hilt.EDRApp.ESensor` and `Hilt.EDRApp.NetFilter` should appear with state `activated enabled`. If ESensor shows `activated waiting for user` it is signed and notarized correctly but still needs approval and Full Disk Access — that is an install step, not an artifact problem.
+`Hilt.EDRApp.ESensor` 和 `Hilt.EDRApp.NetFilter` 都应显示，状态为 `activated enabled`。如果 ESensor 显示 `activated waiting for user`，则表示它已正确签名并公证，但仍需批准和 Full Disk Access——这是一个安装步骤，而非产物问题。
 
 ## What the artifact does NOT include
 
-- **No kernel extension (kext).** The collector is pure user-space System Extensions on Apple's modern frameworks. There is nothing to load into the kernel and no `*.kext` in the package.
-- **No tarball or container image.** macOS ships only the signed `.pkg`. There is no airgapped `docker save` bundle as on Linux; the universal `.pkg` already covers both Apple Silicon and Intel.
-- **No bundled MDM profiles.** The System Extensions and PPPC configuration profiles used for zero-click fleet rollout are delivered through your MDM, not inside the `.pkg`. See [Deploy via MDM](/zh/macos-collector/deploy-mdm) and [Deploy standalone (direct download)](/zh/macos-collector/deploy-standalone).
-- **No auto-update.** Self-update is not yet available on macOS (early access); upgrades are delivered as a new signed `.pkg`. On-device quarantine response is likewise not yet available.
+- **无内核扩展（kext）。** 采集器完全是运行在 Apple 现代框架之上的用户空间系统扩展。没有任何东西需要加载进内核，安装包中也没有 `*.kext`。
+- **无 tarball 或容器镜像。** macOS 仅发布签名的 `.pkg`。不存在 Linux 上那样的隔离网络 `docker save` 打包；通用 `.pkg` 已同时覆盖 Apple Silicon 和 Intel。
+- **无捆绑的 MDM 描述文件。** 用于零点击主机群部署的系统扩展与 PPPC 配置描述文件通过你的 MDM 交付，而非包含在 `.pkg` 内。参见 [Deploy via MDM](/zh/macos-collector/deploy-mdm) 和 [Deploy standalone (direct download)](/zh/macos-collector/deploy-standalone)。
+- **无自动更新。** macOS 上尚不支持自更新（早期访问）；升级以新的签名 `.pkg` 形式交付。设备端隔离响应同样尚不可用。
 
 ## Requirements
 
-- **macOS 13.0 (Ventura) or later.** Background Task Management persistence events (`btm_add`) require 13+.
-- **Universal binary:** Apple Silicon and Intel from the same `.pkg`.
-- **Status:** early access. The notarized `.pkg` with SIP-on install described here is the shipping model.
+- **macOS 13.0（Ventura）或更高版本。** 后台任务管理持久化事件（`btm_add`）需要 13+。
+- **通用二进制：** 同一个 `.pkg` 同时支持 Apple Silicon 和 Intel。
+- **状态：** 早期访问。此处描述的、在 SIP 开启下安装的经过公证的 `.pkg` 即为正式发布模式。

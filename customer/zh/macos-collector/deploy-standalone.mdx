@@ -1,92 +1,92 @@
 ---
 title: "独立部署（直接下载）"
 sidebarTitle: "独立部署"
-description: "Install the Hilt macOS Collector on a single Mac or small team with the notarized .pkg, no MDM: double-click install, one-time approve + Full Disk Access, and verification."
+description: "在单台 Mac 或小型团队上使用经过公证的 .pkg 安装 Hilt macOS 采集器，无需 MDM：双击安装、一次性审批 + Full Disk Access，以及验证。"
 ---
 
-The standalone path installs the macOS Collector from a notarized, Developer ID-signed `.pkg` on a single Mac without any MDM. It is the right choice for an individual machine, a pilot, or a small team where you do not yet have a managed device fleet. The package places **Hilt EDR** (`EDRApp.app`) into `/Applications` and registers a small forwarder `LaunchDaemon`; the user then performs a one-time, ~30-second approval of the system extension and grants it Full Disk Access.
+独立部署方式通过经过公证、以 Developer ID 签名的 `.pkg`，在单台 Mac 上安装 macOS 采集器，无需任何 MDM。它适用于单台机器、试点，或尚未拥有受管设备主机群的小型团队。安装包会将 **Hilt EDR**（`EDRApp.app`）放入 `/Applications`，并注册一个小型转发器 `LaunchDaemon`；随后用户执行一次约 30 秒的系统扩展审批，并为其授予 Full Disk Access。
 
-This works on a **normal, hardened Mac** — System Integrity Protection (SIP) stays **enabled**, there is no `csrutil disable`, no developer mode, and no Terminal required for the consents. That is possible because the app and its embedded extensions are signed with a Developer ID Application certificate, carry an embedded provisioning profile that authorizes the restricted Endpoint Security entitlement, use the Hardened Runtime, and are notarized and stapled by Apple. See [Architecture](/zh/macos-collector/networking-security) for the full entitlement and signing story.
+这在**正常、加固的 Mac** 上即可运行——System Integrity Protection (SIP) 保持**启用**，无需 `csrutil disable`、无需开发者模式，授权过程也无需使用终端。之所以能做到这一点，是因为该应用及其内嵌扩展使用 Developer ID Application 证书签名，携带内嵌的预置描述文件以授权受限的 Endpoint Security 权限（entitlement），使用 Hardened Runtime，并由 Apple 公证和装订（staple）。完整的权限与签名说明请参阅[架构](/zh/macos-collector/networking-security)。
 
 <Note>
-The macOS Collector is in **early access**. The notarized `.pkg` with SIP-on install described here is the target shipping model. For zero-click fleet rollout via Jamf, Kandji, or Intune, see [Deploy with MDM](/zh/macos-collector/deploy-mdm).
+macOS 采集器目前处于**早期访问**阶段。本文所述的经过公证、SIP 保持开启的 `.pkg` 安装方式是目标发布模型。若需通过 Jamf、Kandji 或 Intune 进行零点击的主机群部署，请参阅[使用 MDM 部署](/zh/macos-collector/deploy-mdm)。
 </Note>
 
-## Requirements
+## 要求
 
-| Requirement | Detail |
+| 要求 | 详情 |
 | :-- | :-- |
-| **macOS version** | 13.0 (Ventura) or later. BTM persistence events (`btm_add`) require macOS 13+. |
-| **Architecture** | Universal: Apple Silicon (arm64) and Intel (x86_64) in a single `.pkg`. |
-| **Admin rights** | An administrator account. The installer and the system-extension approval each require an authentication. |
-| **SIP** | Enabled (the default). No `csrutil disable`, no developer mode. |
-| **Outbound network** | HTTPS (443) to your configured Hilt `edr-collector` ingest endpoint. No inbound sockets. |
+| **macOS 版本** | 13.0 (Ventura) 或更高版本。BTM 持久化事件（`btm_add`）需要 macOS 13+。 |
+| **架构** | 通用：Apple Silicon (arm64) 与 Intel (x86_64) 打包于单个 `.pkg`。 |
+| **管理员权限** | 一个管理员账户。安装程序和系统扩展审批各需一次身份验证。 |
+| **SIP** | 启用（默认值）。无需 `csrutil disable`，无需开发者模式。 |
+| **出站网络** | 到已配置的 Hilt `edr-collector` 接入端点的 HTTPS (443)。无入站套接字。 |
 
-## Host resources
+## 主机资源
 
-The package installs a small, well-defined set of items on the host:
+安装包会在主机上安装一小组定义明确的项目：
 
-| Path | Purpose |
+| 路径 | 用途 |
 | :-- | :-- |
-| `/Applications/EDRApp.app` | The Hilt EDR app bundle. Hosts the two embedded system extensions (ESensor, NetFilter). |
-| `/Library/SystemExtensions/` | Where macOS stages and activates the approved extensions (managed by the OS, not the installer). |
-| `/Library/Application Support/Hilt/EDR/` | Runtime state, on-disk JSON-line event spool, and forwarder configuration. |
-| `/Library/LaunchDaemons/` (forwarder plist) | The forwarder `LaunchDaemon` that ships events over outbound HTTPS to the collector. |
+| `/Applications/EDRApp.app` | Hilt EDR 应用包。承载两个内嵌系统扩展（ESensor、NetFilter）。 |
+| `/Library/SystemExtensions/` | macOS 暂存和激活已审批扩展的位置（由操作系统管理，而非安装程序）。 |
+| `/Library/Application Support/Hilt/EDR/` | 运行时状态、磁盘上的 JSON 行事件缓冲，以及转发器配置。 |
+| `/Library/LaunchDaemons/`（转发器 plist） | 通过出站 HTTPS 将事件发送到采集器的转发器 `LaunchDaemon`。 |
 
-The two extensions delivered inside the app bundle are:
+应用包内交付的两个扩展为：
 
-| Extension | Type | Bundle id | Role |
+| 扩展 | 类型 | Bundle id | 角色 |
 | :-- | :-- | :-- | :-- |
-| **ESensor** | Endpoint Security (ES) system extension | `Hilt.EDRApp.ESensor` | Telemetry sensor: process, file, persistence, device, and signal events. Holds the restricted `com.apple.developer.endpoint-security.client` entitlement. |
-| **NetFilter** | NetworkExtension content-filter system extension | `Hilt.EDRApp.NetFilter` | Per-flow network attribution (outbound TCP flows with destination, ports, bytes, owning bundle id). |
+| **ESensor** | Endpoint Security (ES) 系统扩展 | `Hilt.EDRApp.ESensor` | 遥测传感器：进程、文件、持久化、设备和信号事件。持有受限的 `com.apple.developer.endpoint-security.client` 权限。 |
+| **NetFilter** | NetworkExtension 内容过滤系统扩展 | `Hilt.EDRApp.NetFilter` | 逐流网络归因（出站 TCP 流，包含目标、端口、字节数、所属 bundle id）。 |
 
-There is **no kernel extension (kext)**. Both components are pure user-space System Extensions on Apple's modern frameworks.
+**没有内核扩展 (kext)**。两个组件均为构建在 Apple 现代框架之上的纯用户态系统扩展。
 
-## Installation
+## 安装
 
-The standalone install is a double-click followed by two one-time consents. For the click-by-click walkthrough with the exact System Settings panes and screenshots, see [Install flow](/zh/macos-collector/install-flow); the summary below mirrors that procedure.
+独立安装即一次双击，随后进行两项一次性授权。逐步操作的详细图文教程（含确切的“系统设置”面板和截图）请参阅[安装流程](/zh/macos-collector/install-flow)；下方摘要与该流程一致。
 
 <Steps>
-  <Step title="Run the installer">
-    Double-click `Hilt-EDR-<version>.pkg` and follow the prompts. Authenticate with an administrator password when asked. The installer copies `EDRApp.app` into `/Applications` and registers the forwarder `LaunchDaemon`.
+  <Step title="运行安装程序">
+    双击 `Hilt-EDR-<version>.pkg` 并按提示操作。在要求时使用管理员密码进行身份验证。安装程序会将 `EDRApp.app` 复制到 `/Applications` 并注册转发器 `LaunchDaemon`。
   </Step>
-  <Step title="Open the app once">
-    Launch **Hilt EDR** from `/Applications` (or Spotlight). On first launch it requests activation of its system extension. Click **Open System Settings** (or **Allow**) when prompted.
+  <Step title="首次打开应用">
+    从 `/Applications`（或 Spotlight）启动 **Hilt EDR**。首次启动时它会请求激活其系统扩展。在提示时点击 **Open System Settings**（或 **Allow**）。
   </Step>
-  <Step title="Approve the system extension">
-    Go to **System Settings → General → Login Items & Extensions → Endpoint Security Extensions**, enable **ESensor**, and authenticate. This is the system-extension approval; SIP remains enabled throughout.
+  <Step title="审批系统扩展">
+    前往 **System Settings → General → Login Items & Extensions → Endpoint Security Extensions**，启用 **ESensor** 并进行身份验证。这就是系统扩展审批；整个过程中 SIP 始终保持启用。
   </Step>
-  <Step title="Grant Full Disk Access">
-    Go to **System Settings → Privacy & Security → Full Disk Access** and enable the **ESensor** entry, which appears automatically after step 3. It is listed as **ESensor / "Hilt EDR Sensor"**, **not** as "EDRApp".
+  <Step title="授予 Full Disk Access">
+    前往 **System Settings → Privacy & Security → Full Disk Access**，启用在第 3 步后自动出现的 **ESensor** 条目。它列为 **ESensor / “Hilt EDR Sensor”**，**而非** “EDRApp”。
   </Step>
 </Steps>
 
-That is the entire user experience: **approve the extension once, toggle Full Disk Access once.** No SIP changes, no developer mode, no Terminal.
+这就是全部的用户体验：**审批一次扩展，切换一次 Full Disk Access。** 无需更改 SIP，无需开发者模式，无需终端。
 
 <Note>
-**Full Disk Access is required.** Any third-party Endpoint Security client needs it, and the same is true for CrowdStrike, SentinelOne, and similar products. These two consents (system-extension approval and Full Disk Access) are Apple security requirements and **cannot** be suppressed without MDM — the user must physically authenticate at least once. If you need a fully silent, zero-click install, use [Deploy with MDM](/zh/macos-collector/deploy-mdm) instead.
+**Full Disk Access 是必需的。** 任何第三方 Endpoint Security 客户端都需要它，CrowdStrike、SentinelOne 及同类产品也是如此。这两项授权（系统扩展审批和 Full Disk Access）是 Apple 的安全要求，在没有 MDM 的情况下**无法**被抑制——用户必须至少亲自完成一次身份验证。如果你需要完全静默、零点击的安装，请改用[使用 MDM 部署](/zh/macos-collector/deploy-mdm)。
 </Note>
 
-## Configuration
+## 配置
 
-The forwarder reads its configuration from `/Library/Application Support/Hilt/EDR/`. The collector ships events to a single configured ingest endpoint and identifies the host by its human-readable Mac name (`device_name`). Relevant settings:
+转发器从 `/Library/Application Support/Hilt/EDR/` 读取其配置。采集器将事件发送到单个已配置的接入端点，并以人类可读的 Mac 名称（`device_name`）标识主机。相关设置：
 
-| Setting | Purpose |
+| 设置 | 用途 |
 | :-- | :-- |
-| Ingest endpoint | The HTTPS URL of your Hilt `edr-collector` (for example `https://<name>-ingest.hilt.ai`). |
-| Device name | Defaults to the Mac's host name; surfaces as `device_name` on every event. |
+| 接入端点 | 你的 Hilt `edr-collector` 的 HTTPS URL —— 由你的客户团队提供的负载均衡器 DNS 地址（转发器会自动追加 `/ingest`）。它与 Linux 采集器的 `-ingest.hilt.ai` PrivateLink 主机是不同的端点。 |
+| 设备名称 | 默认为 Mac 的主机名；在每个事件上以 `device_name` 呈现。 |
 
-ESensor emits events as JSON lines, which the forwarder `LaunchDaemon` ships over outbound HTTPS to the `edr-collector`. The collector routes events to MSK Kafka topics (`dag.endpoint.exec`, `dag.endpoint.file`, `dag.endpoint.net`), the enrichment service processes them with `ENRICH_PLATFORM=macos`, and they land in the ClickHouse `endpoint_events` table. See [Data flow](/zh/macos-collector/data-flow) for the full pipeline.
+ESensor 以 JSON 行的形式发出事件，转发器 `LaunchDaemon` 通过出站 HTTPS 将其发送到 `edr-collector`。采集器将事件路由到 MSK Kafka 主题（`dag.endpoint.exec`、`dag.endpoint.file`、`dag.endpoint.net`），扩充服务以 `ENRICH_PLATFORM=macos` 处理它们，最终它们落入 ClickHouse 的 `endpoint_events` 表。完整管道请参阅[数据流](/zh/macos-collector/data-flow)。
 
-## Verification
+## 验证
 
-After approving the extension, confirm ESensor is activated and enabled:
+审批扩展后，确认 ESensor 已激活并启用：
 
 ```bash
 systemextensionsctl list
 ```
 
-Expected output includes the ESensor extension in the `[activated enabled]` state:
+预期输出应包含处于 `[activated enabled]` 状态的 ESensor 扩展：
 
 ```text
 1 extension(s)
@@ -95,50 +95,50 @@ enabled	active	teamID	bundleID (version)	name	[state]
 *	*	MVMB6LCP2A	Hilt.EDRApp.ESensor (<version>)	ESensor	[activated enabled]
 ```
 
-Confirm the forwarder `LaunchDaemon` is loaded and running:
+确认转发器 `LaunchDaemon` 已加载并正在运行：
 
 ```bash
 sudo launchctl list | grep -i hilt
 ```
 
-Finally, verify the host appears in the dashboard. Within a minute or two of activation the Mac shows up in the [Collectors](/zh/dashboard/collectors) fleet with a **macOS** host-type badge, and its events become queryable in the Investigate, Networks, Files, and Users views.
+最后，验证主机是否出现在仪表盘中。激活后一两分钟内，该 Mac 会带着 **macOS** 主机类型徽章出现在 [Collectors](/zh/dashboard/collectors) 主机群中，其事件在 Investigate、Networks、Files 和 Users 视图中变得可查询。
 
 <Note>
-If `systemextensionsctl list` shows ESensor as `[activated waiting for user]`, the extension has not yet been approved — return to **System Settings → General → Login Items & Extensions → Endpoint Security Extensions** and enable ESensor. If the sensor activates but no events reach the dashboard, confirm Full Disk Access is granted to ESensor and that outbound HTTPS (443) to your ingest endpoint is permitted.
+如果 `systemextensionsctl list` 将 ESensor 显示为 `[activated waiting for user]`，则该扩展尚未被审批——请返回 **System Settings → General → Login Items & Extensions → Endpoint Security Extensions** 并启用 ESensor。如果传感器已激活但没有事件到达仪表盘，请确认已向 ESensor 授予 Full Disk Access，并且允许到你的接入端点的出站 HTTPS (443)。
 </Note>
 
-## What this install does not do
+## 此安装不会做的事
 
-- **No SIP changes.** It never runs `csrutil disable` and never enables developer mode; SIP stays enabled.
-- **No kernel extension.** Both components are user-space System Extensions; nothing loads into the kernel.
-- **No inbound listener and no phone-home.** The only network egress is outbound HTTPS to your configured ingest endpoint.
-- **No file contents.** ESensor captures event metadata (paths, signing identity, attribution), not the contents of files.
-- **No arbitrary blocking or quarantine response.** Telemetry is overwhelmingly NOTIFY; a small AUTH self-protection set denies unauthorized tampering with the agent in-kernel (see [Event coverage](/zh/macos-collector/event-coverage)). Console-driven on-device quarantine response is not yet available on macOS (early access).
-- **No auto-update.** Upgrades are performed by re-running a newer `.pkg`; in-place auto-update is not yet available on macOS.
+- **不更改 SIP。** 它绝不运行 `csrutil disable`，也绝不启用开发者模式；SIP 保持启用。
+- **无内核扩展。** 两个组件均为用户态系统扩展；不会有任何东西加载到内核中。
+- **无入站监听器，也不回连（phone-home）。** 唯一的网络出口是到你已配置的接入端点的出站 HTTPS。
+- **不采集文件内容。** ESensor 捕获事件元数据（路径、签名身份、归因），而非文件内容。
+- **无任意阻断或隔离响应。** 遥测绝大多数为 NOTIFY；一小组 AUTH 自保护会在内核中拒绝对代理的未授权篡改（参阅[事件覆盖](/zh/macos-collector/event-coverage)）。由控制台驱动的设备端隔离响应在 macOS 上尚不可用（早期访问）。
+- **无自动更新。** 升级通过重新运行更新版的 `.pkg` 来完成；macOS 上尚不支持原地自动更新。
 
-## Upgrade
+## 升级
 
-Because the app and extension are signed with the same Team ID (`MVMB6LCP2A`), an upgrade does **not** require re-approval — the existing system-extension approval and Full Disk Access grant carry over, and `launchd` relaunches the new extension build automatically.
+由于应用和扩展使用相同的 Team ID（`MVMB6LCP2A`）签名，升级**无需**重新审批——现有的系统扩展审批和 Full Disk Access 授权会延续，`launchd` 会自动重新启动新的扩展构建。
 
 <Steps>
-  <Step title="Quit the app">
-    Quit **Hilt EDR** if it is running.
+  <Step title="退出应用">
+    如果 **Hilt EDR** 正在运行，请退出它。
   </Step>
-  <Step title="Run the new package">
-    Double-click the newer `Hilt-EDR-<version>.pkg` and authenticate. It replaces `EDRApp.app` in `/Applications` in place.
+  <Step title="运行新的安装包">
+    双击更新版的 `Hilt-EDR-<version>.pkg` 并进行身份验证。它会原地替换 `/Applications` 中的 `EDRApp.app`。
   </Step>
-  <Step title="Confirm the new build">
-    Run `systemextensionsctl list` and confirm ESensor shows the new version in the `[activated enabled]` state.
+  <Step title="确认新构建">
+    运行 `systemextensionsctl list` 并确认 ESensor 以 `[activated enabled]` 状态显示新版本。
   </Step>
 </Steps>
 
 <Note>
-**macOS major upgrades.** Full Disk Access grants can occasionally reset across a major macOS upgrade (a known TCC behavior). On a standalone Mac you may need to re-toggle Full Disk Access for ESensor once after such an upgrade. MDM-managed hosts have this re-applied automatically via PPPC — see [Deploy with MDM](/zh/macos-collector/deploy-mdm).
+**macOS 大版本升级。** Full Disk Access 授权偶尔会在 macOS 大版本升级时被重置（一种已知的 TCC 行为）。在独立 Mac 上，此类升级后你可能需要为 ESensor 重新切换一次 Full Disk Access。受 MDM 管理的主机会通过 PPPC 自动重新应用此项——参阅[使用 MDM 部署](/zh/macos-collector/deploy-mdm)。
 </Note>
 
-## Uninstall
+## 卸载
 
-Deactivate the system extension and remove the installed components:
+停用系统扩展并移除已安装的组件：
 
 ```bash
 # Deactivate the ES system extension (requires the app to request deactivation)
@@ -150,8 +150,8 @@ sudo rm -rf /Applications/EDRApp.app
 sudo rm -rf "/Library/Application Support/Hilt/EDR"
 ```
 
-After deactivation, remove the stale **ESensor** entries from **System Settings → Privacy & Security → Full Disk Access** and from **Login Items & Extensions → Endpoint Security Extensions**. No reboot is required.
+停用后，从 **System Settings → Privacy & Security → Full Disk Access** 和 **Login Items & Extensions → Endpoint Security Extensions** 中移除过时的 **ESensor** 条目。无需重启。
 
 <Note>
-System Extensions are deactivated through the system-extension lifecycle, not by deleting files alone. Use the app's uninstall action (or its deactivation request) so macOS removes the extension from `/Library/SystemExtensions/`; removing only the app bundle can leave a deactivated-but-staged extension behind.
+系统扩展是通过系统扩展生命周期停用的，而非仅靠删除文件。请使用应用的卸载操作（或其停用请求），以便 macOS 从 `/Library/SystemExtensions/` 中移除该扩展；仅移除应用包可能会遗留一个已停用但仍暂存的扩展。
 </Note>

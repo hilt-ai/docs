@@ -59,7 +59,7 @@ This works because the restricted Endpoint Security entitlement (`com.apple.deve
 | **Notarization** | Notarized and stapled by Apple |
 | **App Sandbox** | **Not** used on the ES extension — sandboxing makes `es_new_client` fail with `ERR_NOT_PERMITTED` |
 
-With SIP on, the kernel's trusted-execution (AMFI) layer only honors the ES entitlement when an Apple-issued provisioning profile that allowlists it is embedded in a properly signed, notarized bundle. The Collector satisfies all of those conditions, so it is a fully trusted Endpoint Security client on a stock, locked-down Mac. For the full entitlement and signing story, see [Architecture](/macos-collector/networking-security).
+With SIP on, the kernel's trusted-execution (AMFI) layer only honors the ES entitlement when an Apple-issued provisioning profile that allowlists it is embedded in a properly signed, notarized bundle. The Collector satisfies all of those conditions, so it is a fully trusted Endpoint Security client on a stock, locked-down Mac. For the full entitlement and signing story, see [Networking and trust model](/macos-collector/networking-security).
 
 <Note>
 Notarization satisfies Gatekeeper's signature and malware check — it does **not** activate the extension. The user (or MDM) still has to approve the System Extension and grant Full Disk Access. See [Install](/macos-collector/install-flow).

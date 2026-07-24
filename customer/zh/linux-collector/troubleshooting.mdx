@@ -27,7 +27,7 @@ kubectl describe pod -l app=dag-agent
 
 1. 使用 `getent hosts` 验证节点上的 DNS 解析。如果该域名无法解析，可能是缺少私有 Route 53 关联。
 2. 确认连通性。如果请求挂起，请检查 PrivateLink 安全组是否允许来自该节点所在安全组的流量。
-3. 确保所配置的 URL 正确：只应使用基础域名，不要附加任何路径。
+3. 确保所配置的 URL 正确：它必须包含 `/ingest` 路径（例如 `https://<name>-ingest.hilt.ai/ingest`）。采集器会将遥测**原样** POST 到 `DAG_SHIP_URL` —— 仅有域名而没有路径会把事件发送到错误位置，通常返回 404/405。
 
 ## 环形缓冲区丢弃计数偏高
 

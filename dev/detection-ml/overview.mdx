@@ -57,7 +57,7 @@ See [Inference](/detection-ml/inference) for the poll loop and scoring path, and
 
 Before ML runs, **dag-enrichment** builds two inputs per host per 5-minute epoch:
 
-- **Numeric features and statistical baselines** (20-D vector, z-scores over rolling windows) to `dag_anomaly_scores` and thresholded rows to `dag_anomaly_alerts` via [`internal/scoring/`](https://github.com/hilt-ai/dag-enrichment/tree/dev/internal/scoring) — this is a first-class detection leg, not just preprocessing for TRACE
+- **Numeric features and statistical baselines** (24 raw + 32 derived features and 21 per-feature z-scores over rolling windows) to `dag_anomaly_scores` and thresholded rows to `dag_anomaly_alerts` via [`internal/scoring/`](https://github.com/hilt-ai/dag-enrichment/tree/dev/internal/scoring) — this is a first-class detection leg, not just preprocessing for TRACE
 - **Token sequences** to `dag_epoch_tokens` via [`internal/features/token_writer.go`](https://github.com/hilt-ai/dag-enrichment/blob/dev/internal/features/token_writer.go)
 
 TRACE fuses token embeddings with the numeric vector from enrichment. ML polls `dag_anomaly_scores` for new epochs; it does not recompute enrichment features.
@@ -97,6 +97,6 @@ Deep dives: [TRACE docs index](https://github.com/hilt-ai/dag-detectionML/blob/d
 
 ## Customer docs (operator view)
 
-- [Detection Accuracy](https://docs.hilt.ai/dashboard/detection-accuracy): cold start, severity, confidence
+- [Detection Accuracy](https://docs.hilt.ai/dashboard/anomalies): cold start, severity, confidence
 - [Anomalies](https://docs.hilt.ai/dashboard/anomalies): triage workflow
 - [Model Lifecycle](https://docs.hilt.ai/on-prem/model-lifecycle): promotion and rollback

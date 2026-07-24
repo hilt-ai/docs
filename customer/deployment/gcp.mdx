@@ -12,7 +12,7 @@ Hilt runs as a single-tenant platform inside your own GCP project. A managed GKE
 
 | Service | Role |
 | :-- | :-- |
-| GKE | Managed Kubernetes for platform services |
+| GKE | Managed Kubernetes for platform services, including the in-cluster ClickHouse analytics database |
 | Pub/Sub | Event streaming |
 | Private Service Connect | Private ingest endpoint |
 | Cloud Storage | Long-term storage and data exports |
@@ -37,4 +37,4 @@ Hilt provisions your GCP deployment using Terraform. The typical process:
 1. You provide a target GCP project with the agreed IAM permissions
 2. Hilt applies the Terraform configuration to create all infrastructure (GKE, Pub/Sub, Cloud SQL, Cloud Storage, Private Service Connect, and networking)
 3. Private Service Connect connectivity is established between your workload VPCs and the platform VPC
-4. Collectors are deployed to your hosts using the guides in this documentation
+4. Collectors are deployed to your hosts using the [Linux](/linux-collector/layout) and [macOS](/macos-collector/layout) collector guides

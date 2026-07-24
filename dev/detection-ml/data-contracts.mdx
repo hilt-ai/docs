@@ -28,7 +28,7 @@ flowchart LR
 
 | Table | Writer | Reader | Purpose |
 | --- | --- | --- | --- |
-| `dag_anomaly_scores` | enrichment | ML poll, backend | 20-D features + z-scores per host/epoch (statistical ensemble leg) |
+| `dag_anomaly_scores` | enrichment | ML poll, backend | 24 raw + 32 derived features and 21 per-feature z-scores per host/epoch, as named columns (statistical ensemble leg) |
 | `dag_anomaly_alerts` | enrichment | backend | Thresholded statistical anomalies per host/epoch |
 | `dag_epoch_tokens` | enrichment | ML + backend | Token arrays and evidence |
 | `dag_trace_scores` | ML | backend, frontend | TRACE findings (ML ensemble leg) |

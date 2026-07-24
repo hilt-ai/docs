@@ -1,105 +1,105 @@
 ---
 title: "配置参考"
 sidebarTitle: "配置"
-description: "Environment variables, on-disk paths, host identity, and MDM-delivered configuration for the Hilt macOS Collector."
+description: "Hilt macOS 采集器的环境变量、磁盘路径、主机身份以及由 MDM 下发的配置。"
 ---
 
-The Hilt macOS Collector ("Hilt EDR", bundle `EDRApp.app`) is configured by environment, not by a hand-edited config file. The two Apple System Extensions it embeds — **ESensor** (Endpoint Security telemetry) and **NetFilter** (per-flow network attribution) — derive their behavior from the signed app bundle and the system policy delivered by [MDM](#mdm-delivered-configuration). The only operator-tunable surface is the **forwarder** LaunchDaemon, which reads three environment variables and ships the sensor's telemetry over outbound HTTPS to your Hilt `edr-collector`.
+Hilt macOS 采集器（"Hilt EDR"，bundle `EDRApp.app`）通过环境进行配置，而非手动编辑配置文件。它内嵌两个 Apple 系统扩展——**ESensor**（Endpoint Security 遥测）和 **NetFilter**（逐流网络归因）——它们的行为由已签名的应用 bundle 以及经由 [MDM](#mdm-delivered-configuration) 下发的系统策略决定。运维人员唯一可调的部分是 **转发器** LaunchDaemon，它读取三个环境变量，并将传感器的遥测通过出站 HTTPS 发送到你的 Hilt `edr-collector`。
 
-There is no CLI wizard and no `csrutil disable`: the collector runs on a normal, hardened Mac with **System Integrity Protection (SIP) enabled**. See [System requirements](/zh/macos-collector/system-requirements) for why.
+这里没有 CLI 向导，也无需 `csrutil disable`：采集器运行在一台常规的、经过加固的 Mac 上，并**启用了系统完整性保护（SIP）**。有关原因，请参阅 [系统要求](/zh/macos-collector/system-requirements)。
 
 ## Forwarder settings
 
-The forwarder is the only component with runtime configuration. It is set at install time and injected into the `com.hilt.edr.forwarder` LaunchDaemon. On a [standalone install](/zh/macos-collector/deploy-standalone) you pass these as environment variables to the installer; on an [MDM-managed install](/zh/macos-collector/deploy-mdm) the packaged forwarder ships with the destination baked in.
+转发器是唯一具有运行时配置的组件。它在安装时设定，并注入到 `com.hilt.edr.forwarder` LaunchDaemon 中。在[独立安装](/zh/macos-collector/deploy-standalone)时，你将这些参数作为环境变量传给安装程序；在[MDM 托管安装](/zh/macos-collector/deploy-mdm)时，打包后的转发器已内置了目标地址。
 
 | Env var | Default | Purpose |
 | :-- | :-- | :-- |
-| `EDR_COLLECTOR_URL` | `http://127.0.0.1:8080` | Base URL of your Hilt `edr-collector`. The forwarder POSTs batches to `${EDR_COLLECTOR_URL}/ingest`. This is the macOS analogue of the Linux collector's `DAG_SHIP_URL`. A trailing slash is trimmed automatically. |
-| `EDR_FINDINGS_FILE` | `/Library/Application Support/Hilt/EDR/findings.ndjson` | The sensor's telemetry output file (NDJSON, one event per line). The forwarder tails this file; ESensor writes it. |
-| `EDR_SPOOL_FILE` | `forwarder-spool.ndjson` alongside the findings file | Offline spool. When the collector is unreachable, batches are written here and drained on reconnect. |
+| `EDR_COLLECTOR_URL` | `http://127.0.0.1:8080` | 你的 Hilt `edr-collector` 的基础 URL。转发器将批次 POST 到 `${EDR_COLLECTOR_URL}/ingest`。这是 Linux 采集器 `DAG_SHIP_URL` 在 macOS 上的对应项。结尾的斜杠会被自动去除。 |
+| `EDR_FINDINGS_FILE` | `/Library/Application Support/Hilt/EDR/findings.ndjson` | 传感器的遥测输出文件（NDJSON，每行一个事件）。转发器 tail 此文件；ESensor 写入此文件。 |
+| `EDR_SPOOL_FILE` | `forwarder-spool.ndjson` alongside the findings file | 离线缓冲队列。当采集器不可达时，批次会写入此处，并在重新连接后排空发送。 |
 
 <Note>
-`EDR_COLLECTOR_URL` is **not hardcoded**. If it is left unset, the forwarder defaults to `http://127.0.0.1:8080`, which only works for local testing. A real deployment must point it at your account's `edr-collector` ingest endpoint — for example the edge Network Load Balancer DNS name. Roaming Macs reach this endpoint over the public internet; no VPN is required.
+`EDR_COLLECTOR_URL` **并非硬编码**。若未设置，转发器默认使用 `http://127.0.0.1:8080`，该地址仅适用于本地测试。真实部署必须将其指向你账户的 `edr-collector` 摄取端点——例如边缘网络负载均衡器（NLB）的 DNS 名称。漫游的 Mac 通过公共互联网访问该端点；无需 VPN。
 </Note>
 
 ### Ingest behavior
 
-The forwarder is a dumb shipper: it tails the findings file, batches events, and POSTs them in the same wire envelope the Linux DLP agent uses, stamped `machine.host_type = "macos"` so enrichment routes and normalizes per platform.
+转发器是一个"简单发送器"：它 tail 发现项文件、将事件成批打包，并用与 Linux DLP 代理相同的传输信封 POST 出去，并标记 `machine.host_type = "macos"`，以便富化流程按平台路由和规范化。
 
 | Property | Value |
 | :-- | :-- |
 | Endpoint | `POST ${EDR_COLLECTOR_URL}/ingest` |
-| Transport | Outbound HTTPS (the only network destination) |
-| Batch size | Up to 500 events per POST (the collector's hard cap is 5000 / 10 MB) |
-| Flush interval | Every 2 seconds, or when a batch fills |
-| Agent version header | `X-DAG-Agent-Version: 1.1.0` (the collector requires ≥ 1.1.0) |
-| Request timeout | 15 seconds |
-| Offline spool cap | 64 MB; oldest backlog is dropped past the cap |
-| Spool drain | Every 5 seconds while a spool file exists |
+| Transport | 出站 HTTPS（唯一的网络目的地） |
+| Batch size | 每次 POST 最多 500 个事件（采集器的硬上限为 5000 / 10 MB） |
+| Flush interval | 每 2 秒一次，或在批次填满时 |
+| Agent version header | `X-DAG-Agent-Version: 1.1.0`（采集器要求 ≥ 1.1.0） |
+| Request timeout | 15 秒 |
+| Offline spool cap | 64 MB；超过上限时丢弃最旧的积压数据 |
+| Spool drain | 只要缓冲文件存在，每 5 秒排空一次 |
 
-Only telemetry lines (those carrying an `hdr` envelope) are shipped; stray finding or heartbeat lines are ignored so the collector never rejects a batch. The forwarder persists a byte offset next to the findings file (`findings.ndjson.offset`) so a restart resumes exactly where it left off — no re-shipping, no skipped startup burst.
+只有遥测行（携带 `hdr` 信封的行）会被发送；零散的发现项或心跳行会被忽略，因此采集器绝不会拒绝某个批次。转发器在发现项文件旁持久化一个字节偏移量（`findings.ndjson.offset`），因此重启后可精确地从上次停止之处恢复——不会重复发送，也不会跳过启动时的突发数据。
 
 ## Host identity
 
-Every macOS event is tagged with the host's identity so it can be correlated across the fleet and surfaced in the dashboard. Unlike the Linux collector — where you set a node label explicitly via `DAG_NODE_ID` — the macOS collector derives its human-readable name **automatically** from the Mac itself.
+每个 macOS 事件都会打上主机身份的标记，以便在整个机群中进行关联并在仪表盘中呈现。与 Linux 采集器不同——那里你要通过 `DAG_NODE_ID` 显式设置节点标签——macOS 采集器**自动**从 Mac 本身派生其可读名称。
 
 | Field | Source | Shown in dashboard |
 | :-- | :-- | :-- |
-| `device_name` | The Mac's **ComputerName** (System Settings > General > About > Name), resolved on-device | The human host name in Collectors, Investigate, and Networks/Files/Users views |
-| `host_id` | A stable per-host UUID generated at install and carried on every event | The canonical fleet identifier; the Kafka partition key |
-| `host_type` | Always `macos` (stamped by the forwarder) | The macOS host-type badge in the Collectors fleet |
-| `boot_id` | The current boot session UUID | Provenance / session continuity |
+| `device_name` | Mac 的 **ComputerName**（系统设置 > 通用 > 关于本机 > 名称），在设备端解析 | Collectors、Investigate 以及 Networks/Files/Users 视图中显示的可读主机名 |
+| `host_id` | 安装时生成、并随每个事件携带的稳定的逐主机 UUID | 机群的规范标识符；Kafka 分区键 |
+| `host_type` | 始终为 `macos`（由转发器标记） | Collectors 机群中的 macOS 主机类型徽章 |
+| `boot_id` | 当前引导会话的 UUID | 溯源 / 会话连续性 |
 
-`host_id` is the partition key the `edr-collector` uses (an FNV-64a hash of `host_id`), so a given Mac always lands on one Kafka partition and its events stay ordered. `device_name` is a per-event field, not a partition key — renaming the Mac updates the display name without disturbing event ordering.
+`host_id` 是 `edr-collector` 使用的分区键（对 `host_id` 取 FNV-64a 哈希），因此某一台 Mac 始终落在同一个 Kafka 分区上，其事件保持有序。`device_name` 是逐事件字段，而非分区键——重命名 Mac 会更新显示名称，而不会扰乱事件顺序。
 
 <Note>
-`device_name` follows the macOS ComputerName, not the network hostname. If you rename the Mac in System Settings, new events carry the new name automatically; there is no agent setting to override it.
+`device_name` 跟随 macOS 的 ComputerName，而非网络主机名。如果你在系统设置中重命名 Mac，新的事件会自动携带新名称；没有可覆盖它的代理设置。
 </Note>
 
 ## On-disk layout
 
-The standalone `.pkg` installs the app into `/Applications`; the System Extensions are activated from inside the bundle, and the forwarder's working files live under Application Support.
+独立 `.pkg` 会将应用安装到 `/Applications`；系统扩展从 bundle 内部激活，转发器的工作文件则位于 Application Support 下。
 
 | Path | Purpose |
 | :-- | :-- |
-| `/Applications/EDRApp.app` | The notarized "Hilt EDR" app bundle (embeds ESensor + NetFilter) |
-| `/Library/Application Support/Hilt/EDR/findings.ndjson` | Sensor telemetry output (the forwarder's input) — overridable via `EDR_FINDINGS_FILE` |
-| `/Library/Application Support/Hilt/EDR/findings.ndjson.offset` | Persisted tail offset for restart-safe resume |
-| `/Library/Application Support/Hilt/EDR/forwarder-spool.ndjson` | Offline spool — overridable via `EDR_SPOOL_FILE` |
-| `com.hilt.edr.forwarder` LaunchDaemon | Runs the forwarder with `EDR_COLLECTOR_URL` injected; `RunAtLoad` + `KeepAlive` |
+| `/Applications/EDRApp.app` | 经过公证的"Hilt EDR"应用 bundle（内嵌 ESensor + NetFilter） |
+| `/Library/Application Support/Hilt/EDR/findings.ndjson` | 传感器遥测输出（转发器的输入）——可通过 `EDR_FINDINGS_FILE` 覆盖 |
+| `/Library/Application Support/Hilt/EDR/findings.ndjson.offset` | 持久化的 tail 偏移量，用于重启后安全恢复 |
+| `/Library/Application Support/Hilt/EDR/forwarder-spool.ndjson` | 离线缓冲队列——可通过 `EDR_SPOOL_FILE` 覆盖 |
+| `com.hilt.edr.forwarder` LaunchDaemon | 以注入的 `EDR_COLLECTOR_URL` 运行转发器；`RunAtLoad` + `KeepAlive` |
 
-The System Extensions themselves are managed by macOS (`systemextensionsctl`), not by a LaunchDaemon — the OS launches and supervises them once the extension is approved.
+系统扩展本身由 macOS（`systemextensionsctl`）管理，而非由 LaunchDaemon 管理——一旦扩展获得批准，操作系统便会启动并监管它们。
 
 ## MDM-delivered configuration
 
-For zero-touch fleets, the collector's *system policy* is delivered by MDM rather than by hand. These profiles are what make a silent, no-prompt install possible; they configure macOS to trust and pre-authorize the collector, and are separate from the forwarder's `EDR_COLLECTOR_URL` (which is baked into the packaged forwarder for the managed path). See [Deploy via MDM](/zh/macos-collector/deploy-mdm) for the full procedure.
+对于零接触机群，采集器的*系统策略*由 MDM 下发，而非手动配置。正是这些描述文件使静默、无提示的安装成为可能；它们将 macOS 配置为信任并预授权采集器，并且与转发器的 `EDR_COLLECTOR_URL` 相互独立（在托管路径下，该地址已内置进打包后的转发器中）。完整流程请参阅 [通过 MDM 部署](/zh/macos-collector/deploy-mdm)。
 
 | Profile payload | Identifier | Setting | Enrollment requirement |
 | :-- | :-- | :-- | :-- |
-| System Extensions policy | `com.apple.system-extension-policy` | `AllowedTeamIdentifiers = MVMB6LCP2A` | MDM enrollment (UAMDM) |
-| PPPC (Privacy Preferences Policy Control) | `com.apple.TCC.configuration-profile-policy` | `SystemPolicyAllFiles = Allow` | Supervision |
+| System Extensions policy | `com.apple.system-extension-policy` | `AllowedTeamIdentifiers = MVMB6LCP2A` | MDM 注册（UAMDM） |
+| PPPC (Privacy Preferences Policy Control) | `com.apple.TCC.configuration-profile-policy` | `SystemPolicyAllFiles = Allow` | 受监管（Supervision） |
 
-- The **System Extensions policy** auto-approves the ESensor and NetFilter extensions by Team ID (`MVMB6LCP2A`, Cybe Corporation), so the user never sees the "extension was blocked" prompt. This requires the Mac to be MDM-enrolled (UAMDM); it does **not** require supervision.
-- The **PPPC profile** pre-grants Full Disk Access to the ESensor extension (`SystemPolicyAllFiles = Allow`), which every Endpoint Security client requires to read protected paths. Pre-granting FDA by profile **does** require the device to be supervised.
+- **系统扩展策略**按 Team ID（`MVMB6LCP2A`，Cybe Corporation）自动批准 ESensor 和 NetFilter 扩展，因此用户永远不会看到"扩展已被阻止"的提示。这要求 Mac 已完成 MDM 注册（UAMDM）；但**不**要求受监管。
+- **PPPC 描述文件**为 ESensor 扩展预先授予完全磁盘访问权限（`SystemPolicyAllFiles = Allow`），每个 Endpoint Security 客户端都需要该权限来读取受保护的路径。通过描述文件预授予 FDA **确实**要求设备处于受监管状态。
 
 <Note>
-Full Disk Access is **required** for the Endpoint Security client to function. On a [standalone install](/zh/macos-collector/deploy-standalone) the user grants it manually in System Settings > Privacy & Security > Full Disk Access — the entry appears as **ESensor** ("Hilt EDR Sensor"), not "EDRApp". The MDM PPPC profile grants the same thing automatically.
+Endpoint Security 客户端要正常工作，**必须**拥有完全磁盘访问权限。在[独立安装](/zh/macos-collector/deploy-standalone)时，用户需在 系统设置 > 隐私与安全性 > 完全磁盘访问权限 中手动授予——该条目显示为 **ESensor**（"Hilt EDR Sensor"），而非"EDRApp"。MDM PPPC 描述文件会自动授予同样的权限。
 </Note>
 
 ## What the configuration does not control
 
-The macOS Collector deliberately exposes a narrow configuration surface. The following are fixed by design and are **not** settings:
+macOS 采集器有意暴露一个很窄的配置面。以下各项在设计上是固定的，**不是**可配置项：
 
-- **No inbound listener.** There is no port to open, no bind address, no phone-home. The only network activity is the forwarder's outbound HTTPS POST to `EDR_COLLECTOR_URL`.
-- **No SIP or developer-mode toggle.** The collector runs with SIP enabled because the app and extensions are Developer ID-signed, carry an embedded provisioning profile for the Endpoint Security entitlement, use the Hardened Runtime, and are notarized and stapled by Apple. There is nothing to disable.
-- **No kernel extension to load.** The collector is pure user-space System Extensions on Apple's modern frameworks. There is no kext, no `kextload`, no approval of a legacy KEXT.
-- **No sampling or rule configuration on-device.** Userspace event filtering (chiefly the high-volume `file_open` events, which dominate at ~95%+) is built into the sensor, not a tunable. Detection and scoring happen downstream in enrichment, not on the Mac.
-- **No event-content toggles.** The collector captures metadata only — process, file, and network event headers plus code-signing and application attribution fields. It never captures file contents, packet payloads, memory, or credentials.
+- **没有入站监听器。** 无需开放端口、无绑定地址、无回连。唯一的网络活动是转发器向 `EDR_COLLECTOR_URL` 发出的出站 HTTPS POST。
+- **没有 SIP 或开发者模式开关。** 采集器在启用 SIP 的情况下运行，因为应用和扩展经过 Developer ID 签名、携带用于 Endpoint Security 授权项的内嵌配置描述文件、使用了 Hardened Runtime，并由 Apple 公证和装订（stapled）。没有任何需要关闭的东西。
+- **没有需要加载的内核扩展。** 采集器是纯用户空间的系统扩展，构建于 Apple 的现代框架之上。没有 kext、没有 `kextload`、也无需批准任何旧式 KEXT。
+- **设备端没有采样或规则配置。** 用户空间的事件过滤（主要是高频的 `file_open` 事件，占比约 95%+）内置于传感器中，不可调。异常评分与严重性判定在下游的富化阶段进行；设备端唯一的强制措施是固定的 ESensor AUTH 自我保护集，它在内核中拒绝对采集器的篡改。
+- **没有事件内容开关。** 采集器仅捕获元数据——进程、文件和网络事件头，以及代码签名和应用归因字段。它从不捕获文件内容、数据包负载、内存或凭据。
 
 ## See also
 
-- [Deploy a standalone install](/zh/macos-collector/deploy-standalone) — the direct-download `.pkg` path and its two one-time approvals.
-- [Deploy via MDM](/zh/macos-collector/deploy-mdm) — zero-click rollout with the two configuration profiles above.
-- [System requirements](/zh/macos-collector/system-requirements) — macOS 13.0+, Apple Silicon + Intel, and the SIP-enabled signing story.
-- [Networking and security](/zh/macos-collector/networking-security) — the outbound-only posture and the collector → MSK narrow door.
-- [Event data model](/zh/macos-collector/event-data-model) — what each event captures, including the code-signing trust and application-attribution fields unique to macOS.
+- [部署独立安装](/zh/macos-collector/deploy-standalone) — 直接下载的 `.pkg` 路径及其两次一次性批准。
+- [通过 MDM 部署](/zh/macos-collector/deploy-mdm) — 使用上述两个配置描述文件的零点击推广。
+- [系统要求](/zh/macos-collector/system-requirements) — macOS 13.0+、Apple Silicon + Intel，以及启用 SIP 的签名机制。
+- [网络与安全](/zh/macos-collector/networking-security) — 仅出站的安全态势以及采集器 → MSK 的窄通道。
+- [事件数据模型](/zh/macos-collector/event-data-model) — 每个事件捕获的内容，包括 macOS 独有的代码签名信任与应用归因字段。

@@ -4,7 +4,7 @@ sidebarTitle: "Google Workspace"
 description: "连接 Google Workspace 目录，让 Hilt 对照员工花名册衡量安装覆盖率。"
 ---
 
-连接 Google Workspace 后，Hilt 可同步你的目录，并显示哪些用户已安装 Agent。配置使用带有全域委托（domain-wide delegation）的 Google Cloud 服务账号——终端用户无需 OAuth 授权界面。
+连接 Google Workspace 后，Hilt 可同步你的目录，并显示哪些用户已安装采集器。配置使用带有全域委托（domain-wide delegation）的 Google Cloud 服务账号——终端用户无需 OAuth 授权界面。
 
 在仪表盘打开 **设置 → 集成（Integrations）→ Google Workspace**，然后按下列步骤操作。同一套引导也可在应用内的 Google Workspace 设置面板中查看。
 
@@ -66,7 +66,7 @@ Hilt 仅请求 Directory 用户列表的只读权限（`admin.directory.user.rea
 | 保存拒绝 JSON | 确认粘贴的是完整密钥文件（含花括号），而不是仅 private key 字段。 |
 | 打开后同步失败 | 复查 Admin SDK 已启用、全域委托使用数字 Client ID，且 scope 完全一致。 |
 | 权限 / 模拟错误 | 在 **Admin email to impersonate** 中使用真实超级管理员（或具备 Directory 读取权限的管理员）邮箱，并确认该用户属于同一域名。 |
-| 覆盖率为空 | 等待首次同步完成，然后点击 **Sync now**。覆盖率会将 Workspace 用户与 Hilt 已从 Agent 观察到的身份进行比对。 |
+| 覆盖率为空 | 等待首次同步完成，然后点击 **Sync now**。覆盖率会将 Workspace 用户与 Hilt 已从采集器观察到的身份进行比对。 |
 | 轮换凭证 | 在 Google Cloud 创建新 JSON 密钥，在 Hilt 中粘贴并保存，然后在 Google Cloud 删除旧密钥。 |
 
 ---

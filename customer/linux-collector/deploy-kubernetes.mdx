@@ -37,7 +37,7 @@ The collector uses three **read-only** host mounts. No writable host mounts are 
 
 ## Installation
 
-The manifest uses three placeholders that you substitute at apply time. The Kubernetes manifest is included in each release under `deploy/k8s/daemonset.yaml`.
+The manifest uses seven placeholders that you substitute at apply time. The Kubernetes manifest is included in each release under `k8s/daemonset.yaml`.
 
 <Steps>
   <Step title="Extract the release tarball">
@@ -50,7 +50,7 @@ The manifest uses three placeholders that you substitute at apply time. The Kube
     ```bash
     sed -e 's|__REGISTRY__|<your-account>.dkr.ecr.<region>.amazonaws.com|' \
         -e 's|__TAG__|v1.8.0|' \
-        -e 's|__SHIP_URL__|https://<name>-ingest.hilt.ai|' \
+        -e 's|__SHIP_URL__|https://<name>-ingest.hilt.ai/ingest|' \
         -e 's|__CPU_REQUEST__|100m|' -e 's|__MEMORY_REQUEST__|128Mi|' \
         -e 's|__CPU_LIMIT__|500m|' -e 's|__MEMORY_LIMIT__|512Mi|' \
         daemonset.yaml | kubectl apply -f -

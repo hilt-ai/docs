@@ -1,6 +1,7 @@
 ---
 title: "Getting Started"
 sidebarTitle: "Getting Started"
+description: "What happens between signing your contract and seeing your first findings: who does what, the deployment timeline, and the platform warm-up period."
 ---
 
 This page walks you through what happens between signing your contract and seeing your first security findings. It covers who does what, the deployment timeline, and what to expect while the platform learns your environment.
@@ -18,7 +19,7 @@ This page walks you through what happens between signing your contract and seein
     **You provide:** A VPC or network segment, IAM/service-account permissions per the deployment guide, and DNS delegation if using a custom subdomain.
   </Step>
   <Step title="Collector deployment (Day 1-3)">
-    Deploy the Hilt collector to your hosts. The collector is a single static binary (Linux) or managed agent (macOS) with no dependencies and no kernel modules.
+    Deploy the Hilt collector to your hosts. The collector is a single static binary (Linux) or a notarized system-extension app (macOS) with no dependencies and no kernel modules.
 
     **Who:** Your infrastructure team, using provided guides:
     - [Deploy on Kubernetes](/linux-collector/deploy-kubernetes)
@@ -66,7 +67,7 @@ This page walks you through what happens between signing your contract and seein
 - [ ] At least one collector reporting (check [Collectors](/dashboard/collectors) page)
 - [ ] Hosts appearing as "Active" in the fleet view
 - [ ] Events visible in [Investigate](/dashboard/investigate)
-- [ ] macOS endpoints reporting (if applicable — see [macOS Collector](/macos-collector))
+- [ ] macOS endpoints reporting (if applicable — see [macOS Collector](/macos-collector/layout))
 - [ ] Your team has dashboard accounts with appropriate roles
 
 ---

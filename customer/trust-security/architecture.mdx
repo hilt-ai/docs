@@ -106,9 +106,9 @@ Events travel one direction, from your hosts into your analytics store and dashb
   └─────────────────────────────────────────────────────────────────────┘
 ```
 
-¹ "Private ALB" is AWS-specific; Azure and Ali Cloud use Kubernetes ingress load balancers.
+¹ "Private ALB" is AWS-specific; GCP, Azure, and Ali Cloud use Kubernetes ingress load balancers.
 
-The dotted path is the only route by which any data leaves your account, and nothing is transferred until you approve each export. See [Data collection and handling](/trust-security/data-handling) for what flows through this pipeline and [Anonymized data export](/on-prem/data-export-overview) for the export controls.
+The dotted path is the only route by which any data leaves your account, and — with approval enabled (the default) — nothing is transferred until you approve each export. See [Data collection and handling](/trust-security/data-handling) for what flows through this pipeline and [Anonymized data export](/on-prem/data-export-overview) for the export controls.
 
 <Note>
 Service names vary by cloud (for example, the streaming buffer is MSK on AWS and Pub/Sub on GCP), but the data flow and trust boundary are identical: telemetry stays in your account.

@@ -23,7 +23,7 @@ Detection ML reads enriched epochs from ClickHouse and writes score tables back 
 
 ## Key Services
 
-**data-access-governance:** eBPF agents on Linux and macOS that capture metadata-level telemetry and ship to the customer ingest endpoint. On AWS ECS Fargate, where eBPF isn't available, a separate seccomp+ptrace-based agent ships the same wire format — see [ECS Fargate Agent](/agents/fargate).
+**data-access-governance:** eBPF agents on Linux that capture metadata-level telemetry and ship to the customer ingest endpoint. macOS uses a separate Apple Endpoint Security agent (`macos-edr-agent`) rather than eBPF — see [EDR Overview](/edr/overview). On AWS ECS Fargate, where eBPF isn't available, a separate seccomp+ptrace-based agent ships the same wire format — see [ECS Fargate Agent](/agents/fargate).
 
 **dag-enrichment:** Consumes Kafka events; normalizes telemetry, builds tokens and numeric features, writes ClickHouse.
 

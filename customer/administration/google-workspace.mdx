@@ -4,7 +4,7 @@ sidebarTitle: "Google Workspace"
 description: "Connect Google Workspace Directory so Hilt can measure install coverage against your employee roster."
 ---
 
-Connect Google Workspace so Hilt can sync your directory and show which users have the agent installed. Setup uses a Google Cloud service account with domain-wide delegation — there is no OAuth consent screen for end users.
+Connect Google Workspace so Hilt can sync your directory and show which users have the collector installed. Setup uses a Google Cloud service account with domain-wide delegation — there is no OAuth consent screen for end users.
 
 Open **Settings → Integrations → Google Workspace** in the dashboard, then follow the steps below. The same walkthrough is available in-app from the Google Workspace setup panel.
 
@@ -66,7 +66,7 @@ Treat the service-account JSON like a password. Anyone who has it, plus domain-w
 | Save rejects the JSON | Confirm you pasted the full key file (including braces), not only the private key field. |
 | Sync fails after turning On | Re-check Admin SDK is enabled, domain-wide delegation uses the numeric Client ID, and the scope matches exactly. |
 | Permission / impersonation errors | Use a real Super Admin (or admin with Directory read) email in **Admin email to impersonate**, and confirm that user is on the same domain. |
-| Coverage looks empty | Wait for the first sync to finish, then click **Sync now**. Coverage compares Workspace users to identities Hilt has already seen from agents. |
+| Coverage looks empty | Wait for the first sync to finish, then click **Sync now**. Coverage compares Workspace users to identities Hilt has already seen from collectors. |
 | Rotating credentials | Create a new JSON key in Google Cloud, paste and save it in Hilt, then delete the old key in Google Cloud. |
 
 ---

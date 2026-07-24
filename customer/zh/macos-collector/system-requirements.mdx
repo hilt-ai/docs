@@ -1,131 +1,131 @@
 ---
 title: "系统要求"
 sidebarTitle: "系统要求"
-description: "macOS version, architecture, System Integrity Protection, Full Disk Access, MDM, and network requirements for the Hilt macOS Collector."
+description: "Hilt macOS 采集器的 macOS 版本、架构、System Integrity Protection、Full Disk Access、MDM 和网络要求。"
 ---
 
 <Note>
-The macOS Collector is in **early access**. The notarized `.pkg` with **SIP enabled** install described here is the target shipping model. Contact your account team to enable it for your deployment.
+macOS 采集器处于**抢先体验**阶段。本文所述的、经公证且**启用 SIP** 的 `.pkg` 安装方式是目标发布模式。请联系您的客户团队，为您的部署启用它。
 </Note>
 
-The Hilt macOS Collector is a notarized macOS app — **Hilt EDR** (bundle `EDRApp.app`, Team `MVMB6LCP2A` / Cybe Corporation) — that embeds two Apple System Extensions:
+Hilt macOS 采集器是一个经过公证的 macOS 应用 —— **Hilt EDR**（bundle `EDRApp.app`，Team `MVMB6LCP2A` / Cybe Corporation）—— 内嵌两个 Apple 系统扩展：
 
-- **ESensor** — an [Endpoint Security](https://developer.apple.com/documentation/endpointsecurity) (ES) system extension (`Hilt.EDRApp.ESensor`). This is the telemetry sensor: process, file, persistence, and device events.
-- **NetFilter** — a [NetworkExtension](https://developer.apple.com/documentation/networkextension) content-filter system extension (`Hilt.EDRApp.NetFilter`) for per-flow network attribution.
+- **ESensor** —— 一个 [Endpoint Security](https://developer.apple.com/documentation/endpointsecurity)（ES）系统扩展（`Hilt.EDRApp.ESensor`）。这是遥测传感器：负责进程、文件、持久化和设备事件。
+- **NetFilter** —— 一个 [NetworkExtension](https://developer.apple.com/documentation/networkextension) 内容过滤系统扩展（`Hilt.EDRApp.NetFilter`），用于逐流网络归因。
 
-There is **no kernel extension (kext)**. Both extensions run in user space on Apple's modern frameworks. Unlike the [Linux Collector](/zh/linux-collector/system-requirements), which loads an eBPF program into the kernel, the macOS Collector relies entirely on Apple-sanctioned System Extensions — which is what makes a **SIP-enabled** install possible.
+**没有内核扩展（kext）**。两个扩展都运行在用户空间，基于 Apple 的现代框架。与向内核加载 eBPF 程序的 [Linux 采集器](/zh/linux-collector/system-requirements)不同，macOS 采集器完全依赖 Apple 认可的系统扩展 —— 这正是**启用 SIP** 安装得以实现的原因。
 
-## Summary
+## 概览
 
-| Requirement | Value |
+| 要求 | 值 |
 | :-- | :-- |
-| **macOS version** | 13.0 (Ventura) or later |
-| **Architecture** | Universal — Apple Silicon (`arm64`) and Intel (`x86_64`) |
-| **System Integrity Protection (SIP)** | **Enabled** (supported — and required; no `csrutil disable`) |
-| **Full Disk Access** | **Required** for ESensor (any ES client needs it) |
-| **MDM** | Optional — only for zero-click (silent) install |
-| **Outbound network** | HTTPS to your Hilt ingest endpoint |
-| **Inbound network** | None |
+| **macOS 版本** | 13.0 (Ventura) 或更高 |
+| **架构** | 通用 —— Apple Silicon (`arm64`) 和 Intel (`x86_64`) |
+| **System Integrity Protection (SIP)** | **启用**（受支持 —— 且必需；无需 `csrutil disable`） |
+| **Full Disk Access** | ESensor **必需**（任何 ES 客户端都需要） |
+| **MDM** | 可选 —— 仅用于零点击（静默）安装 |
+| **出站网络** | 到您的 Hilt 摄取端点的 HTTPS |
+| **入站网络** | 无 |
 
-## macOS version
+## macOS 版本
 
-**macOS 13.0 (Ventura) or later.** The floor is 13.0 because the Collector reports persistence events through **Background Task Management (BTM)** — the `btm_add` Endpoint Security event that fires when a launch agent, launch daemon, or login item is installed. BTM is a macOS 13 framework; on earlier releases that signal does not exist, so a key part of the collector's persistence coverage would be silently missing.
+**macOS 13.0 (Ventura) 或更高。**下限为 13.0 是因为采集器通过 **Background Task Management (BTM)** 上报持久化事件 —— 即在安装 launch agent、launch daemon 或登录项时触发的 `btm_add` Endpoint Security 事件。BTM 是 macOS 13 的框架；在更早的版本上不存在该信号，因此采集器持久化覆盖的一个关键部分会悄然缺失。
 
 <Note>
-Full Disk Access grants can occasionally reset across a **macOS major upgrade** (a known TCC behavior). On MDM-managed hosts a PPPC profile re-applies it automatically; direct-download users may need to re-toggle Full Disk Access once after a major OS upgrade. See [Install](/zh/macos-collector/install-flow).
+Full Disk Access 授权偶尔会在 **macOS 大版本升级**后重置（一种已知的 TCC 行为）。在 MDM 托管的主机上，PPPC 配置文件会自动重新应用；直接下载的用户在大版本 OS 升级后可能需要重新切换一次 Full Disk Access。参见[安装](/zh/macos-collector/install-flow)。
 </Note>
 
-## Architecture
+## 架构
 
-**Universal.** The app and both System Extensions ship as a single universal binary covering:
+**通用。**该应用及两个系统扩展以单一通用二进制文件发布，涵盖：
 
-- **Apple Silicon** (`arm64`) — M-series Macs
+- **Apple Silicon** (`arm64`) —— M 系列 Mac
 - **Intel** (`x86_64`)
 
-A single notarized `.pkg` installs on either architecture; there is no per-architecture artifact to choose. This differs from the [Linux Collector](/zh/linux-collector/release-artifacts), which ships a separate tarball per architecture.
+单个经公证的 `.pkg` 可安装在任一架构上；无需选择针对特定架构的构件。这与为每种架构发布单独 tarball 的 [Linux 采集器](/zh/linux-collector/release-artifacts)不同。
 
 ## System Integrity Protection (SIP)
 
-**SIP stays enabled.** This is the headline of the macOS Collector: it runs on a normal, hardened Mac with **no `csrutil disable`, no developer mode, and no kext**. SIP-on operation is the whole point of the migration to a System Extension.
+**SIP 保持启用。**这是 macOS 采集器的核心亮点：它运行在正常、加固的 Mac 上，**无需 `csrutil disable`、无需开发者模式、无需 kext**。启用 SIP 下的运行正是迁移到系统扩展的全部意义所在。
 
-This works because the restricted Endpoint Security entitlement (`com.apple.developer.endpoint-security.client`) is **authorized**, not merely requested:
+之所以可行，是因为受限的 Endpoint Security entitlement（`com.apple.developer.endpoint-security.client`）是被**授权**的，而不仅仅是被请求：
 
-| Element | Detail |
+| 要素 | 详情 |
 | :-- | :-- |
-| **Entitlement** | `com.apple.developer.endpoint-security.client`, granted to Team `MVMB6LCP2A` by Apple |
-| **Signing** | Developer ID Application certificate |
-| **Provisioning profile** | Embedded in the bundle, authorizing the ES entitlement |
-| **Hardened Runtime** | Enabled |
-| **Notarization** | Notarized and stapled by Apple |
-| **App Sandbox** | **Not** used on the ES extension — sandboxing makes `es_new_client` fail with `ERR_NOT_PERMITTED` |
+| **Entitlement** | `com.apple.developer.endpoint-security.client`，由 Apple 授予 Team `MVMB6LCP2A` |
+| **签名** | Developer ID Application 证书 |
+| **Provisioning profile** | 内嵌于 bundle 中，授权 ES entitlement |
+| **Hardened Runtime** | 已启用 |
+| **公证（Notarization）** | 由 Apple 公证并装订（stapled） |
+| **App Sandbox** | ES 扩展上**未**使用 —— 沙盒化会使 `es_new_client` 以 `ERR_NOT_PERMITTED` 失败 |
 
-With SIP on, the kernel's trusted-execution (AMFI) layer only honors the ES entitlement when an Apple-issued provisioning profile that allowlists it is embedded in a properly signed, notarized bundle. The Collector satisfies all of those conditions, so it is a fully trusted Endpoint Security client on a stock, locked-down Mac. For the full entitlement and signing story, see [Architecture](/zh/macos-collector/networking-security).
+在 SIP 开启的情况下，内核的受信执行（AMFI）层仅当一个将 ES entitlement 列入允许列表的 Apple 签发 provisioning profile 内嵌于正确签名、经公证的 bundle 中时，才会承认该 entitlement。采集器满足所有这些条件，因此它在原厂、锁定的 Mac 上是一个完全受信的 Endpoint Security 客户端。有关完整的 entitlement 与签名说明，参见[架构](/zh/macos-collector/networking-security)。
 
 <Note>
-Notarization satisfies Gatekeeper's signature and malware check — it does **not** activate the extension. The user (or MDM) still has to approve the System Extension and grant Full Disk Access. See [Install](/zh/macos-collector/install-flow).
+公证满足 Gatekeeper 的签名和恶意软件检查 —— 它**不会**激活扩展。用户（或 MDM）仍需批准系统扩展并授予 Full Disk Access。参见[安装](/zh/macos-collector/install-flow)。
 </Note>
 
 ## Full Disk Access
 
-**Full Disk Access is required.** Every Apple Endpoint Security client must have Full Disk Access (TCC `SystemPolicyAllFiles`); without it, `es_new_client()` fails with `ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED` even when the entitlement is correctly authorized. Entitlement authorization and Full Disk Access are **two independent runtime gates** — both must pass.
+**Full Disk Access 是必需的。**每个 Apple Endpoint Security 客户端都必须拥有 Full Disk Access（TCC `SystemPolicyAllFiles`）；否则，即便 entitlement 已正确授权，`es_new_client()` 也会以 `ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED` 失败。Entitlement 授权和 Full Disk Access 是**两个独立的运行时关卡** —— 两者都必须通过。
 
-The grant applies to the **ESensor** extension, not the parent app:
+该授权应用于 **ESensor** 扩展，而非父应用：
 
-- In **System Settings → Privacy & Security → Full Disk Access**, the entry appears as **ESensor** / *"Hilt EDR Sensor"* — **not** "EDRApp".
-- The entry appears automatically once the System Extension is approved.
+- 在**系统设置 → 隐私与安全性 → 完全磁盘访问权限**中，条目显示为 **ESensor** / *"Hilt EDR Sensor"* —— **而非** "EDRApp"。
+- 一旦系统扩展被批准，该条目会自动出现。
 
-This is the same consent that CrowdStrike, SentinelOne, and every other third-party Endpoint Security product require; it is an Apple security requirement, not a Hilt-specific one. It cannot be click-suppressed without MDM. See [Install](/zh/macos-collector/install-flow) for the end-user steps.
+这与 CrowdStrike、SentinelOne 以及其他所有第三方 Endpoint Security 产品所要求的同意相同；这是 Apple 的安全要求，而非 Hilt 特有的要求。若无 MDM，它无法被抑制点击。有关最终用户步骤，参见[安装](/zh/macos-collector/install-flow)。
 
 ## MDM
 
-**MDM is optional.** The Collector installs and runs fully without any MDM. MDM is only needed to make the install **zero-click (silent)** across a fleet by pre-approving the two consents the user would otherwise grant by hand.
+**MDM 是可选的。**采集器无需任何 MDM 即可完整安装和运行。仅当需要通过预先批准用户本会手动授予的两项同意，从而在整个主机群中实现**零点击（静默）**安装时，才需要 MDM。
 
-| Install path | What the user does | MDM needed |
+| 安装路径 | 用户需要做什么 | 是否需要 MDM |
 | :-- | :-- | :-- |
-| **Standalone** (direct download) | Approve the extension once, toggle Full Disk Access once (~2 actions + 1 password) | No |
-| **MDM-managed** (zero-click) | Nothing | Yes |
+| **独立安装**（直接下载） | 批准扩展一次，切换 Full Disk Access 一次（约 2 次操作 + 1 次密码） | 否 |
+| **MDM 托管**（零点击） | 无需操作 | 是 |
 
-For the silent path, push two configuration-profile payloads keyed to Team `MVMB6LCP2A`:
+对于静默路径，推送两个键控到 Team `MVMB6LCP2A` 的配置文件 payload：
 
-| Payload | Effect | Requires |
+| Payload | 效果 | 要求 |
 | :-- | :-- | :-- |
-| **System Extensions** (`com.apple.system-extension-policy`, `AllowedTeamIdentifiers = MVMB6LCP2A`) | Auto-approves the extension — suppresses the approval prompt | MDM-enrolled (UAMDM); supervision **not** required |
-| **PPPC** (`com.apple.TCC.configuration-profile-policy`, `SystemPolicyAllFiles = Allow`) | Pre-grants Full Disk Access | **Supervision required** (ADE / supervised enrollment) |
+| **System Extensions**（`com.apple.system-extension-policy`，`AllowedTeamIdentifiers = MVMB6LCP2A`） | 自动批准扩展 —— 抑制批准提示 | 已加入 MDM（UAMDM）；**无需**监督（supervision） |
+| **PPPC**（`com.apple.TCC.configuration-profile-policy`，`SystemPolicyAllFiles = Allow`） | 预先授予 Full Disk Access | **需要监督**（ADE / 受监督注册） |
 
-Deliver the System Extensions payload *before* the app first launches. The Collector only needs Full Disk Access — never Camera, Microphone, or Screen Recording, which PPPC cannot pre-grant — so MDM install is fully silent. See [Install](/zh/macos-collector/install-flow) for both paths in detail.
+在应用首次启动**之前**下发 System Extensions payload。采集器只需要 Full Disk Access —— 从不需要 Camera、Microphone 或 Screen Recording（这些是 PPPC 无法预先授予的）—— 因此 MDM 安装是完全静默的。有关两条路径的详细说明，参见[安装](/zh/macos-collector/install-flow)。
 
-## Network
+## 网络
 
-**Outbound HTTPS only.** ESensor emits events as JSON lines; a local forwarder LaunchDaemon ships them over **outbound HTTPS** to the Hilt `edr-collector`, which routes them to MSK Kafka topics for enrichment.
+**仅出站 HTTPS。**ESensor 将事件以 JSON 行形式发出；一个本地转发 LaunchDaemon 通过**出站 HTTPS** 将它们传送到 Hilt `edr-collector`，后者再将其路由到 MSK Kafka 主题以进行富化。
 
-| Direction | Detail |
+| 方向 | 详情 |
 | :-- | :-- |
-| **Outbound** | HTTPS to the configured Hilt ingest endpoint |
-| **Inbound** | None — no listening sockets |
-| **Phone-home** | None — nothing beyond the configured ingest endpoint |
+| **出站** | 到已配置的 Hilt 摄取端点的 HTTPS |
+| **入站** | 无 —— 没有监听套接字 |
+| **回连（Phone-home）** | 无 —— 除已配置的摄取端点外不做任何连接 |
 
-**Firewall rule:** allow the host to reach your configured Hilt ingest endpoint over HTTPS. There are no inbound rules to open. For the full path from sensor to ClickHouse, see [Data flow](/zh/macos-collector/data-flow).
+**防火墙规则：**允许主机通过 HTTPS 访问您已配置的 Hilt 摄取端点。无需开放任何入站规则。有关从传感器到 ClickHouse 的完整路径，参见[数据流](/zh/macos-collector/data-flow)。
 
-## What it does not require
+## 它不需要什么
 
-In contrast to the Linux Collector's kernel and privilege requirements, the macOS Collector does **not** need any of the following:
+与 Linux 采集器的内核和权限要求相反，macOS 采集器**不**需要以下任何一项：
 
-- **No `csrutil disable`** — SIP stays enabled.
-- **No `systemextensionsctl developer on`** — developer mode is a dev-only workaround, never used on a real install.
-- **No kernel extension (kext)** — pure user-space System Extensions.
-- **No App Sandbox on the ES extension** — sandboxing breaks `es_new_client`.
-- **No MDM** for the standalone install — MDM is only for zero-click fleet deployment.
-- **No inbound network access** — outbound HTTPS only.
+- **无需 `csrutil disable`** —— SIP 保持启用。
+- **无需 `systemextensionsctl developer on`** —— 开发者模式只是一种仅供开发使用的变通方案，绝不用于真实安装。
+- **无需内核扩展（kext）** —— 纯用户空间系统扩展。
+- **ES 扩展上无需 App Sandbox** —— 沙盒化会破坏 `es_new_client`。
+- **独立安装无需 MDM** —— MDM 仅用于零点击主机群部署。
+- **无需入站网络访问** —— 仅出站 HTTPS。
 
-## What it does not do
+## 它不做什么
 
-Consistent with the [Linux Collector](/zh/linux-collector/event-data-model), the macOS Collector observes at the metadata level only:
+与 [Linux 采集器](/zh/linux-collector/event-data-model)一致，macOS 采集器仅在元数据层面进行观察：
 
-- **Does not read file contents** — only path, operation type, and metadata.
-- **Does not capture packet payloads** — only flow metadata (destination, ports, bytes, owning bundle id).
-- **Does not capture keystrokes or screen content** — it does not request Screen Recording.
-- **Does not block or quarantine arbitrary activity** — telemetry is overwhelmingly NOTIFY. A small AUTH self-protection set (`signal`, `file_unlink`, `file_rename`) denies unauthorized tampering with the agent in-kernel; see [Event coverage](/zh/macos-collector/event-coverage). Console-driven on-device quarantine response is not yet available on macOS.
+- **不读取文件内容** —— 仅路径、操作类型和元数据。
+- **不捕获数据包负载** —— 仅流元数据（目的地、端口、字节数、所属 bundle id）。
+- **不捕获击键或屏幕内容** —— 它不请求 Screen Recording。
+- **不阻断或隔离任意活动** —— 遥测绝大多数为 NOTIFY。一小组 AUTH 自我保护集（`signal`、`file_unlink`、`file_rename`）在内核内拒绝对代理的未授权篡改；参见[事件覆盖](/zh/macos-collector/event-coverage)。由控制台驱动的设备端隔离响应在 macOS 上尚不可用。
 
-## Status
+## 状态
 
-The macOS Collector is in **early access**. The notarized `.pkg` with SIP enabled described on this page is the target shipping model. Auto-update and on-device quarantine response are **not yet available** on macOS; upgrades are delivered by re-installing the signed `.pkg` (direct download) or by package push (MDM).
+macOS 采集器处于**抢先体验**阶段。本页所述的、经公证且启用 SIP 的 `.pkg` 是目标发布模式。自动更新和设备端隔离响应在 macOS 上**尚不可用**；升级通过重新安装已签名的 `.pkg`（直接下载）或通过包推送（MDM）来交付。

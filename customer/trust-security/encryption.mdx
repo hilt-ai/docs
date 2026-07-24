@@ -10,7 +10,7 @@ Hilt encrypts data in transit and at rest using the native capabilities of your 
 
 ## In transit
 
-- **TLS 1.2+ on all connections.** Collector-to-ingest traffic, dashboard access, and internal service traffic use TLS 1.2 or higher.
+- **TLS 1.2+ on external connections.** Collector-to-ingest traffic and dashboard access use TLS 1.2 or higher; load-balancer listeners enforce a TLS 1.2/1.3 policy. Internal service-to-service traffic runs within your private VPC/VNet — the streaming buffer (Kafka) and the dashboard database use TLS, while other internal hops rely on the isolation of that private network.
 - **Private networking.** Collector telemetry rides a private link path (PrivateLink, Private Service Connect, or Private Link) and never traverses the public internet. See [Architecture and data flow](/trust-security/architecture).
 - **Collector to ingest.** The collector connects over HTTPS on TCP/443 to the ingest endpoint. The endpoint presents a certificate issued against your private zone, and the collector validates it against your CA chain. See [Networking and security](/linux-collector/networking-security).
 
@@ -24,16 +24,16 @@ Certificates are managed with each cloud's native certificate service: ACM on AW
 
 ## At rest
 
-All persistent storage is encrypted with cloud-native, KMS-managed keys:
+Persistent storage is encrypted at rest using your cloud provider's native encryption:
 
 | Storage layer | Encryption |
 | :-- | :-- |
-| Analytics database (ClickHouse) | Encrypted at rest on the underlying volumes |
+| Analytics database (ClickHouse) | Provider volume encryption on the underlying cloud volumes |
 | Streaming buffer (Kafka, Pub/Sub, Event Hubs) | Provider-managed encryption at rest |
-| Dashboard database (PostgreSQL) | KMS-managed encryption (RDS, Cloud SQL, or equivalent) |
-| Object storage (S3, Cloud Storage, Blob, OSS) | KMS-managed server-side encryption |
+| Dashboard database (PostgreSQL) | Provider-managed KMS encryption (RDS, Cloud SQL, or equivalent) |
+| Object storage (S3, Cloud Storage, Blob, OSS) | Provider-managed server-side encryption (e.g. SSE-S3 / AES-256) |
 
-Encryption at rest is on by default for every storage layer in the deployment.
+Encryption at rest uses your cloud provider's default/managed keys across these storage layers; customer-managed keys (CMKs) are optional — see [Key ownership](#key-ownership) below.
 
 ---
 

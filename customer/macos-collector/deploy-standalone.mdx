@@ -6,7 +6,7 @@ description: "Install the Hilt macOS Collector on a single Mac or small team wit
 
 The standalone path installs the macOS Collector from a notarized, Developer ID-signed `.pkg` on a single Mac without any MDM. It is the right choice for an individual machine, a pilot, or a small team where you do not yet have a managed device fleet. The package places **Hilt EDR** (`EDRApp.app`) into `/Applications` and registers a small forwarder `LaunchDaemon`; the user then performs a one-time, ~30-second approval of the system extension and grants it Full Disk Access.
 
-This works on a **normal, hardened Mac** — System Integrity Protection (SIP) stays **enabled**, there is no `csrutil disable`, no developer mode, and no Terminal required for the consents. That is possible because the app and its embedded extensions are signed with a Developer ID Application certificate, carry an embedded provisioning profile that authorizes the restricted Endpoint Security entitlement, use the Hardened Runtime, and are notarized and stapled by Apple. See [Architecture](/macos-collector/networking-security) for the full entitlement and signing story.
+This works on a **normal, hardened Mac** — System Integrity Protection (SIP) stays **enabled**, there is no `csrutil disable`, no developer mode, and no Terminal required for the consents. That is possible because the app and its embedded extensions are signed with a Developer ID Application certificate, carry an embedded provisioning profile that authorizes the restricted Endpoint Security entitlement, use the Hardened Runtime, and are notarized and stapled by Apple. See [Networking and trust model](/macos-collector/networking-security) for the full entitlement and signing story.
 
 <Note>
 The macOS Collector is in **early access**. The notarized `.pkg` with SIP-on install described here is the target shipping model. For zero-click fleet rollout via Jamf, Kandji, or Intune, see [Deploy with MDM](/macos-collector/deploy-mdm).
@@ -73,7 +73,7 @@ The forwarder reads its configuration from `/Library/Application Support/Hilt/ED
 
 | Setting | Purpose |
 | :-- | :-- |
-| Ingest endpoint | The HTTPS URL of your Hilt `edr-collector` (for example `https://<name>-ingest.hilt.ai`). |
+| Ingest endpoint | The HTTPS URL of your Hilt `edr-collector` — the load-balancer DNS name provided by your account team (the forwarder appends `/ingest`). This is a separate endpoint from the Linux collector's `-ingest.hilt.ai` PrivateLink host. |
 | Device name | Defaults to the Mac's host name; surfaces as `device_name` on every event. |
 
 ESensor emits events as JSON lines, which the forwarder `LaunchDaemon` ships over outbound HTTPS to the `edr-collector`. The collector routes events to MSK Kafka topics (`dag.endpoint.exec`, `dag.endpoint.file`, `dag.endpoint.net`), the enrichment service processes them with `ENRICH_PLATFORM=macos`, and they land in the ClickHouse `endpoint_events` table. See [Data flow](/macos-collector/data-flow) for the full pipeline.

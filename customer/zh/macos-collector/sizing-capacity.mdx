@@ -1,253 +1,217 @@
 ---
 title: "规模与容量"
 sidebarTitle: "规模与容量"
-description: "Per-endpoint event rates, System Extension CPU/memory footprint, compressed HTTPS bandwidth, and how the collector tier scales with macOS host count. Early-access figures."
+description: "每个端点的事件速率、System Extension 的 CPU/内存占用、压缩后的 HTTPS 带宽,以及采集器层如何随 macOS 主机数量扩展。数据为早期访问阶段的测量值。"
 ---
 
-This page describes the resource footprint of the **Hilt EDR** macOS collector: how
-many events a single Mac generates, how much CPU, memory, and network bandwidth the
-System Extension and forwarder consume, and how the server-side collector tier scales
-as you add macOS hosts.
+本页介绍 **Hilt EDR** macOS 采集器的资源占用情况:单台 Mac 会生成多少事件、System
+Extension 与转发器消耗多少 CPU、内存和网络带宽,以及服务端采集器层如何随着 macOS
+主机数量的增加而扩展。
 
 <Note>
-All numbers on this page are **typical ranges from early-access measurements**, taken
-from the notarized `EDRApp.app` build running with SIP enabled. macOS endpoint volume
-is workload-dependent: a developer's laptop running builds, containers, and IDEs
-generates far more `file_open` traffic than a kiosk or an executive's mail-and-browser
-machine. Treat these as planning baselines, not SLAs. See
-[System requirements](/zh/macos-collector/system-requirements) for the supported OS
-matrix.
+本页所有数值均为**早期访问阶段测量得到的典型区间**,采自启用了 SIP 的、经过公证的
+`EDRApp.app` 构建版本。macOS 端点的数据量取决于工作负载:一台运行构建、容器和 IDE
+的开发者笔记本产生的 `file_open` 流量,远高于自助终端或高管的收发邮件与浏览网页的机器。
+请将这些数值视为规划基线,而非 SLA。受支持的操作系统矩阵参见
+[系统要求](/zh/macos-collector/system-requirements)。
 </Note>
 
-## Per-endpoint event rates
+## 每个端点的事件速率
 
-The macOS collector subscribes to **12 Apple Endpoint Security (ES) event types**
-(mostly NOTIFY; a few AUTH for agent self-protection) plus a per-flow network source,
-and emits them as JSON lines that the forwarder ships
-to the Hilt `edr-collector`. The volume is **heavily dominated by `file_open`** — a
-single macOS host routinely emits **thousands of ES events per minute**, and the vast
-majority are file opens. Apple's own framework guidance describes macOS as emitting
-thousands of ES events per minute per host, and our live data confirms it.
+macOS 采集器订阅 **12 种 Apple Endpoint Security (ES) 事件类型**(大多为 NOTIFY;
+少数为用于 Agent 自我保护的 AUTH),外加一个每条流的网络数据源,并将它们以 JSON 行的
+形式输出,由转发器发送到 Hilt 的 `edr-collector`。数据量**极大程度上由 `file_open` 主导**
+——单台 macOS 主机通常**每分钟发出数千条 ES 事件**,其中绝大多数是文件打开。Apple
+自身的框架指南也指出,macOS 每台主机每分钟会发出数千条 ES 事件,我们的实时数据也印证了这一点。
 
-The table below shows a representative 15-minute window from one enrolled developer Mac
-(`Zin's MacBook Pro`, Apple Silicon), normalized to per-minute rates. `file_open`
-accounts for roughly **95%+** of all telemetry.
+下表展示了一台已注册的开发者 Mac(`Zin's MacBook Pro`,Apple Silicon)的一个代表性
+15 分钟窗口,已归一化为每分钟速率。`file_open` 约占全部遥测的 **95% 以上**。
 
-| Event type | `event_class` | Typical rate (per host) | Share of volume |
+| 事件类型 | `event_class` | 典型速率(每台主机) | 占数据量比例 |
 | :-- | :-- | :-- | :-- |
-| `file_open` (open/create) | file | ~3,000–55,000 / min | **~95%+** |
-| `net_flow` (outbound TCP flow) | network | ~50–1,000 / min | ~1–2% |
-| `exec` (process spawn) | process | ~200–500 / min | \< 1% |
-| `fork` (process fork) | process | ~100–350 / min | \< 1% |
-| `file_unlink` (delete) | file | ~100–300 / min | \< 1% |
+| `file_open`(打开/创建) | file | ~3,000–55,000 / min | **~95%+** |
+| `net_flow`(出站 TCP 流) | network | ~50–1,000 / min | ~1–2% |
+| `exec`(进程派生) | process | ~200–500 / min | \< 1% |
+| `fork`(进程 fork) | process | ~100–350 / min | \< 1% |
+| `file_unlink`(删除) | file | ~100–300 / min | \< 1% |
 | `file_rename` | file | ~80–250 / min | \< 1% |
 | `file_chmod` | file | ~80–200 / min | \< 1% |
-| `signal` (kill attempts) | process | ~50–150 / min | \< 1% |
-| `xattr_set` / `xattr_delete` (quarantine tamper) | file | ~10–80 / min | \< 1% |
-| `mount` (removable media) | device | rare (event-driven) | negligible |
-| `btm_add` (persistence installed) | persistence | rare (event-driven) | negligible |
+| `signal`(终止尝试) | process | ~50–150 / min | \< 1% |
+| `xattr_set` / `xattr_delete`(隔离标记篡改) | file | ~10–80 / min | \< 1% |
+| `mount`(可移动介质) | device | 罕见(事件驱动) | 可忽略 |
+| `btm_add`(安装持久化) | persistence | 罕见(事件驱动) | 可忽略 |
 
-**Why `file_open` dominates.** Every process touch of the filesystem — dynamic library
-loads, font and cache reads, plist lookups, IDE indexing, Spotlight, package managers —
-surfaces as an open/create. A busy developer machine compiling or running containers can
-spike `file_open` to **tens of thousands per minute** for short bursts. This is exactly
-why the collector applies **aggressive userspace filtering** before anything leaves the
-host (see [Agent filtering](/zh/macos-collector/event-coverage)).
+**为何 `file_open` 会占主导。** 进程对文件系统的每一次访问——动态库加载、字体与缓存读取、
+plist 查找、IDE 索引、Spotlight、包管理器——都会表现为一次打开/创建。一台繁忙的开发者机器
+在编译或运行容器时,`file_open` 会在短时间内**飙升至每分钟数万条**。这正是采集器在任何数据
+离开主机之前先施加**积极的用户态过滤**的原因(参见
+[Agent 过滤](/zh/macos-collector/event-coverage))。
 
-**The low-frequency events are the high-signal ones.** `exec` carries `argv`, the
-signing identity (`signing_id`, `team_id`, `cdhash`) and the `code_signature` trust
-verdict; `btm_add` means a launch agent/daemon or login item was registered
-(persistence); `xattr_set`/`xattr_delete` is Gatekeeper quarantine tampering;
-`signal` is a kill attempt. These cost almost nothing in volume but are the events a
-detection engineer queries. See the
-[Event data model](/zh/macos-collector/event-data-model) for the full field inventory.
+**低频事件才是高价值信号。** `exec` 携带 `argv`、签名标识(`signing_id`、`team_id`、
+`cdhash`)以及 `code_signature` 信任判定;`btm_add` 表示注册了一个启动 agent/守护进程
+或登录项(持久化);`xattr_set`/`xattr_delete` 是 Gatekeeper 隔离标记篡改;
+`signal` 是一次终止尝试。这些事件在数据量上几乎不占份额,却正是检测工程师会去查询的事件。
+完整字段清单参见
+[事件数据模型](/zh/macos-collector/event-data-model)。
 
-## Event volume distribution
+## 事件量分布
 
-Because the distribution is so skewed, capacity planning is essentially a `file_open`
-problem. Roughly **19 out of every 20 events** a Mac ships are file opens; everything
-else combined — process, network, persistence, device, signal, xattr — is a few percent.
+由于分布如此偏斜,容量规划本质上就是一个 `file_open` 问题。一台 Mac 发送的事件中,大约
+**每 20 条就有 19 条**是文件打开;其余所有事件加起来——进程、网络、持久化、设备、signal、
+xattr——只占百分之几。
 
-| Category | Events captured | Approx. share of shipped volume |
+| 类别 | 捕获的事件 | 约占发送数据量比例 |
 | :-- | :-- | :-- |
-| File (`file_open` mostly, + unlink/rename/chmod/xattr) | open, create, delete, rename, chmod, xattr set/delete | **~96–97%** |
-| Network (`net_flow`) | outbound TCP flow w/ dest, ports, bytes, bundle id | ~1–2% |
-| Process (`exec`, `fork`, `signal`) | spawn, fork, kill attempts | ~1–2% |
-| Persistence / device (`btm_add`, `mount`) | launch items, removable media | \< 0.1% (event-driven) |
+| 文件(主要为 `file_open`,外加 unlink/rename/chmod/xattr) | 打开、创建、删除、重命名、chmod、xattr 设置/删除 | **~96–97%** |
+| 网络(`net_flow`) | 带目标、端口、字节数、bundle id 的出站 TCP 流 | ~1–2% |
+| 进程(`exec`、`fork`、`signal`) | 派生、fork、终止尝试 | ~1–2% |
+| 持久化 / 设备(`btm_add`、`mount`) | 启动项、可移动介质 | \< 0.1%(事件驱动) |
 
-A practical consequence: tuning the `file_open` filter is the single highest-leverage
-lever for controlling both endpoint CPU and ingest bandwidth. The other event families
-can be enabled in full without materially moving the volume needle.
+一个实际的推论:调优 `file_open` 过滤器是控制端点 CPU 和摄取带宽的单一最高杠杆手段。
+其他事件族即使全部启用,也不会实质性地拨动数据量的指针。
 
-## System Extension CPU and memory footprint
+## System Extension 的 CPU 与内存占用
 
-The collector ships as a notarized macOS app, `EDRApp.app`, that embeds two Apple
-**System Extensions** running in **user space** (there is no kernel extension):
+采集器以经过公证的 macOS 应用 `EDRApp.app` 形式发布,其中内嵌两个在**用户态**运行的
+Apple **System Extension**(不存在内核扩展):
 
-- **`ESensor`** — the Endpoint Security system extension. This is the telemetry sensor
-  that subscribes to the ES events above. Bundle id `Hilt.EDRApp.ESensor`.
-- **`NetFilter`** — a NetworkExtension content-filter system extension that provides
-  per-flow network attribution. Bundle id `Hilt.EDRApp.NetFilter`.
+- **`ESensor`** —— Endpoint Security system extension。这是订阅上述 ES 事件的遥测传感器。
+  bundle id 为 `Hilt.EDRApp.ESensor`。
+- **`NetFilter`** —— 一个 NetworkExtension 内容过滤 system extension,提供每条流的网络归因。
+  bundle id 为 `Hilt.EDRApp.NetFilter`。
 
-A small forwarder LaunchDaemon ships the JSON event stream over outbound HTTPS. Because
-the extensions run on Apple's modern frameworks (no kext, no `csrutil disable`,
-**SIP enabled**), the footprint is that of an ordinary hardened user-space process.
+一个小型的转发器 LaunchDaemon 通过出站 HTTPS 发送 JSON 事件流。由于这些扩展运行在 Apple
+的现代框架之上(无 kext、无需 `csrutil disable`、**SIP 保持启用**),其占用与普通的加固
+用户态进程相当。
 
-| Component | Typical RSS | Typical CPU (steady state) | CPU (burst, e.g. build) |
+| 组件 | 典型 RSS | 典型 CPU(稳态) | CPU(突发,例如构建) |
 | :-- | :-- | :-- | :-- |
-| `ESensor` (ES system extension) | ~40–90 MB | \< 1–2% of one core | up to ~5–10% of one core |
-| `NetFilter` (NE content filter) | ~15–35 MB | \< 1% of one core | low |
-| Forwarder LaunchDaemon | ~10–25 MB | \< 1% of one core | low |
+| `ESensor`(ES system extension) | ~40–90 MB | 单核的 \< 1–2% | 最高约单核的 5–10% |
+| `NetFilter`(NE 内容过滤器) | ~15–35 MB | 单核的 \< 1% | 低 |
+| 转发器 LaunchDaemon | ~10–25 MB | 单核的 \< 1% | 低 |
 
-**Notes on the footprint.**
+**关于占用的说明。**
 
-- macOS delivers ES events synchronously on the extension's message queue. The sensor's
-  job is to classify, filter, and enqueue fast so it never becomes the bottleneck for a
-  busy machine. Memory is dominated by the per-process and signing-identity caches that
-  let helpers fold to their owning app (e.g. `Google Chrome Helper` →
-  `Google Chrome`) and that propagate `responsible_pid` / `session_id`.
-- The figures above are for a **NOTIFY-only telemetry posture**. The agent subscribes to
-  a few events as **AUTH** (`signal`, `unlink`, `rename`) purely for self-protection
-  (it can deny tampering with itself); AUTH handling adds negligible steady-state cost
-  because these events are rare, but it does keep the sensor on the synchronous decision
-  path for those specific operations.
-- CPU scales with **un-filtered** `file_open` rate, not with shipped volume — the
-  expensive work is inspecting the firehose. Filtering happens before serialization, so
-  tightening the filter reduces both CPU and bandwidth at once.
+- macOS 在扩展的消息队列上同步投递 ES 事件。传感器的任务是快速分类、过滤并入队,从而绝不
+  成为繁忙机器的瓶颈。内存主要被每进程缓存和签名标识缓存占用,它们让辅助进程可以折叠归并到
+  其所属应用(例如 `Google Chrome Helper` → `Google Chrome`),并传播
+  `responsible_pid` / `session_id`。
+- 上述数值针对的是**仅 NOTIFY 的遥测模式**。Agent 会将少数事件订阅为 **AUTH**
+  (`signal`、`unlink`、`rename`),纯粹用于自我保护(它可以拒绝对自身的篡改);由于这些
+  事件罕见,AUTH 处理增加的稳态开销可以忽略,但它确实会让传感器对这些特定操作保持在同步决策
+  路径上。
+- CPU 随**未过滤**的 `file_open` 速率而扩展,而非随发送数据量——昂贵的工作在于检视这股洪流。
+  过滤发生在序列化之前,因此收紧过滤器可以同时降低 CPU 和带宽。
 
 <Note>
-These are early-access measurements. The collector does **not** apply a hard CPU or
-memory ceiling to the System Extension itself; Apple manages the extension lifecycle.
-If you require a strict ceiling for fleet policy, coordinate with your account team —
-on-device resource caps are not part of the early-access shipping model.
+这些是早期访问阶段的测量值。采集器**不会**对 System Extension 本身施加硬性的 CPU 或内存上限;
+扩展的生命周期由 Apple 管理。如果你的主机群策略需要严格上限,请与你的客户团队协调——设备端资源
+上限不属于早期访问阶段的发布模型。
 </Note>
 
-## Network bandwidth
+## 网络带宽
 
-The forwarder ships events as **batched, compressed, outbound HTTPS** to the configured
-Hilt ingest endpoint. There are **no inbound sockets and no phone-home** — only outbound
-HTTPS to the one configured endpoint (see
-[Networking and security](/zh/macos-collector/networking-security)).
+转发器以**批量、压缩、出站的 HTTPS** 将事件发送到所配置的 Hilt 摄取端点。**不存在入站套接字,
+也不存在 phone-home**——只有指向那一个已配置端点的出站 HTTPS(参见
+[网络与安全](/zh/macos-collector/networking-security))。
 
-Bandwidth is again a function of `file_open` volume after filtering. Each event is a
-compact JSON line; the dominant `file_open` records are small (path, flags, actor,
-signing identity, application attribution). Batching and compression are what make the
-firehose affordable on the wire.
+带宽同样是过滤之后 `file_open` 数据量的函数。每个事件都是一行紧凑的 JSON;占主导的
+`file_open` 记录很小(路径、标志、行为主体、签名标识、应用归因)。批处理与压缩正是让这股洪流
+在网络上变得可承受的关键。
 
-| Posture | Shipped events/min | Approx. compressed egress |
+| 模式 | 发送事件数/min | 约压缩后的出站流量 |
 | :-- | :-- | :-- |
-| Idle / light user (mail, browser) | ~1,000–4,000 | ~0.2–1 MB/min |
-| Typical knowledge worker | ~4,000–15,000 | ~1–4 MB/min |
-| Developer / heavy build host | ~15,000–55,000+ | ~4–15 MB/min (bursty) |
+| 空闲 / 轻度用户(邮件、浏览器) | ~1,000–4,000 | ~0.2–1 MB/min |
+| 典型知识工作者 | ~4,000–15,000 | ~1–4 MB/min |
+| 开发者 / 重度构建主机 | ~15,000–55,000+ | ~4–15 MB/min(突发) |
 
-**What drives the wire cost.**
+**是什么推高了网络成本。**
 
-- **Compression** typically achieves a high ratio on this payload because event JSON is
-  highly repetitive (the same paths, bundle ids, and signing identities recur), so the
-  compressed egress is a fraction of the raw line volume.
-- **Batching** amortizes TLS and request overhead: events are accumulated and flushed
-  together rather than one request per event, which keeps connection overhead flat as
-  volume rises.
-- **Filtering first** — because aggressive userspace `file_open` filtering runs before
-  the forwarder ever sees an event, the bytes on the wire reflect post-filter volume,
-  not the raw ES firehose.
+- **压缩**在此类负载上通常能达到很高的压缩比,因为事件 JSON 高度重复(相同的路径、bundle id
+  和签名标识反复出现),因此压缩后的出站流量只是原始行数据量的一小部分。
+- **批处理**摊薄了 TLS 与请求开销:事件被累积后一并刷出,而不是每个事件一次请求,这使得连接
+  开销在数据量上升时保持平稳。
+- **过滤优先**——由于积极的用户态 `file_open` 过滤在转发器看到任何事件之前就已运行,网络上的
+  字节反映的是过滤后的数据量,而非原始的 ES 洪流。
 
-A practical planning figure for a typical workstation fleet is **single-digit MB per
-minute per host**, with short bursts above that during builds or large file operations.
-Over a workday this is comfortably within normal corporate egress and does not require
-any special network provisioning beyond outbound 443.
+对于典型工作站主机群,一个实际的规划数值是**每台主机每分钟个位数 MB**,并在构建或大文件操作期间
+出现短暂高于此值的突发。在一个工作日的时间尺度上,这完全处于正常的企业出站流量范围内,除了出站
+443 之外无需任何特殊的网络配置。
 
-## How the collector tier scales with host count
+## 采集器层如何随主机数量扩展
 
-On the server side, macOS hosts flow through the **same pipeline as Linux**, with the
-macOS-specific enrichment platform:
+在服务端,macOS 主机流经与 **Linux 相同的管道**,并配以 macOS 专属的富化平台:
 
 <Steps>
-  <Step title="Forwarder → edr-collector">
-    Each Mac's forwarder LaunchDaemon ships compressed HTTPS batches to the Hilt
-    `edr-collector`. Connections are outbound-only and long-lived/batched, so the
-    collector sees a steady request rate proportional to host count, not to raw event
-    rate.
+  <Step title="转发器 → edr-collector">
+    每台 Mac 的转发器 LaunchDaemon 将压缩的 HTTPS 批次发送到 Hilt 的
+    `edr-collector`。连接为仅出站、长连接/批量,因此采集器看到的请求速率与主机数量成正比,
+    而非与原始事件速率成正比。
   </Step>
   <Step title="edr-collector → MSK Kafka">
-    The collector routes events to MSK Kafka topics by class:
-    `dag.endpoint.exec`, `dag.endpoint.file`, and `dag.endpoint.net`. Because
-    `file_open` is ~95%+ of volume, the `dag.endpoint.file` topic carries the bulk of
-    the partition load and should be sized first.
+    采集器按类别将事件路由到 MSK Kafka 主题:
+    `dag.endpoint.exec`、`dag.endpoint.file` 和 `dag.endpoint.net`。由于
+    `file_open` 占数据量的 95% 以上,`dag.endpoint.file` 主题承载了绝大部分分区负载,
+    应最先进行容量规划。
   </Step>
-  <Step title="Enrichment (ENRICH_PLATFORM=macos)">
-    The enrichment service consumes the topics, stamps code-signing trust and
-    application attribution, and normalizes records. This is the consumer tier that
-    scales with aggregate events/sec across the fleet.
+  <Step title="富化(ENRICH_PLATFORM=macos)">
+    富化服务消费这些主题,标注代码签名信任与应用归因,并规范化记录。这是随主机群聚合事件数/秒
+    而扩展的消费者层。
   </Step>
-  <Step title="ClickHouse (endpoint_events)">
-    Enriched rows land in the purpose-built, macOS-native `endpoint_events` table.
-    Storage and query cost scale with total fleet event volume — again dominated by
-    `file_open`.
+  <Step title="ClickHouse(endpoint_events)">
+    富化后的行落入专门构建的、macOS 原生的 `endpoint_events` 表。存储与查询成本随主机群总事件量
+    而扩展——同样由 `file_open` 主导。
   </Step>
-  <Step title="Dashboard">
-    macOS hosts appear in the [Collectors](/zh/dashboard/collectors) fleet view with a
-    macOS host-type badge, and in the Investigate, Networks, Files, and Users views.
+  <Step title="仪表盘">
+    macOS 主机会出现在 [Collectors](/zh/dashboard/collectors) 主机群视图中,并带有 macOS
+    主机类型徽章,同时也出现在 Investigate、Networks、Files 和 Users 视图中。
   </Step>
 </Steps>
 
-**Scaling characteristics.**
+**扩展特性。**
 
-- **Aggregate volume is what sizes the tier, not host count alone.** A back-of-envelope
-  fleet estimate: multiply your host count by a per-host steady-state rate (use
-  ~5,000–15,000 events/min for a mixed workstation fleet, far higher for developer-heavy
-  populations) to get aggregate events/sec for Kafka partition and enrichment-consumer
-  sizing. One reference Mac alone produced **~844,000 rows in 15 minutes** (~940/sec)
-  during active developer use — so heavy hosts dominate the estimate.
-- **Size the `file_open` path first.** Because the distribution is so skewed,
-  `dag.endpoint.file` partitions and the macOS enrichment consumers keyed to file events
-  are the components that saturate first. The `exec`/`net` paths are comparatively light.
-- **Egress is bounded by compression.** Server-side ingest bandwidth scales linearly
-  with the compressed per-host egress figures above; there is no fan-out amplification on
-  the collector for macOS hosts.
-- **Per-host enrichment cost is uniform.** Every macOS event carries the same
-  code-signing and application-attribution enrichment, so enrichment CPU tracks aggregate
-  event rate cleanly — there is no host-specific enrichment hot spot.
+- **决定该层规模的是聚合数据量,而不仅仅是主机数量。** 一个粗略的主机群估算方法:将主机数量乘以
+  每台主机的稳态速率(混合工作站主机群可用 ~5,000–15,000 事件/min,开发者密集型群体则要高得多),
+  得到用于 Kafka 分区和富化消费者容量规划的聚合事件数/秒。仅一台参考 Mac 在活跃的开发者使用期间,
+  就在 **15 分钟内产生了约 844,000 行**(约 940/秒)——因此重度主机在估算中占主导。
+- **优先为 `file_open` 路径规划容量。** 由于分布如此偏斜,`dag.endpoint.file` 分区以及以文件
+  事件为键的 macOS 富化消费者,是最先饱和的组件。`exec`/`net` 路径相对轻量。
+- **出站流量受压缩约束。** 服务端摄取带宽随上文压缩后的每台主机出站流量线性扩展;macOS 主机在
+  采集器上不存在扇出放大。
+- **每台主机的富化成本是均匀的。** 每个 macOS 事件都携带相同的代码签名与应用归因富化,因此富化
+  CPU 干净地跟随聚合事件速率——不存在主机特定的富化热点。
 
-For control-plane and infrastructure sizing details shared with the Linux pipeline, see
-[End-to-end data flow](/zh/macos-collector/data-flow).
+关于与 Linux 管道共享的控制平面与基础设施容量规划细节,参见
+[端到端数据流](/zh/macos-collector/data-flow)。
 
-## Tuning levers
+## 调优杠杆
 
-When a fleet's volume or egress is higher than budgeted, the levers — in order of
-leverage — are:
+当主机群的数据量或出站流量高于预算时,可用的杠杆按杠杆效应从大到小排列如下:
 
-1. **Tighten `file_open` filtering.** This is ~95%+ of volume; excluding high-churn
-   cache and build directories is the single biggest reduction in both endpoint CPU and
-   egress. See [Agent filtering](/zh/macos-collector/event-coverage).
-2. **Scope process events.** `exec`/`fork` are already low volume; no action needed in
-   most fleets, but they are the highest-signal-per-byte events and should generally stay
-   on.
-3. **Leave the security long-tail on.** `btm_add`, `xattr_set`/`xattr_delete`, `mount`,
-   and `signal` are event-driven and rare — they add negligible volume while providing
-   persistence, quarantine-tamper, removable-media, and kill-attempt visibility.
+1. **收紧 `file_open` 过滤。** 这占数据量的 95% 以上;排除高频变动的缓存和构建目录,是对端点
+   CPU 和出站流量同时的单一最大幅度削减。参见 [Agent 过滤](/zh/macos-collector/event-coverage)。
+2. **限定进程事件的范围。** `exec`/`fork` 本已是低数据量;大多数主机群无需采取任何措施,但它们是
+   每字节信号价值最高的事件,通常应保持开启。
+3. **保留安全长尾事件的开启状态。** `btm_add`、`xattr_set`/`xattr_delete`、`mount` 和
+   `signal` 都是事件驱动且罕见的——它们增加的数据量可忽略,却提供了持久化、隔离标记篡改、可移动
+   介质和终止尝试的可见性。
 
-## What this collector does not do
+## 本采集器不做什么
 
-Consistent with the rest of the macOS collector design:
+与 macOS 采集器设计的其余部分保持一致:
 
-- **No on-device resource cap on the System Extension.** Apple manages the extension
-  lifecycle; the collector does not impose a hard `CPUQuota`/`MemoryMax` on the ES
-  extension the way the Linux VM installer can on a systemd unit. On-device resource caps
-  are not part of the early-access model.
-- **No inbound listeners.** Bandwidth is strictly outbound, batched, compressed HTTPS to
-  the one configured ingest endpoint — there is no inbound socket to size for and no
-  phone-home.
-- **No raw packet capture.** Network bandwidth reflects `net_flow` connection metadata
-  (destination, ports, byte counts, bundle id), not payload — so network telemetry adds
-  only ~1–2% to volume, never a packet-capture-scale load.
-- **No file-content shipping.** `file_open` is metadata (path, flags, actor, signing
-  identity); the collector never reads or ships file contents, so file volume is bounded
-  by event count, not by file size.
+- **不对 System Extension 施加设备端资源上限。** 扩展的生命周期由 Apple 管理;采集器不会像
+  Linux VM 安装程序对 systemd 单元那样,对 ES 扩展施加硬性的 `CPUQuota`/`MemoryMax`。设备端
+  资源上限不属于早期访问模型。
+- **不存在入站侦听器。** 带宽严格为出站、批量、压缩的 HTTPS,指向那一个已配置的摄取端点——不存在
+  需要规划容量的入站套接字,也不存在 phone-home。
+- **不进行原始数据包捕获。** 网络带宽反映的是 `net_flow` 连接元数据(目标、端口、字节数、
+  bundle id),而非载荷——因此网络遥测只为数据量增加约 1–2%,绝不会带来数据包捕获规模的负载。
+- **不发送文件内容。** `file_open` 是元数据(路径、标志、行为主体、签名标识);采集器从不读取或
+  发送文件内容,因此文件数据量受事件数量约束,而非文件大小。
 
 <Note>
-The macOS collector is in **early access**. The notarized `.pkg` install with SIP
-enabled described across these pages is the target shipping model; auto-update and
-on-device quarantine response are not yet available on macOS. Sizing figures will be
-refreshed as the fleet grows beyond early-access deployments.
+macOS 采集器处于**早期访问**阶段。这些页面中描述的、启用 SIP 的经公证 `.pkg` 安装方式是目标
+发布模型;macOS 上尚不提供自动更新和设备端隔离响应。随着主机群规模超越早期访问阶段的部署,容量
+规划数值将会更新。
 </Note>

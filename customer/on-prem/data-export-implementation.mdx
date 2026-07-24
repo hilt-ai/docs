@@ -102,15 +102,26 @@ The export pipeline is provisioned as part of every deployment and runs on a dai
     "token_depths", "token_roles", "total_events", "tokens_before_topk",
     "ml_label", "ml_source"
   ],
+  "zscore_names": ["exec_count_z", "net_bytes_out_z", "file_write_count_z", "unique_dst_z"],
+  "zero_filled_columns": ["numeric_features[21]:accelerator_syscalls", "derived_features[6]:dst_entropy_ratio"],
   "excluded_columns_note": "token_evidence_json, evidence, reason, drivers, owner, identity, host_id, boot_id, alert_source, rule_id, rule_name, rule_label, rule_severity, matched_conditions, all dag_events columns, all Postgres tables",
   "file_size_bytes": 284729384,
   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "format": "parquet+zstd",
+  "temporal_jitter_hours": 17.3,
+  "min_hosts": 5,
+  "anonymized": true,
   "approved": false,
   "approved_by": "",
-  "approved_at": ""
+  "approved_at": "",
+  "transferred": false,
+  "transferred_at": ""
 }
 ```
+
+<Note>
+`zero_filled_columns` lists feature slots that have no backing column on this deployment and were exported as zeros (entries look like `numeric_features[<i>]:<feature_name>`) — it is distinct from `excluded_columns_note`, which names identity columns deliberately withheld. `zscore_names` gives the canonical order of the packed `zscores` vector.
+</Note>
 
 ## Customer controls
 

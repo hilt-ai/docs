@@ -36,7 +36,7 @@ The header identifies *when*, *where*, and *who* — the same actor metadata on 
 | `host_id` | String | Stable machine identifier for the Mac. Joins the host into the [Collectors](/dashboard/collectors) fleet. |
 | `boot_id` | String | Identifier for the current boot, for ordering across reboots. |
 | `device_name` | String | The human Mac name, e.g. `Zin's MacBook Pro`. Populated on 100% of rows — no host-inventory join required. |
-| `event_class` | LowCardinality(String) | The broad family: `process`, `file`, `network`, `persistence`, `device`. |
+| `event_class` | LowCardinality(String) | The broad family: `process`, `file`, `network`, `persistence`, `device`, `malware`. (The schema also reserves `auth`, `code`, and `privacy` for future use; they are not emitted today.) |
 | `event_type` | LowCardinality(String) | The specific event, e.g. `exec`, `file_open`, `net_flow`, `btm_add`. |
 | `wall_time_ns` | UInt64 | Wall-clock timestamp (nanoseconds) of the event. |
 | `event_time` | DateTime64 | Derived timestamp for time-range queries and partitioning. |
@@ -124,10 +124,10 @@ Beyond the common header and the two always-present identity layers, each event 
 | `argv` | `exec` | The full command line of the executed program, including arguments. Set on `exec` rows. |
 | `comm` / `signing_id` / `cdhash` | `exec`, `fork` | The acting binary's name, bundle id, and integrity hash (header/identity columns above). |
 | `parent_comm`, `ppid` | `exec`, `fork` | Parent process context; propagated down the tree. |
-| `target_pid` | `signal` | The PID the signal was **sent to** (the would-be victim of a kill attempt). |
-| `signum` | `signal` | The signal number sent (e.g. `9` = SIGKILL). |
+| `attrs['target_pid']` | `signal` | The PID the signal was **sent to** (the would-be victim of a kill attempt). Carried in the `attrs` map, not a dedicated column. |
+| `attrs['signum']` | `signal` | The signal number sent (e.g. `9` = SIGKILL). Carried in the `attrs` map. |
 
-`exec` is the spine of the process model: it carries the argv, the signing identity, the team id, and the cdhash all on one row. `signal` events record kill attempts — `target_pid` and `signum` reveal who tried to terminate whom, which surfaces both attacker kill-chains and attempts to tamper with the collector itself.
+`exec` is the spine of the process model: it carries the argv, the signing identity, the team id, and the cdhash all on one row. `signal` events record kill attempts — `attrs['target_pid']` and `attrs['signum']` reveal who tried to terminate whom, which surfaces both attacker kill-chains and attempts to tamper with the collector itself.
 
 ### File payload — `file_open`, `file_unlink`, `file_rename`, `file_chmod`, `xattr_set`, `xattr_delete`
 

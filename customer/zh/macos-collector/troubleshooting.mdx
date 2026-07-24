@@ -1,152 +1,152 @@
 ---
 title: "故障排查"
 sidebarTitle: "故障排查"
-description: "Diagnose and fix common Hilt macOS Collector failures: system extension approval, Endpoint Security entitlement and Full Disk Access errors, and telemetry that never lands."
+description: "诊断并修复常见的 Hilt macOS 采集器故障：系统扩展审批、Endpoint Security 授权与 Full Disk Access 错误，以及遥测始终无法到达的问题。"
 ---
 
-The Hilt macOS Collector is a notarized macOS app (`EDRApp.app`, team **Cybe Corporation / MVMB6LCP2A**) that embeds two Apple System Extensions — **ESensor** (Endpoint Security telemetry) and **NetFilter** (NetworkExtension content filter) — plus a small forwarder LaunchDaemon. There is **no kernel extension**, and the collector runs with **System Integrity Protection (SIP) enabled**.
+Hilt macOS 采集器是一个经过公证的 macOS 应用（`EDRApp.app`，团队 **Cybe Corporation / MVMB6LCP2A**），其中内嵌了两个 Apple 系统扩展 —— **ESensor**（Endpoint Security 遥测）和 **NetFilter**（NetworkExtension 内容过滤器）—— 以及一个小型转发器 LaunchDaemon。它**没有内核扩展**，并且采集器在 **System Integrity Protection (SIP) 已启用** 的状态下运行。
 
-Most field issues fall into one of three buckets: the system extension never activates, the Endpoint Security client fails to start (an `ES_NEW_CLIENT_RESULT_ERR_*` code), or events are produced but never reach the `edr-collector`. The table below maps each symptom to its real cause and fix; the sections that follow go deeper on the ones that need procedure or context.
+大多数现场问题都落入以下三类之一：系统扩展始终未激活、Endpoint Security 客户端启动失败（一个 `ES_NEW_CLIENT_RESULT_ERR_*` 代码），或者事件已生成但从未到达 `edr-collector`。下表将每个现象映射到其真正的原因与修复方法；随后的各节会对需要操作步骤或背景说明的项目做更深入的展开。
 
 <Note>
-Two **independent** runtime gates must both pass before ESensor can observe anything. **Gate 1 (entitlement)** is checked by the kernel's trusted-execution layer (AMFI) under SIP — its failure code is `ERR_NOT_ENTITLED`. **Gate 2 (Full Disk Access)** is checked by TCC — its failure code is `ERR_NOT_PERMITTED`. They are unrelated: a fully entitled, Apple-signed, notarized ESensor still fails with `ERR_NOT_PERMITTED` until it has Full Disk Access. Keep them straight before you start changing things.
+在 ESensor 能观测到任何内容之前，必须同时通过两道**相互独立**的运行时关卡。**关卡 1（授权）**由内核的可信执行层（AMFI）在 SIP 下检查 —— 其失败代码为 `ERR_NOT_ENTITLED`。**关卡 2（Full Disk Access）**由 TCC 检查 —— 其失败代码为 `ERR_NOT_PERMITTED`。二者互不相关：一个授权完整、经 Apple 签名并公证的 ESensor，在获得 Full Disk Access 之前仍会以 `ERR_NOT_PERMITTED` 失败。开始动手排查前，请先把这两者分清楚。
 </Note>
 
-## Symptom → cause → fix
+## 现象 → 原因 → 修复
 
-| Symptom | Real cause | Fix |
+| 现象 | 真正原因 | 修复 |
 | :-- | :-- | :-- |
-| Extension never appears under **Login Items & Extensions**; no approval prompt | App is not in `/Applications`, or the activation request was never submitted | Move `EDRApp.app` to `/Applications` and relaunch; macOS only honors a `OSSystemExtensionRequest` from an app in `/Applications` |
-| Extension shows **`[activated waiting for user]`** in `systemextensionsctl list` | Extension is staged but the user has not approved it | Approve under **System Settings → General → Login Items & Extensions → Endpoint Security Extensions**, or push the MDM System Extensions profile |
-| ESensor logs `ES_NEW_CLIENT_RESULT_ERR_NOT_ENTITLED` | Entitlement not **authorized** — missing/invalid embedded provisioning profile, ad-hoc signature, or a build SIP won't honor | Install the notarized, Developer ID-signed `.pkg`; do not run an ad-hoc or self-built bundle on a SIP-on Mac |
-| ESensor logs `ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED` | Entitlement is fine, but the host process has **no Full Disk Access** | Grant Full Disk Access to **ESensor** (System Settings → Privacy & Security → Full Disk Access), or push the MDM PPPC profile |
-| Extension activates and ES client starts, but **no telemetry** lands in the dashboard | Forwarder LaunchDaemon down, wrong `EDR_COLLECTOR_URL`, or outbound HTTPS blocked | Confirm the forwarder daemon is loaded, the collector URL is correct (base host, no path), and outbound 443 to the ingest endpoint is open |
-| Full Disk Access **lost after a macOS upgrade**; ESensor flips to `ERR_NOT_PERMITTED` | TCC permissions are reset across major macOS upgrades | Re-grant Full Disk Access, or use an MDM PPPC profile so the grant persists across upgrades |
-| FDA entry you expect is missing; you only see **`EDRApp`** in the list | The FDA grant is attributed to the **extension**, not the app | Grant FDA to the **ESensor** entry, shown as **"Hilt EDR Sensor"** — not "EDRApp" |
-| **App Sandbox** unexpectedly enabled on ESensor → instant `ERR_NOT_PERMITTED` | The ES extension must **not** use the App Sandbox | Use the shipped notarized build; the App Sandbox is incompatible with `es_new_client()` |
+| 扩展从未出现在 **Login Items & Extensions** 下；没有审批提示 | 应用不在 `/Applications` 中，或激活请求从未被提交 | 将 `EDRApp.app` 移入 `/Applications` 并重新启动；macOS 只接受来自 `/Applications` 中应用的 `OSSystemExtensionRequest` |
+| `systemextensionsctl list` 中扩展显示为 **`[activated waiting for user]`** | 扩展已暂存，但用户尚未批准 | 在 **System Settings → General → Login Items & Extensions → Endpoint Security Extensions** 下批准，或推送 MDM System Extensions 配置描述文件 |
+| ESensor 记录 `ES_NEW_CLIENT_RESULT_ERR_NOT_ENTITLED` | 授权未被**授予** —— 缺失/无效的内嵌预置描述文件、ad-hoc 签名，或 SIP 不会接受的构建 | 安装经公证、以 Developer ID 签名的 `.pkg`；不要在启用 SIP 的 Mac 上运行 ad-hoc 或自行构建的软件包 |
+| ESensor 记录 `ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED` | 授权没有问题，但宿主进程**没有 Full Disk Access** | 为 **ESensor** 授予 Full Disk Access（System Settings → Privacy & Security → Full Disk Access），或推送 MDM PPPC 描述文件 |
+| 扩展已激活且 ES 客户端已启动，但仪表盘中**没有遥测**到达 | 转发器 LaunchDaemon 已停止、`EDR_COLLECTOR_URL` 错误，或出站 HTTPS 被阻断 | 确认转发器守护进程已加载、采集器 URL 正确（基础主机、无路径），并且到摄取端点的出站 443 已放通 |
+| macOS 升级后 **Full Disk Access 丢失**；ESensor 翻转为 `ERR_NOT_PERMITTED` | 跨 macOS 大版本升级时 TCC 权限会被重置 | 重新授予 Full Disk Access，或使用 MDM PPPC 描述文件，使授权在升级后持续保留 |
+| 你预期的 FDA 条目缺失；列表中只看到 **`EDRApp`** | FDA 授权归属于**扩展**，而非应用 | 为 **ESensor** 条目授予 FDA，它显示为 **“Hilt EDR Sensor”** —— 而不是 “EDRApp” |
+| ESensor 上意外启用了 **App Sandbox** → 立即出现 `ERR_NOT_PERMITTED` | ES 扩展**绝不能**使用 App Sandbox | 使用随附的公证构建；App Sandbox 与 `es_new_client()` 不兼容 |
 
-## Extension does not appear or is not approved
+## 扩展未出现或未获批准
 
-The collector activates ESensor (and NetFilter) by submitting an `OSSystemExtensionRequest` when `EDRApp.app` launches. macOS imposes two hard preconditions before it will even surface an approval prompt.
+采集器在 `EDRApp.app` 启动时提交一个 `OSSystemExtensionRequest`，以此激活 ESensor（和 NetFilter）。在 macOS 甚至弹出审批提示之前，它会强制要求满足两个硬性前提条件。
 
 <Steps>
-  <Step title="Confirm the app is in /Applications">
-    macOS only activates system extensions from an app installed in `/Applications`. If the app was run from `~/Downloads`, a DMG, or any other location, the activation request is silently rejected and no prompt appears. The notarized `.pkg` installs `EDRApp.app` into `/Applications` for you; if you copied the app by hand, move it there and relaunch.
+  <Step title="确认应用位于 /Applications">
+    macOS 只会激活安装在 `/Applications` 中的应用的系统扩展。如果应用是从 `~/Downloads`、某个 DMG 或任何其他位置运行的，激活请求会被静默拒绝，且不会出现任何提示。经公证的 `.pkg` 会替你把 `EDRApp.app` 安装到 `/Applications`；如果你是手动复制的应用，请将其移动到该目录并重新启动。
   </Step>
-  <Step title="Approve the Endpoint Security extension">
-    On a standalone (non-MDM) install the approval is a one-time user action. Open **System Settings → General → Login Items & Extensions**, expand **Endpoint Security Extensions**, and enable **ESensor**. On older terminology you may see this surfaced as a **Privacy & Security → Allow** banner shortly after first launch.
+  <Step title="批准 Endpoint Security 扩展">
+    在独立（非 MDM）安装中，审批是一次性的用户操作。打开 **System Settings → General → Login Items & Extensions**，展开 **Endpoint Security Extensions**，并启用 **ESensor**。在较旧的术语中，你可能会在首次启动后不久看到它以 **Privacy & Security → Allow** 横幅的形式出现。
   </Step>
-  <Step title="Verify it activated">
-    Run `systemextensionsctl list` and confirm ESensor shows `[activated enabled]`. The states below decode the most common results.
+  <Step title="验证是否已激活">
+    运行 `systemextensionsctl list`，确认 ESensor 显示为 `[activated enabled]`。下方内容解读最常见的几种结果。
   </Step>
 </Steps>
 
-If you manage a fleet, do not rely on the user-facing prompt at all. Push a **System Extensions configuration profile** (`com.apple.system-extension-policy` with `AllowedTeamIdentifiers = MVMB6LCP2A`) **before** the app first tries to load the extension. That auto-approves activation and requires only MDM enrollment (UAMDM) — supervision is not needed for this payload. See [Deployment](/zh/macos-collector/deploy-mdm) for the full MDM profile set.
+如果你管理的是一整批设备，则完全不要依赖面向用户的提示。在应用首次尝试加载扩展**之前**，推送一个 **System Extensions 配置描述文件**（`com.apple.system-extension-policy`，其中 `AllowedTeamIdentifiers = MVMB6LCP2A`）。这会自动批准激活，并且只需要 MDM 注册（UAMDM）—— 此负载不需要监管（supervision）。完整的 MDM 描述文件集合请参见 [部署](/zh/macos-collector/deploy-mdm)。
 
-### Decoding `systemextensionsctl list` states
+### 解读 `systemextensionsctl list` 状态
 
-| State | Meaning | Action |
+| 状态 | 含义 | 操作 |
 | :-- | :-- | :-- |
-| `[activated enabled]` | Extension is approved and running | None — this is the healthy state |
-| `[activated waiting for user]` | Staged, but awaiting the approval toggle | Approve it (user toggle or MDM System Extensions profile) |
-| `[terminated waiting to uninstall on reboot]` | A prior version is being replaced | Reboot to complete the swap |
-| Extension absent from the list entirely | Activation request never reached the OS | Confirm the app is in `/Applications` and was launched at least once |
+| `[activated enabled]` | 扩展已获批准并正在运行 | 无 —— 这是健康状态 |
+| `[activated waiting for user]` | 已暂存，但正在等待审批开关 | 批准它（用户开关或 MDM System Extensions 描述文件） |
+| `[terminated waiting to uninstall on reboot]` | 正在替换一个旧版本 | 重启以完成替换 |
+| 扩展完全不在列表中 | 激活请求从未到达操作系统 | 确认应用位于 `/Applications` 中，并且至少启动过一次 |
 
-## Endpoint Security client errors (`es_new_client`)
+## Endpoint Security 客户端错误（`es_new_client`）
 
-When ESensor starts, it calls `es_new_client()`. A failure here means no process, file, or persistence telemetry will ever be emitted, even though the extension itself shows as activated. The two codes you will see in practice map to the two gates described in the note at the top of this page.
+ESensor 启动时会调用 `es_new_client()`。此处的失败意味着即使扩展本身显示为已激活，也永远不会发出任何进程、文件或持久化遥测。你在实际中会遇到的两个代码，对应本页顶部说明中描述的两道关卡。
 
-**`ES_NEW_CLIENT_RESULT_ERR_NOT_ENTITLED` — Gate 1, entitlement.**
-The restricted entitlement `com.apple.developer.endpoint-security.client` is not being honored. Under SIP, the kernel only honors that entitlement when an **Apple-issued provisioning profile** authorizing it is embedded in a properly signed, notarized bundle. The shipping collector satisfies this: it is signed with a **Developer ID Application** certificate, carries the embedded profile, uses the **Hardened Runtime**, and is **notarized and stapled** by Apple. You hit `ERR_NOT_ENTITLED` almost exclusively when running something that is *not* that build — an ad-hoc-signed binary, a locally rebuilt bundle whose profile is missing or stale, or a tampered app whose signature no longer validates. The fix is to install the official notarized `.pkg`.
+**`ES_NEW_CLIENT_RESULT_ERR_NOT_ENTITLED` —— 关卡 1，授权。**
+受限授权 `com.apple.developer.endpoint-security.client` 未被接受。在 SIP 下，只有当一个授权该权限的 **Apple 颁发的预置描述文件** 内嵌在正确签名并公证的软件包中时，内核才会接受该授权。发行版采集器满足这一点：它以 **Developer ID Application** 证书签名、携带内嵌描述文件、使用 **Hardened Runtime**，并由 Apple **公证和装订（stapled）**。你几乎只会在运行*非*该构建的东西时遇到 `ERR_NOT_ENTITLED` —— 例如 ad-hoc 签名的二进制文件、描述文件缺失或过期的本地重新构建软件包，或者签名不再通过验证的被篡改应用。修复方法是安装官方公证的 `.pkg`。
 
 <Note>
-This is the headline property of the collector: because the entitlement is authorized the supported, Apple-blessed way, the collector runs on a **normal, hardened Mac with SIP on**. You should never need `csrutil disable` or developer mode. If a runbook tells you to disable SIP to make telemetry work, it predates the entitlement migration and is wrong.
+这是采集器的核心亮点特性：由于授权是以受支持、经 Apple 认可的方式获得的，采集器可以在**启用 SIP 的普通、加固 Mac** 上运行。你永远不应需要 `csrutil disable` 或开发者模式。如果某个操作手册告诉你要禁用 SIP 才能让遥测工作，那它早于授权迁移，是错误的。
 </Note>
 
-**`ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED` — Gate 2, Full Disk Access.**
-The entitlement is fine, but the host process lacks TCC **Full Disk Access**. Full Disk Access is **required** for any Endpoint Security client — there is no configuration that removes this requirement. Grant it, and the error clears (see the next section). A secondary cause of this exact code is the **App Sandbox** being enabled on the ES extension; the sandbox makes `es_new_client()` fail with `ERR_NOT_PERMITTED` regardless of FDA. The shipped extension is deliberately not sandboxed, so this only surfaces on custom builds.
+**`ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED` —— 关卡 2，Full Disk Access。**
+授权没有问题，但宿主进程缺少 TCC **Full Disk Access**。任何 Endpoint Security 客户端都**必须**具备 Full Disk Access —— 没有任何配置能取消这一要求。授予它，错误便会消除（见下一节）。这一相同代码的次要原因是 ES 扩展上启用了 **App Sandbox**；无论 FDA 如何，沙箱都会让 `es_new_client()` 以 `ERR_NOT_PERMITTED` 失败。随附的扩展刻意不使用沙箱，因此这只会在自定义构建中出现。
 
-The collector is built to recover from `ERR_NOT_PERMITTED` without operator intervention: on that error the extension **exits**, and `launchd` relaunches it within roughly ten seconds. The moment Full Disk Access is granted, the next relaunch succeeds and events begin flowing — no app restart or reboot required.
+采集器的设计使其能够在无需操作员介入的情况下从 `ERR_NOT_PERMITTED` 中恢复：出现该错误时扩展会**退出**，而 `launchd` 会在大约十秒内将其重新启动。一旦授予 Full Disk Access，下一次重新启动便会成功，事件随即开始流动 —— 无需重启应用或重启系统。
 
-## Granting and keeping Full Disk Access
+## 授予并保持 Full Disk Access
 
-Full Disk Access is granted to the **extension**, not the app, and the entry is labeled differently than people expect.
+Full Disk Access 授予的是**扩展**，而不是应用，而且该条目的标签与人们预期的不同。
 
 <Steps>
-  <Step title="Open the Full Disk Access pane">
-    **System Settings → Privacy & Security → Full Disk Access.**
+  <Step title="打开 Full Disk Access 面板">
+    **System Settings → Privacy & Security → Full Disk Access。**
   </Step>
-  <Step title="Enable the ESensor entry">
-    Enable the entry shown as **ESensor / "Hilt EDR Sensor"**. It will **not** appear as "EDRApp" — granting FDA to the app bundle alone does not satisfy the ES client. If the entry is missing, launch `EDRApp.app` once so the extension registers, then return to this pane.
+  <Step title="启用 ESensor 条目">
+    启用显示为 **ESensor /“Hilt EDR Sensor”** 的条目。它**不会**以 “EDRApp” 出现 —— 仅为应用软件包授予 FDA 并不能满足 ES 客户端。如果该条目缺失，请启动一次 `EDRApp.app` 以让扩展注册，然后返回此面板。
   </Step>
-  <Step title="Confirm recovery">
-    Within ~10 seconds `launchd` relaunches ESensor, `es_new_client()` succeeds, and the `ERR_NOT_PERMITTED` log line stops. No reboot needed.
+  <Step title="确认恢复">
+    大约 10 秒内 `launchd` 会重新启动 ESensor，`es_new_client()` 成功，`ERR_NOT_PERMITTED` 日志行随即停止。无需重启。
   </Step>
 </Steps>
 
-### Full Disk Access lost after a macOS upgrade
+### macOS 升级后 Full Disk Access 丢失
 
-macOS resets TCC permissions across **major** OS upgrades. After such an upgrade, ESensor can flip back to `ERR_NOT_PERMITTED` even though nothing in the collector changed. This is expected macOS behavior, not a collector fault. You have two options:
+macOS 会在**大版本**操作系统升级时重置 TCC 权限。在此类升级之后，即使采集器本身没有任何变化，ESensor 也可能翻转回 `ERR_NOT_PERMITTED`。这是预期的 macOS 行为，并非采集器的故障。你有两个选择：
 
-- **Standalone hosts:** re-grant Full Disk Access to **ESensor** using the steps above. The extension's self-relaunch loop means telemetry resumes within seconds of re-granting.
-- **Managed fleets:** push a **PPPC configuration profile** (`com.apple.TCC.configuration-profile-policy` with `SystemPolicyAllFiles = Allow`) so Full Disk Access is pre-granted and **survives upgrades** automatically. The PPPC payload requires **supervision** (ADE / supervised enrollment), not just enrollment. Combined with the System Extensions profile, this yields a silent, upgrade-resilient install. See [Deployment](/zh/macos-collector/deploy-mdm).
+- **独立主机：** 使用上述步骤为 **ESensor** 重新授予 Full Disk Access。扩展的自重启循环意味着遥测会在重新授予后数秒内恢复。
+- **受管设备群：** 推送一个 **PPPC 配置描述文件**（`com.apple.TCC.configuration-profile-policy`，其中 `SystemPolicyAllFiles = Allow`），使 Full Disk Access 被预先授予并在升级后自动**保留**。PPPC 负载需要**监管**（ADE / 监管注册），而不仅仅是注册。与 System Extensions 描述文件结合，可实现静默、抗升级的安装。参见 [部署](/zh/macos-collector/deploy-mdm)。
 
-## No telemetry landing in the dashboard
+## 仪表盘中没有遥测到达
 
-If ESensor shows `[activated enabled]` and `es_new_client()` succeeded (no `ERR_*` lines), but macOS hosts are not appearing in the [Collectors](/zh/dashboard/collectors) fleet view or no events show under Investigate/Networks/Files/Users, the break is in the shipping path, not the sensor. ESensor emits events as JSON lines; the **forwarder LaunchDaemon** ships them over outbound HTTPS to the `edr-collector`, which routes to MSK Kafka (`dag.endpoint.exec/file/net`) and on to enrichment (`ENRICH_PLATFORM=macos`) and the ClickHouse `endpoint_events` table. Check the path in order, closest to the host first.
+如果 ESensor 显示为 `[activated enabled]` 且 `es_new_client()` 成功（没有 `ERR_*` 行），但 macOS 主机没有出现在 [采集器](/zh/dashboard/collectors) 设备群视图中，或者 Investigate/Networks/Files/Users 下没有显示任何事件，那么问题出在投递路径上，而不是传感器上。ESensor 以 JSON 行的形式发出事件；**转发器 LaunchDaemon** 通过出站 HTTPS 将它们发送到 `edr-collector`，后者路由到 MSK Kafka（`dag.endpoint.exec/file/net`），再到富化（`ENRICH_PLATFORM=macos`）以及 ClickHouse `endpoint_events` 表。请按顺序、从最靠近主机的一端开始检查该路径。
 
 <Steps>
-  <Step title="Confirm the forwarder LaunchDaemon is running">
-    The forwarder is a system LaunchDaemon installed alongside the app. Confirm it is loaded and not crash-looping. If it is missing or unloaded, no events leave the host regardless of how healthy ESensor is.
+  <Step title="确认转发器 LaunchDaemon 正在运行">
+    转发器是随应用一起安装的系统 LaunchDaemon。确认它已加载且没有崩溃循环。如果它缺失或未加载，那么无论 ESensor 多么健康，都不会有事件离开主机。
   </Step>
-  <Step title="Check EDR_COLLECTOR_URL">
-    The forwarder ships to the URL in `EDR_COLLECTOR_URL`. It must be the **base ingest host** for your deployment with **no extra path** appended — a stray path segment is a common cause of silent rejects. Confirm the value and that it resolves from the host.
+  <Step title="检查 EDR_COLLECTOR_URL">
+    转发器会发送到 `EDR_COLLECTOR_URL` 中的 URL。它必须是你部署的**基础摄取主机**，且**不附加任何额外路径** —— 多余的路径段是静默拒绝的常见原因。确认该值，并确认它能从主机解析。
   </Step>
-  <Step title="Verify outbound HTTPS">
-    The collector uses **only outbound HTTPS (443)** to the configured ingest endpoint — no inbound sockets, no phone-home. Confirm that outbound 443 to the ingest host is permitted by any local firewall, web proxy, or network policy. A TLS-intercepting proxy that the host does not trust will also break shipping.
+  <Step title="验证出站 HTTPS">
+    采集器**仅**使用到所配置摄取端点的**出站 HTTPS（443）** —— 没有入站套接字，也没有回连（phone-home）。确认到摄取主机的出站 443 已被任何本地防火墙、Web 代理或网络策略放通。主机不信任的 TLS 拦截代理同样会破坏投递。
   </Step>
-  <Step title="Confirm events at the source">
-    If the forwarder, URL, and network all check out but nothing arrives, confirm ESensor is actually producing events by streaming its log (see below). A sensor producing zero events usually means it is still blocked on Gate 1 or Gate 2 despite appearing activated.
+  <Step title="在源头确认事件">
+    如果转发器、URL 和网络都检查无误但仍无内容到达，请通过流式查看 ESensor 的日志（见下文）来确认它确实在生成事件。一个生成零事件的传感器，通常意味着它尽管显示为已激活，但仍被阻断在关卡 1 或关卡 2。
   </Step>
 </Steps>
 
 <Note>
-Aggressive userspace filtering is applied before events leave the host — `file_open` alone is over 95% of raw volume and is heavily reduced. "Lower-than-expected event counts" is therefore usually correct behavior, not a fault. Distinguish *fewer* events from *zero* events: zero events points to one of the gates or the forwarder; merely sparse events is normal filtering. See [Event filtering](/zh/macos-collector/event-coverage).
+在事件离开主机之前会应用激进的用户态过滤 —— 仅 `file_open` 就占原始量的 95% 以上，并被大幅削减。因此，“事件计数低于预期”通常是正确行为，而非故障。请区分*较少*事件与*零*事件：零事件指向某道关卡或转发器；仅仅是稀疏事件则属于正常过滤。参见 [事件过滤](/zh/macos-collector/event-coverage)。
 </Note>
 
-## How to inspect the collector
+## 如何检查采集器
 
-Two commands cover almost all live diagnosis.
+两条命令几乎覆盖所有实时诊断。
 
-**List system extensions and their states:**
+**列出系统扩展及其状态：**
 
 ```bash
 systemextensionsctl list
 ```
 
-Look for the ESensor entry (bundle id `Hilt.EDRApp.ESensor`) and the NetFilter entry (`Hilt.EDRApp.NetFilter`). A healthy ESensor reads `[activated enabled]`; `[activated waiting for user]` means it still needs approval. Confirm the team identifier is `MVMB6LCP2A`.
+查找 ESensor 条目（bundle id `Hilt.EDRApp.ESensor`）和 NetFilter 条目（`Hilt.EDRApp.NetFilter`）。健康的 ESensor 显示为 `[activated enabled]`；`[activated waiting for user]` 意味着它仍需批准。确认团队标识符为 `MVMB6LCP2A`。
 
-**Stream the extension's live logs:**
+**流式查看扩展的实时日志：**
 
 ```bash
 log stream --predicate 'subsystem == "Hilt.EDRApp.ESensor"' --info
 ```
 
-This surfaces `es_new_client()` results in real time. The presence of `ERR_NOT_ENTITLED` (Gate 1) or `ERR_NOT_PERMITTED` (Gate 2) tells you immediately which gate is failing and routes you to the matching section above. To inspect past activity instead of streaming, swap `log stream` for `log show --last 1h` with the same predicate.
+这会实时呈现 `es_new_client()` 的结果。出现 `ERR_NOT_ENTITLED`（关卡 1）或 `ERR_NOT_PERMITTED`（关卡 2）会立即告诉你哪道关卡失败，并把你引导到上文对应的章节。若要查看过往活动而非流式查看，可将 `log stream` 换成使用相同 predicate 的 `log show --last 1h`。
 
-To confirm what the OS believes about the installed bundle's signature, entitlements, and notarization:
+若要确认操作系统对已安装软件包的签名、授权和公证的判断：
 
 ```bash
 codesign -dv --entitlements - /Applications/EDRApp.app
 spctl -a -vvv --type install /Applications/EDRApp.app
 ```
 
-These confirm the Developer ID signature, the embedded `com.apple.developer.endpoint-security.client` entitlement, and that the build is notarized — the foundation that Gate 1 depends on.
+这些命令确认 Developer ID 签名、内嵌的 `com.apple.developer.endpoint-security.client` 授权，以及该构建已被公证 —— 也就是关卡 1 所依赖的基础。
 
-## What this page does not cover
+## 本页不涵盖的内容
 
-- **Re-enabling features that do not exist yet.** Auto-update and on-device quarantine response are **not yet available** on macOS during early access. If telemetry is missing, the cause is install/approval/forwarder — not a disabled update or response feature.
-- **Disabling SIP.** The supported collector runs with **SIP enabled**. There is no troubleshooting step that involves `csrutil disable`; if you think you need it, you are running an unsupported build (see `ERR_NOT_ENTITLED` above).
-- **Kernel extension issues.** There is **no kext**. Anything referencing `kextload`, `kextstat`, or a kernel extension approval pane does not apply to this collector.
+- **重新启用尚不存在的功能。** 自动更新和设备端隔离响应在早期访问阶段的 macOS 上**尚不可用**。如果遥测缺失，原因在于安装/审批/转发器 —— 而不是被禁用的更新或响应功能。
+- **禁用 SIP。** 受支持的采集器在 **SIP 已启用** 的状态下运行。没有任何涉及 `csrutil disable` 的故障排查步骤；如果你认为你需要它，那你运行的是不受支持的构建（见上文的 `ERR_NOT_ENTITLED`）。
+- **内核扩展问题。** 这里**没有 kext**。任何引用 `kextload`、`kextstat` 或内核扩展审批面板的内容都不适用于此采集器。
 
-For the full architecture and data path, see [Data flow](/zh/macos-collector/data-flow); for install paths and MDM profiles, see [Deployment](/zh/macos-collector/deploy-mdm).
+完整的架构与数据路径请参见 [数据流](/zh/macos-collector/data-flow)；安装路径与 MDM 描述文件请参见 [部署](/zh/macos-collector/deploy-mdm)。

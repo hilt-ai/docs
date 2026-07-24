@@ -7,7 +7,7 @@ The agent accepts configuration via (in order of precedence) CLI flags, environm
 
 | CLI | Env var | Config key | Default | Purpose |
 | :-- | :-- | :-- | :-- | :-- |
-| `-s` | `DAG_SHIP_URL` | `ship_url` | unset = file mode | HTTPS collector URL. |
+| `-s` | `DAG_SHIP_URL` | `ship_url` | unset = file mode | Full HTTPS ingest URL, including the `/ingest` path (e.g. `https://<name>-ingest.hilt.ai/ingest`) — the agent POSTs to it verbatim. Unset = file mode. |
 | `-o` | `DAG_OUTPUT_PATH` | `output_path` | `/var/log/dag-agent/events.jsonl` | JSONL output. Set to `-` for stdout explicitly. |
 | `-n` | `DAG_NODE_ID` | `node_id` | `$(hostname)` / `spec.nodeName` on K8s | String host label displayed on the dashboard. |
 | `-b` | n/a | n/a | off | Benchmark mode; ship only. |

@@ -1,100 +1,100 @@
 ---
 title: "通过 MDM 部署"
 sidebarTitle: "MDM 部署"
-description: "Zero-click fleet rollout of the Hilt macOS Collector through Jamf, Kandji, or Intune: push the signed .pkg, auto-approve the System Extension, and pre-grant Full Disk Access with PPPC — no end-user interaction."
+description: "通过 Jamf、Kandji 或 Intune 对 Hilt macOS 采集器进行零点击主机群部署：推送已签名的 .pkg、自动批准系统扩展，并借助 PPPC 预授予 Full Disk Access——全程无需终端用户交互。"
 ---
 
-## Overview
+## 概述
 
-The Hilt macOS Collector ships as a notarized macOS app, **Hilt EDR** (`EDRApp.app`, team **Cybe Corporation / MVMB6LCP2A**), that embeds two Apple System Extensions:
+Hilt macOS 采集器以一款经过公证的 macOS 应用 **Hilt EDR**（`EDRApp.app`，团队 **Cybe Corporation / MVMB6LCP2A**）的形式发布，其中内嵌了两个 Apple 系统扩展：
 
 | Extension | Type | Bundle id | Role |
 | :-- | :-- | :-- | :-- |
-| ESensor | Endpoint Security (ES) | `Hilt.EDRApp.ESensor` | Telemetry sensor: process / file / network / persistence events |
-| NetFilter | NetworkExtension content filter | `Hilt.EDRApp.NetFilter` | Per-flow network attribution |
+| ESensor | Endpoint Security (ES) | `Hilt.EDRApp.ESensor` | 遥测传感器：进程 / 文件 / 网络 / 持久化事件 |
+| NetFilter | NetworkExtension content filter | `Hilt.EDRApp.NetFilter` | 逐流网络归因 |
 
-There is **no kernel extension** — both are pure user-space System Extensions on Apple's modern frameworks, and the collector runs with **System Integrity Protection (SIP) enabled** on a normal, hardened Mac. See [Networking and trust model](/zh/macos-collector/networking-security) for the full signing-and-entitlement story.
+这里**没有内核扩展**——两者都是基于 Apple 现代框架的纯用户空间系统扩展，采集器在启用了 **System Integrity Protection (SIP)** 的普通加固 Mac 上运行。完整的签名与授权（entitlement）说明参见[网络与信任模型](/zh/macos-collector/networking-security)。
 
-On an unmanaged Mac, an Endpoint Security product requires two unavoidable user consents — approving the System Extension and granting Full Disk Access — because they are Apple security requirements that cannot be click-suppressed without an MDM. The [direct-download path](/zh/macos-collector/deploy-standalone) walks the user through those two consents. **Under MDM you remove both prompts** by pushing two configuration profiles alongside the app, so enrollment becomes a silent, zero-touch install.
+在未受管理的 Mac 上，Endpoint Security 类产品需要两项无法回避的用户授权——批准系统扩展以及授予 Full Disk Access——因为这些是 Apple 的安全要求，没有 MDM 就无法抑制其弹窗。[直接下载路径](/zh/macos-collector/deploy-standalone)会引导用户完成这两项授权。**在 MDM 下，你可以消除这两个弹窗**：只需随应用一起推送两个配置描述文件，注册即成为一次静默、零接触的安装。
 
-This page covers the three pieces of an MDM rollout:
+本页介绍 MDM 部署的三个部分：
 
-1. **App delivery** — deploy the signed `.pkg` to the fleet.
-2. **System Extensions payload** — auto-approve the embedded extensions so no approval prompt appears.
-3. **PPPC (Privacy) payload** — pre-grant Full Disk Access so no FDA prompt appears.
+1. **应用分发** —— 将已签名的 `.pkg` 部署到主机群。
+2. **系统扩展 payload** —— 自动批准内嵌扩展，使批准弹窗不再出现。
+3. **PPPC（隐私）payload** —— 预授予 Full Disk Access，使 FDA 弹窗不再出现。
 
 <Note>
-The macOS collector is **early access**. The notarized `.pkg` plus SIP-on install described here is the target shipping model. Auto-update and on-device quarantine response are not yet available on macOS.
+macOS 采集器目前处于**早期访问（early access）**阶段。这里描述的经公证 `.pkg` 加 SIP 启用的安装方式即为目标发布模型。自动更新和设备端隔离响应在 macOS 上尚不可用。
 </Note>
 
-## Enrollment prerequisites
+## 注册前置条件
 
-The two profiles have different enrollment requirements. Plan your rollout around the stricter one (supervision), or accept a single FDA toggle per host where supervision is unavailable.
+这两个描述文件的注册要求不同。请围绕更严格的一项（监管）来规划部署，或者在无法实现监管的情况下，接受每台主机需手动切换一次 FDA。
 
 | Profile | What it does | Minimum enrollment |
 | :-- | :-- | :-- |
-| System Extensions (`com.apple.system-extension-policy`) | Pre-approves the extension — no approval prompt | **User-Approved MDM (UAMDM)**. Supervision *not* required. |
-| PPPC (`com.apple.TCC.configuration-profile-policy`) | Pre-grants Full Disk Access — no FDA prompt | **Supervision** (ADE / Automated Device Enrollment, or a supervised enrollment). |
+| System Extensions (`com.apple.system-extension-policy`) | 预批准扩展——无批准弹窗 | **User-Approved MDM (UAMDM)**。*无需*监管。 |
+| PPPC (`com.apple.TCC.configuration-profile-policy`) | 预授予 Full Disk Access——无 FDA 弹窗 | **监管**（ADE / Automated Device Enrollment，或受监管的注册）。 |
 
-- **UAMDM** is granted on any Mac that is enrolled in MDM with the user having approved the enrollment (or via ADE, where it is automatic). It is enough to silence the System Extension approval.
-- **Supervision** is the stronger state, typically achieved through **Automated Device Enrollment (ADE)** (formerly DEP) or Apple Configurator. Only a supervised Mac honors a PPPC payload that grants `SystemPolicyAllFiles`.
+- **UAMDM** 会授予任何已注册到 MDM、且用户已批准该注册的 Mac（或通过 ADE 自动获得）。它足以消除系统扩展的批准弹窗。
+- **监管**是更强的状态，通常通过 **Automated Device Enrollment (ADE)**（前称 DEP）或 Apple Configurator 实现。只有受监管的 Mac 才会遵从授予 `SystemPolicyAllFiles` 的 PPPC payload。
 
-On a UAMDM-but-not-supervised Mac, the extension auto-approves but the user must still toggle Full Disk Access once. On a supervised, ADE-enrolled fleet, the entire install is silent.
+在 UAMDM 但未受监管的 Mac 上，扩展会自动获批，但用户仍须手动切换一次 Full Disk Access。在受监管、通过 ADE 注册的主机群上，整个安装过程是静默的。
 
 | Mac state | System Extension approval | Full Disk Access | User actions |
 | :-- | :-- | :-- | :-- |
-| Unmanaged (direct download) | one click | one toggle | ~2 clicks + 1 password |
-| UAMDM, not supervised | auto (silent) | one toggle | one FDA toggle |
-| Supervised (ADE) | auto (silent) | auto (silent) | **zero** |
+| 未受管理（直接下载） | 一次点击 | 一次切换 | 约 2 次点击 + 1 次密码 |
+| UAMDM，未受监管 | 自动（静默） | 一次切换 | 一次 FDA 切换 |
+| 受监管（ADE） | 自动（静默） | 自动（静默） | **零** |
 
-## Piece 1 — Deploy the signed .pkg
+## 部分 1 —— 部署已签名的 .pkg
 
-The collector is distributed as a notarized, Developer ID-signed `.pkg`. Installing it places `EDRApp.app` in `/Applications` and registers the small forwarder LaunchDaemon that ships events. See [Release artifacts](/zh/macos-collector/release-artifacts) for where to obtain the package and its checksum.
+采集器以经过公证、使用 Developer ID 签名的 `.pkg` 分发。安装它会将 `EDRApp.app` 放入 `/Applications`，并注册用于发送事件的小型转发器 LaunchDaemon。获取安装包及其校验和的位置参见[发布工件](/zh/macos-collector/release-artifacts)。
 
 <Steps>
   <Step title="Upload the package to your MDM">
-    Add the signed `.pkg` to your MDM's package store:
-    - **Jamf Pro:** upload to a distribution point (Jamf Admin or the web console), then scope a policy with an **Install Package** action.
-    - **Kandji:** add a **Custom App** of type **Installer Package (.pkg)** and assign it to a Blueprint.
-    - **Intune:** add it as a **macOS app → Line-of-business app** (`.pkg`), or wrap and deploy via the Intune macOS PKG installer.
+    将已签名的 `.pkg` 添加到你的 MDM 的软件包库中：
+    - **Jamf Pro：** 上传到分发点（Jamf Admin 或 Web 控制台），然后在策略中限定一个 **Install Package** 操作。
+    - **Kandji：** 添加一个类型为 **Installer Package (.pkg)** 的 **Custom App**，并将其分配到某个 Blueprint。
+    - **Intune：** 将其作为 **macOS app → Line-of-business app**（`.pkg`）添加，或通过 Intune macOS PKG 安装程序封装并部署。
   </Step>
   <Step title="Order delivery before first launch">
-    Deliver the **System Extensions payload before the app first launches** (see Piece 2). If the app starts before its approval profile lands, macOS will surface a one-time approval prompt that the profile would have suppressed. In Jamf, scope the configuration profile to the same smart group at the same priority or higher than the install policy; in Kandji and Intune, profiles and apps in a Blueprint / assignment converge at check-in, so target the same group.
+    **在应用首次启动之前**先交付**系统扩展 payload**（见部分 2）。如果应用在其批准描述文件到达之前就启动，macOS 会弹出一次性的批准提示，而该描述文件本可以抑制它。在 Jamf 中，将配置描述文件限定到与安装策略相同的智能群组，并设为相同或更高的优先级；在 Kandji 和 Intune 中，Blueprint / 分配中的描述文件和应用会在设备签入时收敛，因此针对同一群组即可。
   </Step>
   <Step title="Verify the install landed">
-    From a managed host (or via your MDM's remote-command / script runner):
+    从受管主机上（或通过你的 MDM 的远程命令 / 脚本运行器）：
     ```bash
     pkgutil --pkg-info-plist <package-identifier>
     ls -d /Applications/EDRApp.app
     systemextensionsctl list
     ```
-    `systemextensionsctl list` should show `Hilt.EDRApp.ESensor` and `Hilt.EDRApp.NetFilter` in the `[activated enabled]` state once approval has applied.
+    批准生效后，`systemextensionsctl list` 应显示 `Hilt.EDRApp.ESensor` 和 `Hilt.EDRApp.NetFilter` 处于 `[activated enabled]` 状态。
   </Step>
 </Steps>
 
-The `.pkg` is notarized and Developer ID-signed, so Gatekeeper admits it without any local override. No `csrutil disable`, no `systemextensionsctl developer on`, and no developer mode are involved on managed hosts — those are dev-only steps that a notarized package removes entirely.
+该 `.pkg` 经过公证并使用 Developer ID 签名，因此 Gatekeeper 无需任何本地覆盖即可放行。受管主机上不涉及 `csrutil disable`、`systemextensionsctl developer on`，也不涉及开发者模式——这些都是仅供开发使用的步骤，而经过公证的安装包完全省去了它们。
 
-## Piece 2 — System Extensions payload (auto-approve the extension)
+## 部分 2 —— 系统扩展 payload（自动批准扩展）
 
-To suppress the System Extension approval prompt, push a **System Extensions** configuration profile. The payload type is `com.apple.system-extension-policy`, and the key is to whitelist Hilt's Apple Developer Team ID so any extension signed by that team is auto-approved.
+要抑制系统扩展的批准弹窗，请推送一个**系统扩展**配置描述文件。payload 类型为 `com.apple.system-extension-policy`，关键在于将 Hilt 的 Apple Developer Team ID 列入白名单，从而使由该团队签名的任何扩展都被自动批准。
 
-**Required values**
+**所需值**
 
 | Key | Value | Meaning |
 | :-- | :-- | :-- |
-| Payload type | `com.apple.system-extension-policy` | System Extensions policy |
-| `AllowedTeamIdentifiers` | `MVMB6LCP2A` | Auto-approve any system extension signed by Cybe Corporation |
-| `AllowedSystemExtensions` (optional, tighter) | `MVMB6LCP2A` → `Hilt.EDRApp.ESensor`, `Hilt.EDRApp.NetFilter` | Restrict approval to exactly these two extensions |
+| Payload type | `com.apple.system-extension-policy` | 系统扩展策略 |
+| `AllowedTeamIdentifiers` | `MVMB6LCP2A` | 自动批准由 Cybe Corporation 签名的任何系统扩展 |
+| `AllowedSystemExtensions`（可选，更严格） | `MVMB6LCP2A` → `Hilt.EDRApp.ESensor`, `Hilt.EDRApp.NetFilter` | 将批准限制为恰好这两个扩展 |
 
-Whitelisting the Team ID (`MVMB6LCP2A`) is the simplest and recommended form: it auto-approves both ESensor and NetFilter, and survives extension renames or additions within the same team. If your policy prefers an explicit allowlist, pin the two bundle ids under `AllowedSystemExtensions` keyed to the team.
+将 Team ID（`MVMB6LCP2A`）列入白名单是最简单、也是推荐的方式：它会自动批准 ESensor 和 NetFilter，并在同一团队内的扩展重命名或新增时依然有效。如果你的策略偏好显式的允许列表，可在 `AllowedSystemExtensions` 下以团队为键固定这两个 bundle id。
 
-**By MDM:**
+**按 MDM 划分：**
 
-- **Jamf Pro:** Configuration Profile → **System Extensions** payload → set **System Extension Types** to *Allowed Team IDs*, add `MVMB6LCP2A`. (Optionally add *Allowed System Extensions* with the two bundle ids.)
-- **Kandji:** **System Extensions** library item → add an allowed team identifier `MVMB6LCP2A`.
-- **Intune:** **Devices → Configuration → macOS → Templates → Extensions → System Extensions** → allow the team identifier `MVMB6LCP2A`.
+- **Jamf Pro：** Configuration Profile → **System Extensions** payload → 将 **System Extension Types** 设为 *Allowed Team IDs*，添加 `MVMB6LCP2A`。（可选：添加 *Allowed System Extensions* 并填入两个 bundle id。）
+- **Kandji：** **System Extensions** 库项目 → 添加允许的团队标识符 `MVMB6LCP2A`。
+- **Intune：** **Devices → Configuration → macOS → Templates → Extensions → System Extensions** → 允许团队标识符 `MVMB6LCP2A`。
 
-A raw payload, for reference or for a custom-profile MDM, looks like this:
+原始 payload（供参考，或用于自定义描述文件的 MDM）如下所示：
 
 ```xml
 <dict>
@@ -115,15 +115,15 @@ A raw payload, for reference or for a custom-profile MDM, looks like this:
 </dict>
 ```
 
-This payload only requires **UAMDM**, not supervision. With it in place before first launch, the extension activates without ever surfacing the *"System extension blocked / Open System Settings"* prompt.
+此 payload 只需 **UAMDM**，无需监管。只要在首次启动前部署到位，扩展便会激活，而绝不会弹出 *"System extension blocked / Open System Settings"* 提示。
 
-## Piece 3 — PPPC payload (pre-grant Full Disk Access)
+## 部分 3 —— PPPC payload（预授予 Full Disk Access）
 
-Full Disk Access is **required** for any Endpoint Security client — this is not optional, and the FDA entry on macOS appears as **ESensor / "Hilt EDR Sensor"**, not "EDRApp". To grant it silently, push a **Privacy Preferences Policy Control (PPPC)** profile.
+Full Disk Access 对任何 Endpoint Security 客户端都是**必需**的——这并非可选项，且 macOS 上的 FDA 条目显示为 **ESensor /"Hilt EDR Sensor"**，而非 "EDRApp"。要静默授予它，请推送一个 **Privacy Preferences Policy Control (PPPC)** 描述文件。
 
-The payload type is `com.apple.TCC.configuration-profile-policy`. Set the `SystemPolicyAllFiles` service to **Allow**, keyed to ESensor's code requirement so the grant binds to the correct, signed binary.
+payload 类型为 `com.apple.TCC.configuration-profile-policy`。将 `SystemPolicyAllFiles` 服务设为 **Allow**，并以 ESensor 的代码要求（code requirement）为键，使该授权绑定到正确的、已签名的二进制文件。
 
-**Required values**
+**所需值**
 
 | Key | Value |
 | :-- | :-- |
@@ -134,13 +134,13 @@ The payload type is `com.apple.TCC.configuration-profile-policy`. Set the `Syste
 | Service | `SystemPolicyAllFiles` |
 | Access | `Allow` |
 
-**By MDM:**
+**按 MDM 划分：**
 
-- **Jamf Pro:** Configuration Profile → **Privacy Preferences Policy Control** payload → add an app with **Identifier** `Hilt.EDRApp.ESensor` (type *Bundle ID*), paste the code requirement, set **App or service** = *SystemPolicyAllFiles*, **Access** = *Allow*. Jamf can auto-compute the code requirement if you upload the signed app.
-- **Kandji:** **PPPC** library item → add the ESensor identifier with the code requirement → grant *Full Disk Access (SystemPolicyAllFiles)*.
-- **Intune:** macOS PPPC profile → service `SystemPolicyAllFiles` → *Allow*, with the identifier and code requirement above.
+- **Jamf Pro：** Configuration Profile → **Privacy Preferences Policy Control** payload → 添加一个应用，**Identifier** 为 `Hilt.EDRApp.ESensor`（类型 *Bundle ID*），粘贴代码要求，将 **App or service** 设为 *SystemPolicyAllFiles*、**Access** 设为 *Allow*。如果你上传了已签名的应用，Jamf 可自动计算代码要求。
+- **Kandji：** **PPPC** 库项目 → 添加带代码要求的 ESensor 标识符 → 授予 *Full Disk Access (SystemPolicyAllFiles)*。
+- **Intune：** macOS PPPC 描述文件 → 服务 `SystemPolicyAllFiles` → *Allow*，并填入上述标识符和代码要求。
 
-A raw payload, for reference:
+原始 payload，供参考：
 
 ```xml
 <dict>
@@ -165,21 +165,21 @@ A raw payload, for reference:
 </dict>
 ```
 
-This payload **requires supervision** (ADE / supervised enrollment). On a supervised, ADE-enrolled fleet it grants Full Disk Access with no user interaction; the install is fully silent end to end.
+此 payload **需要监管**（ADE / 受监管的注册）。在受监管、通过 ADE 注册的主机群上，它会在无需用户交互的情况下授予 Full Disk Access；整个安装过程从头到尾完全静默。
 
 <Note>
-PPPC can pre-grant **Full Disk Access** (and Accessibility), but it can **never** pre-grant **Camera, Microphone, or Screen Recording** — Apple always requires a manual user grant for those three. The Hilt ES sensor only needs Full Disk Access, so an MDM install is fully silent. You do not need, and should not request, any of the camera / mic / screen services.
+PPPC 可以预授予 **Full Disk Access**（以及 Accessibility），但**绝不能**预授予 **Camera、Microphone 或 Screen Recording**——对这三项，Apple 始终要求用户手动授予。Hilt ES 传感器只需要 Full Disk Access，因此 MDM 安装是完全静默的。你不需要、也不应请求任何摄像头 / 麦克风 / 屏幕相关服务。
 </Note>
 
-## Result and verification
+## 结果与验证
 
-With all three pieces in place against a supervised, ADE-enrolled Mac:
+在受监管、通过 ADE 注册的 Mac 上部署好全部三个部分后：
 
-1. The MDM installs the `.pkg` → `EDRApp.app` lands in `/Applications` and the forwarder LaunchDaemon registers.
-2. The System Extensions profile auto-approves ESensor and NetFilter — no approval prompt.
-3. The PPPC profile pre-grants Full Disk Access to ESensor — no FDA prompt.
+1. MDM 安装 `.pkg` → `EDRApp.app` 落入 `/Applications`，转发器 LaunchDaemon 完成注册。
+2. 系统扩展描述文件自动批准 ESensor 和 NetFilter——无批准弹窗。
+3. PPPC 描述文件向 ESensor 预授予 Full Disk Access——无 FDA 弹窗。
 
-The user sees nothing; telemetry begins flowing. To confirm from a managed host:
+用户什么都不会看到；遥测开始流动。要从受管主机确认：
 
 ```bash
 # Extensions activated and enabled
@@ -192,17 +192,17 @@ pgrep -fl ESensor
 launchctl print system/<forwarder-daemon-label>
 ```
 
-`systemextensionsctl list` should report `Hilt.EDRApp.ESensor` and `Hilt.EDRApp.NetFilter` as `[activated enabled]`. Within a minute the host appears in the dashboard **Collectors** fleet with a **macOS host-type badge**, and its events flow into the **Investigate**, **Networks**, **Files**, and **Users** views. See [Data flow](/zh/macos-collector/data-flow) for the end-to-end pipeline (ESensor → forwarder → edr-collector → MSK → enrichment → ClickHouse `endpoint_events`).
+`systemextensionsctl list` 应将 `Hilt.EDRApp.ESensor` 和 `Hilt.EDRApp.NetFilter` 报告为 `[activated enabled]`。一分钟内，该主机会带着 **macOS 主机类型徽章**出现在仪表盘的 **Collectors** 主机群中，其事件也会流入 **Investigate**、**Networks**、**Files** 和 **Users** 视图。端到端管道（ESensor → 转发器 → edr-collector → MSK → 富化 → ClickHouse `endpoint_events`）参见[数据流](/zh/macos-collector/data-flow)。
 
-## Updates and macOS upgrades
+## 更新与 macOS 升级
 
-- **App / extension update** (same Team ID, signed): no re-approval. The existing System Extension approval and FDA grant carry over, and `launchd` relaunches the new extension build automatically. Push the new `.pkg` through the same MDM mechanism.
-- **macOS major upgrade:** Full Disk Access grants can occasionally reset across major OS upgrades (a known TCC behavior). The MDM PPPC profile re-applies the grant automatically at the next check-in, so supervised fleets self-heal. Direct-download (non-MDM) users may need to re-toggle FDA once.
+- **应用 / 扩展更新**（相同 Team ID、已签名）：无需重新批准。既有的系统扩展批准和 FDA 授权会延续，`launchd` 会自动重新启动新的扩展构建。通过同一 MDM 机制推送新的 `.pkg` 即可。
+- **macOS 大版本升级：** Full Disk Access 授权在大版本 OS 升级时偶尔会被重置（这是一种已知的 TCC 行为）。MDM PPPC 描述文件会在下次签入时自动重新应用该授权，因此受监管的主机群可自我修复。直接下载（非 MDM）的用户可能需要重新切换一次 FDA。
 
-## What this deployment does not do
+## 此部署不做什么
 
-- **No inbound exposure.** The collector opens no listening sockets and never phones home. The only network path is outbound HTTPS from the forwarder to the configured ingest endpoint. See [Networking and trust model](/zh/macos-collector/networking-security).
-- **No kernel extension.** Nothing loads into the kernel; there is no kext approval and no SIP change. The Mac stays hardened with SIP enabled.
-- **No camera / mic / screen capture.** The sensor requests only Full Disk Access. It cannot, and does not, request Camera, Microphone, or Screen Recording — and PPPC could not pre-grant them anyway.
-- **No auto-update or on-device response (yet).** During early access, upgrades are pushed by re-deploying the `.pkg`; on-device quarantine response is not available on macOS.
-- **No supervision bypass.** PPPC's silent Full Disk Access grant genuinely requires supervision. On UAMDM-only Macs, expect exactly one FDA toggle per host; everything else is silent.
+- **无入站暴露。** 采集器不打开任何监听套接字，也绝不回连（phone home）。唯一的网络路径是从转发器出站的 HTTPS，连往所配置的接入端点。参见[网络与信任模型](/zh/macos-collector/networking-security)。
+- **无内核扩展。** 没有任何东西加载进内核；不存在 kext 批准，也不改动 SIP。Mac 始终保持 SIP 启用的加固状态。
+- **无摄像头 / 麦克风 / 屏幕捕获。** 传感器只请求 Full Disk Access。它无法、也不会请求 Camera、Microphone 或 Screen Recording——况且 PPPC 本就无法预授予它们。
+- **暂无自动更新或设备端响应。** 在早期访问期间，升级通过重新部署 `.pkg` 来推送；设备端隔离响应在 macOS 上尚不可用。
+- **无监管绕过。** PPPC 的静默 Full Disk Access 授权确实需要监管。在仅有 UAMDM 的 Mac 上，每台主机应预期恰好一次 FDA 切换；其余一切均为静默。

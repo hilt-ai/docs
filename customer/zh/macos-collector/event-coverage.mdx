@@ -1,100 +1,100 @@
 ---
 title: "事件覆盖与过滤"
 sidebarTitle: "事件覆盖"
-description: "Which Apple Endpoint Security events the macOS collector captures, how each one maps to a typed event, and how userspace filtering reduces file-open volume to a security-relevant stream."
+description: "macOS 采集器捕获哪些 Apple Endpoint Security 事件，每个事件如何映射到类型化事件，以及用户空间过滤如何将文件打开量削减为与安全相关的数据流。"
 ---
 
-The macOS collector (the **Hilt EDR** app and its **ESensor** Endpoint Security system extension) subscribes to Apple's Endpoint Security (ES) framework and emits a small, fixed set of typed events. Unlike the Linux collector — which reads raw syscall tracepoints over eBPF and must drop the firehose in the kernel — ESensor receives only the ES event classes it explicitly subscribes to. The kernel-side selection is therefore Apple's `es_subscribe` allow-list, and the collector's own filtering happens entirely in userspace, before events are serialized to JSON lines and shipped to the [edr-collector](/zh/macos-collector/data-flow).
+macOS 采集器（**Hilt EDR** 应用及其 **ESensor** Endpoint Security 系统扩展）订阅 Apple 的 Endpoint Security（ES）框架，并发出一小组固定的类型化事件。与 Linux 采集器不同——后者通过 eBPF 读取原始系统调用跟踪点，必须在内核中丢弃海量数据——ESensor 只接收它显式订阅的 ES 事件类别。因此内核侧的筛选就是 Apple 的 `es_subscribe` 允许列表，而采集器自身的过滤完全发生在用户空间，在事件被序列化为 JSON 行并发送到 [edr-collector](/zh/macos-collector/data-flow) 之前完成。
 
-Every event the sensor emits carries **code-signing trust** and **application attribution** as first-class fields, so the coverage below is not just "what happened" but "who did it, signed by whom." See [Event data model](/zh/macos-collector/event-data-model) for the full column set.
+传感器发出的每个事件都将**代码签名信任**和**应用归因**作为一等字段携带，因此下面的覆盖范围不仅是"发生了什么"，而是"由谁完成、由谁签名"。完整的字段集参见[事件数据模型](/zh/macos-collector/event-data-model)。
 
 ---
 
-## Event coverage
+## 事件覆盖
 
-ESensor subscribes to **12 Apple Endpoint Security event types** plus a network-flow source, and emits **12 typed events** into the `endpoint_events` table. Each row is tagged with an `event_class` (process, file, persistence, device, network) and an `event_type`.
+ESensor 订阅 **12 种 Apple Endpoint Security 事件类型**外加一个网络流来源，并向 `endpoint_events` 表发出 **12 个类型化事件**。每一行都标注了 `event_class`（process、file、persistence、device、network）和 `event_type`。
 
-| `event_type` | Apple ES event | `event_class` | What it captures |
+| `event_type` | Apple ES event | `event_class` | 捕获内容 |
 | :-- | :-- | :-- | :-- |
-| `exec` | `NOTIFY_EXEC` | process | Process spawn, with full `argv`, code-signing identity (`signing_id`, `team_id`, `code_signature`) and the binary `cdhash` |
-| `fork` | `NOTIFY_FORK` | process | Process fork (parent → child), used to build the process tree |
-| `signal` | `AUTH_SIGNAL` | process | A signal sent to a process (kill attempts); carries target pid and signal number. Subscribed as **AUTH** so the sensor can also deny tampering with itself |
-| `file_open` | `NOTIFY_OPEN` / `NOTIFY_CREATE` | file | File open or create, with `filename` and open `flags`. **Dominant by volume (~95%)** |
-| `file_unlink` | `AUTH_UNLINK` | file | File delete. Subscribed as AUTH for sensor self-protection; still emits NOTIFY-equivalent telemetry |
-| `file_rename` | `AUTH_RENAME` | file | File rename, with source `filename` and `dest_path`. Also AUTH for self-protection |
-| `file_chmod` | `NOTIFY_SETMODE` | file | Permission change (chmod), with the new `mode` |
-| `xattr_set` | `NOTIFY_SETEXTATTR` | file | Extended-attribute set — the signal for **Gatekeeper quarantine** tampering; carries `xattr_name` |
-| `xattr_delete` | `NOTIFY_DELETEEXTATTR` | file | Extended-attribute delete — quarantine removal (Gatekeeper bypass) |
-| `mount` | `NOTIFY_MOUNT` | device | Filesystem mount — removable media and disk images; carries mount path and removable flag |
-| `btm_add` | `NOTIFY_BTM_LAUNCH_ITEM_ADD` | persistence | A launch agent, daemon, or login item was registered — **persistence installed**. Uses macOS 13+ Background Task Management; carries item type, item path, and managed flag |
-| `net_flow` | NetworkExtension / lsof | network | Outbound TCP flow, with destination address and port, byte counts, direction, and the responsible app's `bundle_id` |
+| `exec` | `NOTIFY_EXEC` | process | 进程生成，携带完整 `argv`、代码签名标识（`signing_id`、`team_id`、`code_signature`）以及二进制的 `cdhash` |
+| `fork` | `NOTIFY_FORK` | process | 进程 fork（父进程 → 子进程），用于构建进程树 |
+| `signal` | `AUTH_SIGNAL` | process | 发送给进程的信号（kill 尝试）；携带目标 pid 和信号编号。以 **AUTH** 方式订阅，使传感器还能拒绝对自身的篡改 |
+| `file_open` | `NOTIFY_OPEN` / `NOTIFY_CREATE` | file | 文件打开或创建，携带 `filename` 和打开 `flags`。**按量占主导（约 95%）** |
+| `file_unlink` | `AUTH_UNLINK` | file | 文件删除。以 AUTH 方式订阅以实现传感器自我保护；仍发出等同于 NOTIFY 的遥测 |
+| `file_rename` | `AUTH_RENAME` | file | 文件重命名，携带源 `filename` 和 `dest_path`。同样以 AUTH 方式实现自我保护 |
+| `file_chmod` | `NOTIFY_SETMODE` | file | 权限变更（chmod），携带新的 `mode` |
+| `xattr_set` | `NOTIFY_SETEXTATTR` | file | 扩展属性设置——**Gatekeeper 隔离**篡改的信号；携带 `xattr_name` |
+| `xattr_delete` | `NOTIFY_DELETEEXTATTR` | file | 扩展属性删除——移除隔离（绕过 Gatekeeper） |
+| `mount` | `NOTIFY_MOUNT` | device | 文件系统挂载——可移动介质和磁盘映像；携带挂载路径和可移动标志 |
+| `btm_add` | `NOTIFY_BTM_LAUNCH_ITEM_ADD` | persistence | 注册了 launch agent、守护进程或登录项——**已安装持久化**。使用 macOS 13+ 的 Background Task Management；携带项类型、项路径和托管标志 |
+| `net_flow` | NetworkExtension / lsof | network | 出站 TCP 流，携带目标地址和端口、字节计数、方向以及负责应用的 `bundle_id` |
 
 <Note>
-`xattr_delete` and `mount` are genuine but **rare** events (quarantine removal, USB or DMG mount). They are subscribed and emitted continuously — you simply will not see them in quiet windows. `btm_add` is similarly low-volume but high-signal: a single row can mean a new persistence mechanism was installed.
+`xattr_delete` 和 `mount` 是真实但**罕见**的事件（移除隔离、USB 或 DMG 挂载）。它们被持续订阅并发出——只是在安静时段你不会看到它们。`btm_add` 同样是低量但高信号：单独一行就可能意味着安装了新的持久化机制。
 </Note>
 
-### Network flows
+### 网络流
 
-`net_flow` is the one event that does not originate from an ES `NOTIFY` callback. ES does not surface per-flow network telemetry, so the sensor uses Apple's **NetworkExtension** content-filter extension (**NetFilter**, bundle id `Hilt.EDRApp.NetFilter`) for per-flow attribution, with an `lsof`-based poller as the always-available fallback. A network flow therefore carries the same code-signing and application attribution as every other event: the responsible app's bundle id, signing identity, and Mac device name. See [Networking and security](/zh/macos-collector/networking-security) for the egress model.
+`net_flow` 是唯一不源自 ES `NOTIFY` 回调的事件。ES 不暴露逐流的网络遥测，因此传感器使用 Apple 的 **NetworkExtension** 内容过滤扩展（**NetFilter**，bundle id `Hilt.EDRApp.NetFilter`）进行逐流归因，并以基于 `lsof` 的轮询器作为始终可用的回退。因此网络流携带与其他所有事件相同的代码签名和应用归因：负责应用的 bundle id、签名标识以及 Mac 设备名。出站模型参见[网络与安全](/zh/macos-collector/networking-security)。
 
 ---
 
-## What gets filtered
+## 哪些内容会被过滤
 
-`file_open` is roughly **95% of total event volume** on a typical Mac — opening files is what applications do all day, and the overwhelming majority of those opens are framework loads, font and locale reads, cache churn, and preference-plist reads with no governance value. The collector applies **aggressive userspace filtering** to reduce this to a security-relevant stream before anything leaves the host.
+在一台典型的 Mac 上，`file_open` 大约占**总事件量的 95%**——打开文件是应用整天都在做的事，而其中绝大多数打开是框架加载、字体和区域设置读取、缓存翻搅以及无治理价值的偏好设置 plist 读取。采集器应用**激进的用户空间过滤**，在任何数据离开主机之前将其削减为与安全相关的数据流。
 
-| Category | Examples | Why filtered |
+| 类别 | 示例 | 过滤原因 |
 | :-- | :-- | :-- |
-| **OS housekeeping opens** | Framework and dylib loads, font and locale reads, `~/Library/Caches` churn, preference-plist reads | Extremely high volume, no security signal |
-| **Self-events** | The sensor's and forwarder's own file and network I/O | Prevents feedback loops |
-| **Internal network flows** | Loopback and link-local connections; only **external** destinations are kept | Internal-only traffic is not governance-relevant |
-| **Platform-binary noise** | High-churn reads attributable to Apple platform binaries | Well-understood system components generating volume |
+| **操作系统日常维护打开** | 框架和 dylib 加载、字体和区域设置读取、`~/Library/Caches` 翻搅、偏好设置 plist 读取 | 量极高，无安全信号 |
+| **自身事件** | 传感器和转发器自身的文件和网络 I/O | 防止反馈循环 |
+| **内部网络流** | 环回和链路本地连接；仅保留**外部**目标 | 仅内部的流量与治理无关 |
+| **平台二进制噪声** | 可归因于 Apple 平台二进制的高翻搅读取 | 产生量的系统组件已被充分了解 |
 
-Because every event arrives pre-attributed, the filter can make decisions on **code signature** and **application** rather than path alone — for example, suppressing routine reads from Apple platform binaries while always keeping reads from `unsigned_or_invalid` or `adhoc`-signed processes.
+由于每个事件到达时都已预先归因，过滤器可以基于**代码签名**和**应用**而非仅凭路径做决策——例如，抑制来自 Apple 平台二进制的常规读取，同时始终保留来自 `unsigned_or_invalid` 或 `adhoc` 签名进程的读取。
 
-### External-only network flows
+### 仅外部的网络流
 
-Network telemetry is captured **external-only by design**: the NetworkExtension provider and the `lsof` poller both report only outbound flows to destinations off the host. Loopback (`127.0.0.0/8`, `::1`) and link-local traffic are never emitted. This keeps `net_flow` focused on actual egress — where data leaves the Mac — and out of the high-volume localhost IPC chatter that dominates a desktop.
-
----
-
-## What is never filtered
-
-Certain event categories bypass volume filtering regardless of source, because their security value does not depend on the actor:
-
-- **All process executions** (`exec`): the collector always records what was executed, including from platform binaries and signed apps. `argv`, `cdhash`, and signing identity are always captured.
-- **All persistence events** (`btm_add`): a launch agent, daemon, or login item being installed is always recorded — this is the macOS persistence primitive.
-- **All tamper signals** (`xattr_set`, `xattr_delete`, `signal`): quarantine-attribute changes and kill attempts are never dropped, including those targeting the sensor itself.
-- **External network flows** (`net_flow`): every outbound flow to an off-host destination is preserved, with full app attribution.
-- **Sensitive-path access**: opens of credential files, SSH keys, tokens, and security-relevant configuration are preserved even when the same path-class would otherwise be noisy.
-
-This is where the macOS differentiator pays off. Because trust and attribution are stamped on every row, a query like *"which `unsigned_or_invalid` app read `~/.ssh`"* is a single `WHERE` clause over `endpoint_events` — an expression the Linux collector cannot form, because it has no per-event code-signing verdict.
+网络遥测**按设计仅捕获外部**：NetworkExtension 提供程序和 `lsof` 轮询器都只报告发往主机之外目标的出站流。环回（`127.0.0.0/8`、`::1`）和链路本地流量绝不会被发出。这使 `net_flow` 聚焦于实际的出站流量——数据离开 Mac 之处——而不受主导桌面环境的高量本地主机 IPC 喧闹影响。
 
 ---
 
-## What it does not do
+## 哪些内容绝不会被过滤
 
-- **No kernel extension.** ESensor is a pure user-space ES system extension on Apple's modern framework. There is no kext and no `csrutil disable` — the collector runs with [System Integrity Protection enabled](/zh/macos-collector/networking-security).
-- **No content inspection.** Filtering operates on metadata only — path class, code signature, application id, destination — never on file or packet contents.
-- **No DNS names or payload.** The NetworkExtension content-filter path gives the 5-tuple, byte counts, direction, and responsible app, but not DNS query names or decrypted payload.
-- **No inbound capture.** Only outbound flows are observed; the sensor opens no inbound sockets and the forwarder only makes outbound HTTPS to the configured ingest endpoint.
-- **No `WRITE`/`ACCESS`/`STAT`/`LOOKUP` firehose.** These ES event classes are deliberately not subscribed; `file_open` plus `file_chmod`/`file_rename`/`file_unlink` cover file activity at a fraction of the volume.
+某些事件类别无论来源如何都会绕过量过滤，因为它们的安全价值不取决于行为者：
+
+- **所有进程执行**（`exec`）：采集器始终记录执行了什么，包括来自平台二进制和已签名应用的执行。`argv`、`cdhash` 和签名标识始终被捕获。
+- **所有持久化事件**（`btm_add`）：安装 launch agent、守护进程或登录项始终会被记录——这是 macOS 的持久化原语。
+- **所有篡改信号**（`xattr_set`、`xattr_delete`、`signal`）：隔离属性变更和 kill 尝试绝不会被丢弃，包括针对传感器自身的那些。
+- **外部网络流**（`net_flow`）：发往主机外目标的每一个出站流都会被保留，并带有完整的应用归因。
+- **敏感路径访问**：即使同一路径类别在其他情况下会很嘈杂，对凭据文件、SSH 密钥、令牌以及安全相关配置的打开也会被保留。
+
+这正是 macOS 差异化优势的体现所在。由于信任和归因被打在每一行上，像*"哪个 `unsigned_or_invalid` 应用读取了 `~/.ssh`"*这样的查询在 `endpoint_events` 上就是单个 `WHERE` 子句——这是 Linux 采集器无法构造的表达式，因为它没有逐事件的代码签名裁定。
 
 ---
 
-## Roadmap hooks (not yet enabled)
+## 它不做什么
 
-Apple's Endpoint Security framework exposes more than 100 `NOTIFY` event types. The collector subscribes to a deliberately small subset today; the following are identified as high-value next additions but are **not currently emitted to telemetry**:
+- **无内核扩展。** ESensor 是运行在 Apple 现代框架之上的纯用户空间 ES 系统扩展。没有 kext，也不需要 `csrutil disable`——采集器在[启用 System Integrity Protection](/zh/macos-collector/networking-security) 的情况下运行。
+- **无内容检查。** 过滤仅基于元数据运作——路径类别、代码签名、应用 id、目标——绝不基于文件或数据包内容。
+- **无 DNS 名称或负载。** NetworkExtension 内容过滤路径提供五元组、字节计数、方向和负责应用，但不提供 DNS 查询名称或解密后的负载。
+- **无入站捕获。** 只观测出站流；传感器不打开任何入站套接字，转发器只向配置的接入端点发起出站 HTTPS。
+- **无 `WRITE`/`ACCESS`/`STAT`/`LOOKUP` 海量数据。** 这些 ES 事件类别被刻意不订阅；`file_open` 加上 `file_chmod`/`file_rename`/`file_unlink` 以极小的量覆盖了文件活动。
 
-| Apple ES event | macOS | What it would add |
+---
+
+## 路线图挂钩（尚未启用）
+
+Apple 的 Endpoint Security 框架暴露了 100 多种 `NOTIFY` 事件类型。采集器目前刻意只订阅一个很小的子集；以下被确定为高价值的后续新增项，但**当前不发出到遥测**：
+
+| Apple ES event | macOS | 会增加什么 |
 | :-- | :-- | :-- |
-| `NOTIFY_EXIT` | 10.15 | Process end — enables exit timestamps, durations, and clean process-tree completion |
-| `NOTIFY_SETUID` (and `SETGID`/`SETEUID`/…) | 13.0 | Privilege change / escalation signal |
-| `NOTIFY_GET_TASK` (and `GET_TASK_READ`/`_NAME`/`_INSPECT`) | 10.15 | Task-port access — the core indicator for process **injection** and debugging |
-| `NOTIFY_MMAP` / `NOTIFY_MPROTECT` | 10.15 | Memory mapping and `RWX` protection changes — shellcode and **code-injection** detection (MMAP is high-volume and would require aggressive non-platform-binary filtering) |
-| `NOTIFY_TCC_MODIFY` | 15.4 | Privacy-permission grants (camera, mic, screen recording, Full Disk Access, Accessibility) |
-| DNS visibility | — | An `NEDNSProxyProvider` would surface DNS queries and answers — domain-level network visibility beyond the current 5-tuple flows |
+| `NOTIFY_EXIT` | 10.15 | 进程结束——启用退出时间戳、持续时长以及干净的进程树完成 |
+| `NOTIFY_SETUID`（以及 `SETGID`/`SETEUID`/…） | 13.0 | 权限变更 / 提权信号 |
+| `NOTIFY_GET_TASK`（以及 `GET_TASK_READ`/`_NAME`/`_INSPECT`） | 10.15 | task-port 访问——进程**注入**和调试的核心指标 |
+| `NOTIFY_MMAP` / `NOTIFY_MPROTECT` | 10.15 | 内存映射和 `RWX` 保护变更——shellcode 和**代码注入**检测（MMAP 量高，需要激进的非平台二进制过滤） |
+| `NOTIFY_TCC_MODIFY` | 15.4 | 隐私权限授予（摄像头、麦克风、屏幕录制、完全磁盘访问、辅助功能） |
+| DNS 可见性 | — | `NEDNSProxyProvider` 会暴露 DNS 查询和应答——超越当前五元组流的域级网络可见性 |
 
 <Note>
-ES availability is gated at subscription time: subscribing to an event type unsupported by the host macOS version fails for that one type only, not the whole client. This is why `btm_add` (macOS 13+ Background Task Management) and any future `TCC_MODIFY` (macOS 15.4+) hooks degrade gracefully on older hosts rather than breaking the sensor. The collector requires **macOS 13.0 (Ventura) or later**.
+ES 可用性在订阅时受限：订阅一个宿主 macOS 版本不支持的事件类型，只会导致该单一类型失败，而非整个客户端。这就是为什么 `btm_add`（macOS 13+ 的 Background Task Management）以及任何未来的 `TCC_MODIFY`（macOS 15.4+）挂钩会在较旧的宿主上优雅降级，而不会破坏传感器。采集器要求 **macOS 13.0（Ventura）或更高版本**。
 </Note>

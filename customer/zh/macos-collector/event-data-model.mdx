@@ -1,82 +1,82 @@
 ---
 title: "事件数据模型"
 sidebarTitle: "事件数据模型"
-description: "The endpoint_events schema: what the macOS collector captures, the code-signing trust and application attribution stamped on every row, and explicitly what it does not capture."
+description: "endpoint_events 表结构：macOS 采集器捕获的内容、盖在每一行上的代码签名信任与应用归属，以及它明确不会捕获的内容。"
 ---
 
-The macOS collector (the **Hilt EDR** app and its **ESensor** Endpoint Security extension) emits one event per security-relevant kernel action. Those events are shipped over HTTPS to the Hilt `edr-collector`, routed through MSK Kafka and the enrichment service (`ENRICH_PLATFORM=macos`), and land in a single, purpose-built ClickHouse table: **`endpoint_events`**.
+macOS 采集器（**Hilt EDR** 应用及其 **ESensor** Endpoint Security 扩展）会为每一次与安全相关的内核动作发出一个事件。这些事件通过 HTTPS 发送到 Hilt 的 `edr-collector`，经由 MSK Kafka 和富化服务（`ENRICH_PLATFORM=macos`）路由，最终落入一张专门构建的 ClickHouse 表：**`endpoint_events`**。
 
-`endpoint_events` is a wide, macOS-native table typed by `event_class` and `event_type`. Per-class columns are populated only for the events that use them; everything else is left empty. There is no Linux cgroup, container, pod, or Kubernetes clutter in this schema — those concepts do not apply to an endpoint.
+`endpoint_events` 是一张宽表，为 macOS 原生设计，以 `event_class` 和 `event_type` 分型。每个分类专属的列只会在使用它们的事件上被填充，其余列留空。此表结构中没有 Linux 的 cgroup、容器、pod 或 Kubernetes 之类的杂项——这些概念不适用于端点。
 
-The defining property of this table — the macOS differentiator — is that **every single row carries code-signing trust and application attribution as first-class columns.** A file read, a network flow, and a process exec all arrive already stamped with "what signed this binary, do we trust that signature, and which user-facing application is responsible." On Linux, none of that exists at the kernel-event level. On macOS it rides on every row, which turns questions like *"which unsigned application read `~/.ssh`?"* into a single `WHERE` clause.
+此表最本质的特性——也是 macOS 的差异化所在——在于**每一行都把代码签名信任与应用归属作为一等列携带。** 一次文件读取、一条网络流以及一次进程 exec，到达时都已盖好"是谁签署了这个二进制文件、我们是否信任该签名、以及哪个面向用户的应用对此负责"。在 Linux 上，内核事件层面根本不存在这些信息。而在 macOS 上，它们随每一行一同传递，从而把诸如*"哪个未签名的应用读取了 `~/.ssh`？"*这样的问题变成一条 `WHERE` 子句。
 
 ---
 
-## Schema overview
+## 表结构概览
 
-Each row is one observed kernel event with four layers of columns:
+每一行都是一次观测到的内核事件，包含四层列：
 
-| Layer | Columns | Present on |
+| 层 | 列 | 出现于 |
 | :-- | :-- | :-- |
-| **Common header** | `host_id`, `boot_id`, `device_name`, `event_class`, `event_type`, `wall_time_ns`, `event_time`, `pid`, `ppid`, `tgid`, `uid`, `euid`, `username`, `comm` | Every row |
-| **Code-signing identity** | `signing_id`, `team_id`, `cdhash`, `code_signature`, `is_platform_binary` | Every row (macOS differentiator) |
-| **Application attribution** | `application_id`, `application_display_name`, `responsible_pid`, `session_id` | Every row (macOS differentiator) |
-| **Per-event payload** | `argv`, `filename`, `flags`, `mode`, `dest_path`, `dst_addr`, `dst_port`, `bytes_sent`, `bytes_recv`, `bundle_id`, `item_type`, `item_path`, `xattr_name`, `target_pid`, `signum`, … plus an `attrs` map for the long tail | Class-specific |
+| **公共头部** | `host_id`、`boot_id`、`device_name`、`event_class`、`event_type`、`wall_time_ns`、`event_time`、`pid`、`ppid`、`tgid`、`uid`、`euid`、`username`、`comm` | 每一行 |
+| **代码签名标识** | `signing_id`、`team_id`、`cdhash`、`code_signature`、`is_platform_binary` | 每一行（macOS 差异化） |
+| **应用归属** | `application_id`、`application_display_name`、`responsible_pid`、`session_id` | 每一行（macOS 差异化） |
+| **单事件载荷** | `argv`、`filename`、`flags`、`mode`、`dest_path`、`dst_addr`、`dst_port`、`bytes_sent`、`bytes_recv`、`bundle_id`、`item_type`、`item_path`、`xattr_name`、`target_pid`、`signum`……以及用于长尾属性的 `attrs` 映射 | 因分类而异 |
 
-This document walks each layer in turn, then lists the `event_type` values.
+本文将依次介绍每一层，然后列出 `event_type` 的取值。
 
 ---
 
-## Common header (every event)
+## 公共头部（每个事件）
 
-The header identifies *when*, *where*, and *who* — the same actor metadata on every row regardless of event class.
+头部标识*何时*、*何地*与*何人*——无论事件分类如何，每一行都带有相同的行为主体元数据。
 
-| Column | Type | Meaning |
+| 列 | 类型 | 含义 |
 | :-- | :-- | :-- |
-| `host_id` | String | Stable machine identifier for the Mac. Joins the host into the [Collectors](/zh/dashboard/collectors) fleet. |
-| `boot_id` | String | Identifier for the current boot, for ordering across reboots. |
-| `device_name` | String | The human Mac name, e.g. `Zin's MacBook Pro`. Populated on 100% of rows — no host-inventory join required. |
-| `event_class` | LowCardinality(String) | The broad family: `process`, `file`, `network`, `persistence`, `device`. |
-| `event_type` | LowCardinality(String) | The specific event, e.g. `exec`, `file_open`, `net_flow`, `btm_add`. |
-| `wall_time_ns` | UInt64 | Wall-clock timestamp (nanoseconds) of the event. |
-| `event_time` | DateTime64 | Derived timestamp for time-range queries and partitioning. |
-| `pid` | UInt32 | Process ID of the acting process. |
-| `ppid` | UInt32 | Parent process ID. |
-| `tgid` | UInt32 | Thread group ID. |
-| `uid` / `euid` | UInt32 | Real / effective user ID (`0` = root, which is valid and common). |
-| `username` | String | Resolved login name of `uid`. |
-| `comm` | String | Short process name of the acting binary. |
+| `host_id` | String | 该 Mac 的稳定机器标识符。将主机加入 [Collectors](/zh/dashboard/collectors) 机群。 |
+| `boot_id` | String | 当前启动周期的标识符，用于跨重启排序。 |
+| `device_name` | String | Mac 的人类可读名称，例如 `Zin's MacBook Pro`。在 100% 的行上填充——无需主机清单联表。 |
+| `event_class` | LowCardinality(String) | 大类：`process`、`file`、`network`、`persistence`、`device`、`malware`。（表结构还预留了 `auth`、`code`、`privacy` 供未来使用；目前不会发出。） |
+| `event_type` | LowCardinality(String) | 具体事件，例如 `exec`、`file_open`、`net_flow`、`btm_add`。 |
+| `wall_time_ns` | UInt64 | 事件的挂钟时间戳（纳秒）。 |
+| `event_time` | DateTime64 | 用于时间范围查询和分区的派生时间戳。 |
+| `pid` | UInt32 | 执行动作进程的进程 ID。 |
+| `ppid` | UInt32 | 父进程 ID。 |
+| `tgid` | UInt32 | 线程组 ID。 |
+| `uid` / `euid` | UInt32 | 真实 / 有效用户 ID（`0` = root，这是有效且常见的）。 |
+| `username` | String | `uid` 解析出的登录名。 |
+| `comm` | String | 执行动作二进制文件的短进程名。 |
 
 <Note>
-`wall_time_ns` is the authoritative event timestamp from the Endpoint Security message. `event_time` is the derived `DateTime64` column you filter and partition on in ClickHouse.
+`wall_time_ns` 是来自 Endpoint Security 消息的权威事件时间戳。`event_time` 是派生的 `DateTime64` 列，你在 ClickHouse 中用它进行过滤和分区。
 </Note>
 
 ---
 
-## Code-signing identity (every event) — the macOS differentiator
+## 代码签名标识（每个事件）——macOS 差异化
 
-On macOS, the kernel knows the **signing identity** of every running binary, and Apple's Endpoint Security framework hands it to ESensor on each message. The collector promotes that identity to dedicated columns, so trust is queryable on *every* event — not just on exec.
+在 macOS 上，内核知道每个运行中二进制文件的**签名标识**，Apple 的 Endpoint Security 框架会在每条消息中把它交给 ESensor。采集器将该标识提升为专用列，因此信任在*每个*事件上都可查询——而不仅仅是在 exec 上。
 
-| Column | Type | Meaning |
+| 列 | 类型 | 含义 |
 | :-- | :-- | :-- |
-| `signing_id` | String | The code-signing identifier (bundle id) of the acting binary, e.g. `com.google.Chrome` or `com.apple.bash`. Filled on ~98% of rows. |
-| `team_id` | String | The Apple Developer **Team ID** that signed the binary (e.g. `MVMB6LCP2A` for Cybe Corporation). Empty for Apple **platform binaries** — which is correct, not a gap — so it fills on a minority of rows (~13%, all third-party). |
-| `cdhash` | String | The **code directory hash**: a cryptographic integrity hash of the binary, captured on `exec` and propagated down the process tree. This is the per-binary fingerprint. |
-| `code_signature` | LowCardinality(String) | The **trust verdict** (see below). Filled on ~98% of rows. |
-| `is_platform_binary` | UInt8 | `1` if the binary is an Apple-shipped OS component, `0` if third-party. |
+| `signing_id` | String | 执行动作二进制文件的代码签名标识符（bundle id），例如 `com.google.Chrome` 或 `com.apple.bash`。约 98% 的行上填充。 |
+| `team_id` | String | 签署该二进制文件的 Apple Developer **Team ID**（例如 Cybe Corporation 为 `MVMB6LCP2A`）。对 Apple **平台二进制文件**为空——这是正确的，并非缺失——因此仅在少数行上填充（约 13%，全部为第三方）。 |
+| `cdhash` | String | **代码目录哈希**：二进制文件的加密完整性哈希，在 `exec` 时捕获并沿进程树向下传播。这是每个二进制文件的指纹。 |
+| `code_signature` | LowCardinality(String) | **信任裁定**（见下文）。约 98% 的行上填充。 |
+| `is_platform_binary` | UInt8 | 若二进制文件是 Apple 随系统提供的组件则为 `1`，第三方则为 `0`。 |
 
-### The `code_signature` verdict
+### `code_signature` 裁定
 
-`code_signature` collapses Apple's signature evaluation into one of four trust tiers:
+`code_signature` 将 Apple 的签名评估归并为四个信任层级之一：
 
-| Verdict | Meaning | Example |
+| 裁定 | 含义 | 示例 |
 | :-- | :-- | :-- |
-| `platform` | Signed by Apple as part of the OS. | `/bin/zsh`, `/usr/sbin/cfprefsd` |
-| `developer_id` | Signed with a Developer ID certificate and notarized — a known third-party vendor. | Google Chrome, Slack, the Hilt EDR app itself |
-| `adhoc` | Ad-hoc signed: a valid signature with **no identity** behind it. Common for locally built tools and a frequent malware tell. | a freshly compiled binary |
-| `unsigned_or_invalid` | No signature, or a signature that failed validation. | dropped payloads, tampered binaries |
+| `platform` | 作为操作系统的一部分由 Apple 签署。 | `/bin/zsh`、`/usr/sbin/cfprefsd` |
+| `developer_id` | 使用 Developer ID 证书签署并经过公证——已知的第三方厂商。 | Google Chrome、Slack、Hilt EDR 应用本身 |
+| `adhoc` | 临时（ad-hoc）签名：有效签名但背后**没有身份**。常见于本地构建的工具，也是恶意软件的常见特征。 | 刚编译出来的二进制文件 |
+| `unsigned_or_invalid` | 无签名，或签名未通过验证。 | 投放的载荷、被篡改的二进制文件 |
 
-This is the column that makes macOS telemetry distinctive. Because the verdict is on **every** row — file, network, and process alike — you can ask trust questions about any action:
+正是这一列让 macOS 遥测与众不同。因为裁定存在于**每一**行上——文件、网络与进程皆然——你可以对任何动作提出信任层面的问题：
 
 ```sql
 -- Every file an UNSIGNED or AD-HOC binary opened under a user's SSH directory
@@ -88,154 +88,154 @@ WHERE event_class = 'file'
 ORDER BY event_time DESC;
 ```
 
-On the Linux collector this query cannot be expressed: there is no per-event notion of signing trust.
+在 Linux 采集器上无法表达这条查询：不存在按事件划分的签名信任概念。
 
 ---
 
-## Application attribution (every event) — the macOS differentiator
+## 应用归属（每个事件）——macOS 差异化
 
-A modern macOS app is not one process. Google Chrome alone spawns dozens of `Google Chrome Helper`, `Google Chrome Helper (GPU)`, and `Google Chrome Helper (Renderer)` processes. Looking at raw `comm` values, the signal is scattered across helper processes that mean nothing to an analyst.
+现代 macOS 应用并非单个进程。仅 Google Chrome 就会派生出数十个 `Google Chrome Helper`、`Google Chrome Helper (GPU)` 和 `Google Chrome Helper (Renderer)` 进程。只看原始的 `comm` 值，信号会散落在对分析师毫无意义的辅助进程之中。
 
-The macOS collector folds every event back to the **owning application** using Apple's Endpoint Security "responsible process" concept, so activity is grouped the way a human thinks about it.
+macOS 采集器利用 Apple Endpoint Security 的"负责进程"概念，把每个事件归拢回其**所属应用**，从而按照人类的思维方式对活动进行分组。
 
-| Column | Type | Meaning |
+| 列 | 类型 | 含义 |
 | :-- | :-- | :-- |
-| `application_id` | String | Bundle id of the **owning application**. Helper processes fold to their parent app — `Google Chrome Helper` → `com.google.Chrome`. Filled on ~98% of rows. |
-| `application_display_name` | String | Human-readable app name, e.g. `Google Chrome`. Filled on ~98% of rows. |
-| `responsible_pid` | UInt32 | Apple ES **responsible process** PID — the process the OS holds accountable for this action (the app, not the transient helper). Filled on ~100% of rows on the current agent build. |
-| `session_id` | String | A per-app-instance session identifier. Groups all events from one launch of an application into a single session. Filled on 100% of rows. |
+| `application_id` | String | **所属应用**的 bundle id。辅助进程折叠到其父应用——`Google Chrome Helper` → `com.google.Chrome`。约 98% 的行上填充。 |
+| `application_display_name` | String | 人类可读的应用名称，例如 `Google Chrome`。约 98% 的行上填充。 |
+| `responsible_pid` | UInt32 | Apple ES **负责进程** PID——操作系统认定应对此动作负责的进程（应用本身，而非临时辅助进程）。在当前 agent 版本上约 100% 的行上填充。 |
+| `session_id` | String | 每个应用实例的会话标识符。将一次应用启动产生的所有事件归入单个会话。在 100% 的行上填充。 |
 
-This means a single `WHERE application_id = 'com.google.Chrome'` returns the entire footprint of Chrome — every helper exec, every file it touched, every flow it opened — without enumerating helper names. `session_id` further narrows that to one specific launch of the app, and `responsible_pid` lets you pivot from any event to the accountable process.
+这意味着单个 `WHERE application_id = 'com.google.Chrome'` 就能返回 Chrome 的完整足迹——每一次辅助进程 exec、它触及的每个文件、它打开的每条流——无需枚举辅助进程名。`session_id` 进一步将其收窄到应用的某一次具体启动，而 `responsible_pid` 让你可以从任意事件转向该负责进程。
 
 <Note>
-`responsible_pid` and `application_id` are how the dashboard's Investigate, Files, Networks, and Users views attribute scattered helper-process activity to the application a user actually ran. The folding happens at enrichment time so it is consistent across every query.
+`responsible_pid` 和 `application_id` 是仪表盘的 Investigate、Files、Networks 和 Users 视图将散落的辅助进程活动归属到用户实际运行的应用的方式。折叠在富化时完成，因此在每一次查询中都保持一致。
 </Note>
 
 ---
 
-## Per-event payloads
+## 单事件载荷
 
-Beyond the common header and the two always-present identity layers, each event class carries its own payload columns. The long tail of less-common attributes lands in an `attrs` map.
+除了公共头部和两层始终存在的标识列外，每个事件分类还携带各自的载荷列。较少见的长尾属性会落入 `attrs` 映射。
 
-### Process payload — `exec`, `fork`, `signal`
+### 进程载荷——`exec`、`fork`、`signal`
 
-| Column | Events | Meaning |
+| 列 | 事件 | 含义 |
 | :-- | :-- | :-- |
-| `argv` | `exec` | The full command line of the executed program, including arguments. Set on `exec` rows. |
-| `comm` / `signing_id` / `cdhash` | `exec`, `fork` | The acting binary's name, bundle id, and integrity hash (header/identity columns above). |
-| `parent_comm`, `ppid` | `exec`, `fork` | Parent process context; propagated down the tree. |
-| `target_pid` | `signal` | The PID the signal was **sent to** (the would-be victim of a kill attempt). |
-| `signum` | `signal` | The signal number sent (e.g. `9` = SIGKILL). |
+| `argv` | `exec` | 被执行程序的完整命令行，包括参数。在 `exec` 行上设置。 |
+| `comm` / `signing_id` / `cdhash` | `exec`、`fork` | 执行动作二进制文件的名称、bundle id 和完整性哈希（上文的头部/标识列）。 |
+| `parent_comm`、`ppid` | `exec`、`fork` | 父进程上下文；沿进程树向下传播。 |
+| `attrs['target_pid']` | `signal` | 信号被**发送到**的 PID（试图 kill 时的潜在受害者）。承载于 `attrs` 映射中，并非独立列。 |
+| `attrs['signum']` | `signal` | 发送的信号编号（例如 `9` = SIGKILL）。承载于 `attrs` 映射中。 |
 
-`exec` is the spine of the process model: it carries the argv, the signing identity, the team id, and the cdhash all on one row. `signal` events record kill attempts — `target_pid` and `signum` reveal who tried to terminate whom, which surfaces both attacker kill-chains and attempts to tamper with the collector itself.
+`exec` 是进程模型的主干：它在同一行上携带 argv、签名标识、team id 和 cdhash。`signal` 事件记录 kill 尝试——`attrs['target_pid']` 和 `attrs['signum']` 揭示谁试图终止谁，从而暴露攻击者的击杀链，以及篡改采集器自身的尝试。
 
-### File payload — `file_open`, `file_unlink`, `file_rename`, `file_chmod`, `xattr_set`, `xattr_delete`
+### 文件载荷——`file_open`、`file_unlink`、`file_rename`、`file_chmod`、`xattr_set`、`xattr_delete`
 
-| Column | Events | Meaning |
+| 列 | 事件 | 含义 |
 | :-- | :-- | :-- |
-| `filename` | all file events | The path acted on. The primary subject of a file event. |
-| `flags` | `file_open` | Open flags (read/write/create intent). |
-| `mode` | `file_chmod` | The new permission bits. |
-| `dest_path` | `file_rename` | The destination path of a rename (`filename` → `dest_path`). |
-| `xattr_name` | `xattr_set`, `xattr_delete` | The extended-attribute name set or removed. |
+| `filename` | 所有文件事件 | 被操作的路径。文件事件的主要对象。 |
+| `flags` | `file_open` | 打开标志（读/写/创建意图）。 |
+| `mode` | `file_chmod` | 新的权限位。 |
+| `dest_path` | `file_rename` | 重命名的目标路径（`filename` → `dest_path`）。 |
+| `xattr_name` | `xattr_set`、`xattr_delete` | 被设置或移除的扩展属性名称。 |
 
-`file_open` dominates event volume (~95%+), which is why ESensor applies aggressive userspace filtering before anything leaves the host — see [Agent filtering](/zh/macos-collector/event-coverage).
+`file_open` 主导事件量（约 95%+），这正是 ESensor 在任何数据离开主机之前就施加激进的用户态过滤的原因——参见 [Agent 过滤](/zh/macos-collector/event-coverage)。
 
-The `xattr_*` events are macOS-specific and high-signal: they capture changes to **`com.apple.quarantine`**, the extended attribute Gatekeeper uses to mark downloaded files. An `xattr_delete` on a quarantine attribute is a classic **Gatekeeper bypass** — stripping the "downloaded from the internet" flag so the OS will run a file without prompting.
+`xattr_*` 事件为 macOS 特有且信号价值高：它们捕获对 **`com.apple.quarantine`** 的更改，这是 Gatekeeper 用来标记下载文件的扩展属性。对隔离属性的 `xattr_delete` 是一种经典的 **Gatekeeper 绕过**——剥除"从互联网下载"标志，使操作系统在不弹窗提示的情况下运行文件。
 
-### Network payload — `net_flow`
+### 网络载荷——`net_flow`
 
-| Column | Meaning |
+| 列 | 含义 |
 | :-- | :-- |
-| `dst_addr` | Destination IP address of the outbound flow. |
-| `dst_port` | Destination port. |
-| `direction` | Flow direction (outbound). |
-| `bytes_sent` / `bytes_recv` | Bytes transferred in each direction over the flow. |
-| `bundle_id` | The **responsible application** bundle id for the flow — the app that owns the socket, e.g. `com.google.Chrome`. |
+| `dst_addr` | 出站流的目标 IP 地址。 |
+| `dst_port` | 目标端口。 |
+| `direction` | 流方向（出站）。 |
+| `bytes_sent` / `bytes_recv` | 该流上每个方向传输的字节数。 |
+| `bundle_id` | 该流的**负责应用** bundle id——拥有该 socket 的应用，例如 `com.google.Chrome`。 |
 
-Network flows come from a combination of an `lsof`/socket poller and the **NetFilter** NetworkExtension content-filter system extension, which resolves each flow's audit token back to the responsible app. Because of NetFilter, a `net_flow` row already knows *which application* opened the connection — `bundle_id` answers "what made this connection" without a separate process-to-socket correlation step.
+网络流来自 `lsof`/socket 轮询器与 **NetFilter** NetworkExtension 内容过滤系统扩展的组合，后者将每条流的审计令牌解析回负责应用。得益于 NetFilter，一条 `net_flow` 行已经知道*哪个应用*打开了该连接——`bundle_id` 无需单独的进程到 socket 关联步骤即可回答"是什么发起了这个连接"。
 
 <Note>
-`net_flow` records connection metadata only — destination, ports, byte counts, and the responsible app. It does not capture packet payloads, and by default it does not resolve DNS names.
+`net_flow` 仅记录连接元数据——目标、端口、字节计数和负责应用。它不捕获数据包载荷，且默认不解析 DNS 名称。
 </Note>
 
-### Persistence payload — `btm_add`
+### 持久化载荷——`btm_add`
 
-| Column | Meaning |
+| 列 | 含义 |
 | :-- | :-- |
-| `item_type` | What kind of persistence was registered: `launch_agent`, `launch_daemon`, or `login_item`. |
-| `item_path` | The path of the installed launch item / login item. |
-| `managed` | Whether the item was installed by MDM (managed) vs. by a user/process. |
+| `item_type` | 注册了何种持久化：`launch_agent`、`launch_daemon` 或 `login_item`。 |
+| `item_path` | 已安装的启动项 / 登录项的路径。 |
+| `managed` | 该项是由 MDM 安装（受管）还是由用户/进程安装。 |
 
-`btm_add` events come from macOS 13+ **Background Task Management (BTM)** and fire whenever a launch agent, launch daemon, or login item is registered — i.e. when something installs itself to **persist across reboots**. This is the single highest-signal persistence event on macOS: it is how the vast majority of macOS malware (and legitimate auto-start software) survives a restart.
+`btm_add` 事件来自 macOS 13+ 的 **Background Task Management (BTM)**，每当注册 launch agent、launch daemon 或 login item 时触发——即当某物将自身安装为**跨重启持久化**时。这是 macOS 上信号价值最高的单个持久化事件：绝大多数 macOS 恶意软件（以及合法的自启动软件）正是借此在重启后存活。
 
-### Device payload — `mount`
+### 设备载荷——`mount`
 
-| Column | Meaning |
+| 列 | 含义 |
 | :-- | :-- |
-| `path` (via `attrs`) | The mount point of the filesystem. |
-| `removable` (via `attrs`) | Whether the mounted volume is removable media. |
+| `path`（经由 `attrs`） | 文件系统的挂载点。 |
+| `removable`（经由 `attrs`） | 被挂载的卷是否为可移动介质。 |
 
-`mount` events fire when a filesystem is mounted — most interestingly removable media (USB drives) and disk images (DMGs), both common vectors for data exfiltration and software delivery.
+`mount` 事件在文件系统被挂载时触发——最值得关注的是可移动介质（USB 驱动器）和磁盘映像（DMG），二者都是数据外泄和软件投递的常见途径。
 
 ---
 
-## Event types
+## 事件类型
 
-The collector subscribes to **12 Apple Endpoint Security events** plus a network source, and emits the following `event_type` values into `endpoint_events`:
+采集器订阅 **12 个 Apple Endpoint Security 事件**外加一个网络源，并向 `endpoint_events` 发出以下 `event_type` 取值：
 
-| `event_type` | `event_class` | What it records | Payload columns |
+| `event_type` | `event_class` | 记录内容 | 载荷列 |
 | :-- | :-- | :-- | :-- |
-| `exec` | process | Process spawn, with full command line and signing identity | `argv`, `signing_id`, `team_id`, `cdhash`, `code_signature` |
-| `fork` | process | Process fork (parent → child) | parent context |
-| `signal` | process | A signal sent to a process (kill attempts; also drives collector self-protection) | `target_pid`, `signum` |
-| `file_open` | file | File open / create — dominates volume (~95%+) | `filename`, `flags` |
-| `file_unlink` | file | File delete | `filename` |
-| `file_rename` | file | File rename / move | `filename` → `dest_path` |
-| `file_chmod` | file | Permission change | `filename`, `mode` |
-| `xattr_set` | file | Extended-attribute set — Gatekeeper quarantine tamper | `xattr_name` |
-| `xattr_delete` | file | Extended-attribute delete — quarantine removal (rare) | `xattr_name` |
-| `mount` | device | Filesystem mount — removable media / DMG (rare) | `path`, `removable` |
-| `btm_add` | persistence | Launch agent / daemon / login item registered — persistence installed (macOS 13+) | `item_type`, `item_path`, `managed` |
-| `net_flow` | network | Outbound TCP flow with destination, ports, bytes, and responsible app | `dst_addr`, `dst_port`, `direction`, `bytes_sent`, `bytes_recv`, `bundle_id` |
+| `exec` | process | 进程派生，带完整命令行和签名标识 | `argv`、`signing_id`、`team_id`、`cdhash`、`code_signature` |
+| `fork` | process | 进程 fork（父 → 子） | 父进程上下文 |
+| `signal` | process | 发送给进程的信号（kill 尝试；也驱动采集器自我保护） | `target_pid`、`signum` |
+| `file_open` | file | 文件打开 / 创建——主导事件量（约 95%+） | `filename`、`flags` |
+| `file_unlink` | file | 文件删除 | `filename` |
+| `file_rename` | file | 文件重命名 / 移动 | `filename` → `dest_path` |
+| `file_chmod` | file | 权限更改 | `filename`、`mode` |
+| `xattr_set` | file | 扩展属性设置——Gatekeeper 隔离篡改 | `xattr_name` |
+| `xattr_delete` | file | 扩展属性删除——隔离移除（罕见） | `xattr_name` |
+| `mount` | device | 文件系统挂载——可移动介质 / DMG（罕见） | `path`、`removable` |
+| `btm_add` | persistence | 注册 launch agent / daemon / login item——安装持久化（macOS 13+） | `item_type`、`item_path`、`managed` |
+| `net_flow` | network | 出站 TCP 流，带目标、端口、字节数和负责应用 | `dst_addr`、`dst_port`、`direction`、`bytes_sent`、`bytes_recv`、`bundle_id` |
 
 <Note>
-`xattr_delete` and `mount` are rare by nature (quarantine removal and USB/DMG mounts) — they are subscribed and emitted, but a quiet host may show none over a short window. `signal`, `file_unlink`, and `file_rename` are subscribed as **AUTH** events so ESensor can also *deny* tampering with itself, but they still emit equivalent telemetry rows.
+`xattr_delete` 和 `mount` 本质上罕见（隔离移除以及 USB/DMG 挂载）——它们已被订阅并发出，但一台安静的主机在短时间窗口内可能一个都不显示。`signal`、`file_unlink` 和 `file_rename` 作为 **AUTH** 事件订阅，以便 ESensor 还能*拒绝*对自身的篡改，但它们仍会发出等价的遥测行。
 </Note>
 
 ---
 
-## How identity and attribution are filled
+## 标识与归属如何被填充
 
-The identity and attribution layers are not best-effort metadata — they are populated at high fill rates and are the columns most queries pivot on. Verified fill rates from live data:
+标识层与归属层并非尽力而为的元数据——它们以很高的填充率被填充，且是大多数查询所依赖的透视列。来自实时数据的已验证填充率：
 
-| Column | Fill | Note |
+| 列 | 填充率 | 备注 |
 | :-- | :-- | :-- |
-| `signing_id` | ~98% | bundle id of the acting binary |
-| `code_signature` | ~98% | trust verdict: `platform` / `developer_id` / `adhoc` / `unsigned_or_invalid` |
-| `team_id` | ~13% | empty for Apple platform binaries (correct) |
-| `cdhash` | exec rows | code-directory hash; set on `exec`, propagated down the tree |
-| `argv` | exec rows | full command line; set on `exec` |
-| `application_id` | ~98% | owning app — helpers fold to parent |
-| `application_display_name` | ~98% | owning app name |
-| `responsible_pid` | ~100% | Apple ES responsible process (current agent build) |
-| `session_id` | 100% | per app-instance session |
-| `device_name` | 100% | human Mac name; no host-inventory join needed |
+| `signing_id` | ~98% | 执行动作二进制文件的 bundle id |
+| `code_signature` | ~98% | 信任裁定：`platform` / `developer_id` / `adhoc` / `unsigned_or_invalid` |
+| `team_id` | ~13% | 对 Apple 平台二进制文件为空（正确） |
+| `cdhash` | exec 行 | 代码目录哈希；在 `exec` 时设置，沿进程树向下传播 |
+| `argv` | exec 行 | 完整命令行；在 `exec` 时设置 |
+| `application_id` | ~98% | 所属应用——辅助进程折叠到父应用 |
+| `application_display_name` | ~98% | 所属应用名称 |
+| `responsible_pid` | ~100% | Apple ES 负责进程（当前 agent 版本） |
+| `session_id` | 100% | 每个应用实例的会话 |
+| `device_name` | 100% | Mac 人类可读名称；无需主机清单联表 |
 
-For more on how telemetry travels from ESensor to ClickHouse, see [End-to-end data flow](/zh/macos-collector/data-flow). For how raw event volume is reduced before it leaves the host, see [Agent filtering](/zh/macos-collector/event-coverage).
+关于遥测如何从 ESensor 传输到 ClickHouse 的更多内容，参见[端到端数据流](/zh/macos-collector/data-flow)。关于原始事件量在离开主机之前如何被削减，参见 [Agent 过滤](/zh/macos-collector/event-coverage)。
 
 ---
 
-## What the collector does not capture
+## 采集器不会捕获的内容
 
-Consistent with the Linux collector's design philosophy, the macOS collector observes activity at the **metadata level only**. It is not a content-inspection tool. It does **not** capture:
+与 Linux 采集器的设计理念一致，macOS 采集器仅在**元数据层面**观测活动。它不是内容检查工具。它**不会**捕获：
 
-- **File contents** — only the path, operation type, flags, and (for renames) the destination
-- **Packet payloads** — only the flow's destination, ports, byte counts, and responsible app
-- **DNS query contents** — `net_flow` does not resolve domain names by default
-- **Keystrokes or screen content**
-- **Memory regions or process memory**
-- **Environment variables**
-- **Credentials or any user data** beyond what standard tools like `ps`, `lsof`, or `codesign` would expose
+- **文件内容**——仅捕获路径、操作类型、标志，以及（对于重命名）目标路径
+- **数据包载荷**——仅捕获流的目标、端口、字节计数和负责应用
+- **DNS 查询内容**——`net_flow` 默认不解析域名
+- **键盘输入或屏幕内容**
+- **内存区域或进程内存**
+- **环境变量**
+- **凭据或任何用户数据**——超出 `ps`、`lsof` 或 `codesign` 等标准工具本就会暴露的范围之外
 
-In other words, ESensor reports *that* a binary opened a file, signed by whom, on behalf of which app — never *what was in* the file. All event shipping is over **outbound HTTPS only** to the configured ingest endpoint; the collector opens no inbound sockets and makes no phone-home connections.
+换言之，ESensor 报告的是*一个二进制文件打开了某文件、由谁签署、代表哪个应用*这一*事实*——而绝不报告文件*中有什么*。所有事件发送都仅通过**出站 HTTPS** 发往配置的接入端点；采集器不打开任何入站 socket，也不发起任何回连（phone-home）连接。

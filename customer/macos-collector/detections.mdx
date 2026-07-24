@@ -35,7 +35,7 @@ Detection runs **on the endpoint, inside ESensor**, before events leave the Mac.
 | `alerted` | Operation completed; elevated finding for review |
 | `logged` | Recorded for context and correlation |
 
-Severity scales with the actor's code-signing verdict. The agent protects its own bundle, updater, and launch items — unauthorized kill/delete/rename attempts are denied and surfaced as blocked tamper findings. Authorized MDM and signed updater paths remain allowed; see [Uninstall](/macos-collector/uninstall).
+Severity scales with the actor's code-signing verdict. The collector protects its own app bundle and extensions — unauthorized kill/delete/rename attempts are denied in-kernel and surfaced as blocked tamper findings. Authorized MDM removal paths remain allowed; see [Uninstall](/macos-collector/uninstall).
 
 ---
 

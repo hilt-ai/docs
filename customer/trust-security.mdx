@@ -11,7 +11,7 @@ Hilt is **Data Movement Governance (DMG)** that runs inside your own cloud accou
 ## Trust principles
 
 - **Customer-owned infrastructure and data.** Every deployment is single-tenant, provisioned in your cloud account (AWS, GCP, Azure, or Ali Cloud). Telemetry, the analytics store, and the dashboard stay in your account.
-- **No covert egress.** Collector telemetry has one destination: the ingest endpoint in your account, reached over private networking. Nothing leaves your account except the anonymized export pipeline, which you review and approve before each transfer.
+- **No covert egress.** Collector telemetry has one destination: the ingest endpoint in your account, reached over private networking. Nothing leaves your account except the anonymized export pipeline, which — when approval is enabled (the default) — you review and approve before each transfer.
 - **Least privilege, approval-gated access.** Hilt engineers hold no standing access to your environment. Access happens only through your approval workflow and is logged.
 - **Transparency.** What the collector observes (and what it never observes) is documented and enforced in the collector itself, at the metadata level only.
 - **Defense in depth.** Controls layer across network (private subnets, private link), identity (role-based access, team scoping), encryption (TLS 1.2+, KMS at rest), and application (event filtering, audit logging).
@@ -20,7 +20,7 @@ Hilt is **Data Movement Governance (DMG)** that runs inside your own cloud accou
 
 ## Architecture at a glance
 
-Collectors on your hosts stream metadata-level telemetry over private networking to an ingest endpoint in your account. Events are buffered, enriched, scored, and stored in an analytics database, then surfaced in a dashboard, all within your cloud boundary. The only path out of your account is the anonymized export pipeline, a core component of every deployment that runs on a daily schedule and requires your approval before each transfer.
+Collectors on your hosts stream metadata-level telemetry over private networking to an ingest endpoint in your account. Events are buffered, enriched, scored, and stored in an analytics database, then surfaced in a dashboard, all within your cloud boundary. The only path out of your account is the anonymized export pipeline, a core component of every deployment that runs on a daily schedule and, with approval enabled (the default), requires your approval before each transfer.
 
 For the component map, per-cloud service list, and a data-flow diagram, see [Architecture and data flow](/trust-security/architecture).
 
@@ -32,8 +32,8 @@ For the component map, per-cloud service list, and a data-flow diagram, see [Arc
 | :-- | :-- | :-- |
 | Deployment model | Single-tenant in your cloud account, provisioned with Terraform | Hilt provisions, you grant scoped access |
 | Network isolation | Private subnets, private link ingest, no public ingress | Shared |
-| Encryption in transit | TLS 1.2+ on all connections | Hilt |
-| Encryption at rest | Cloud-native KMS encryption on all storage | Hilt (keys held in your account) |
+| Encryption in transit | TLS 1.2+ on external/ingress connections; private networking internally | Hilt |
+| Encryption at rest | Cloud-provider-managed encryption (KMS / SSE) on storage | Hilt design; keys in your account's KMS (CMKs optional) |
 | Data residency | Telemetry stays in your cloud account | Hilt design, you own the account |
 | Identity and access | Dashboard role-based access with team scoping | You |
 | Hilt engineer access | Approval-gated, time-bound, logged, no standing access | Shared |
@@ -54,7 +54,7 @@ Hilt operates the platform; you own the cloud account it runs in. Responsibiliti
 | Collector deployment | Deploy and upgrade collectors (or enable auto-update) | Provide artifacts, guides, and the auto-update agent |
 | Platform infrastructure | Approve maintenance windows | Provision, patch, upgrade, and monitor platform components |
 | Dashboard user management | Create users, assign roles and teams | Provide the role-based access model |
-| Encryption keys | Own the cloud KMS in your account | Configure KMS encryption on all platform storage |
+| Encryption keys | Provider-managed by default; supply a CMK if you require one | Enable provider encryption on platform storage |
 | Data export approval | Review the manifest, approve or delete each export | Provide the pipeline and anonymization controls |
 | Incident response | Report incidents, act on findings, quarantine hosts | Investigate platform issues and notify you |
 

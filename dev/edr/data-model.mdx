@@ -10,8 +10,9 @@ sidebarTitle: "Data Model"
 
 | Block | Columns | Notes |
 | --- | --- | --- |
-| Common | `wall_time_ns`, `kernel_ts_ns`, `event_class`, `event_type`, `host_id`, `boot_id`, `device_name`, `host_type` | `event_class`: process, file, network, persistence, device, auth, code, privacy, malware |
+| Common | `wall_time_ns`, `kernel_ts_ns`, `event_class`, `event_type`, `host_id`, `boot_id`, `device_name`, `host_type` | `event_class`: process, file, network, persistence, device, auth, code, privacy, malware (auth/code/privacy reserved — not yet emitted by the sensor; runtime set is process, file, network, device, persistence, malware + `other`) |
 | Actor | `pid`, `ppid`, `tgid`, `uid`, `euid`, `username`, `comm`, `exe_path`, `parent_comm`, `argv` | pid derived from the ES `audit_token` |
+| Application | `application_id`, `application_display_name`, `responsible_pid`, `session_id` | Owning-app attribution (helpers fold to the owning app); `responsible_pid` = ES responsible process; added in migration `000052` |
 | Code signing | `signing_id`, `team_id`, `cdhash`, `is_platform_binary`, `code_signature` | `code_signature` is the four-tier trust verdict on every row |
 | File / network | `filename`, `dest_path`, `mode`, `flags`, `xattr_name` / `direction`, `protocol`, `src_*`, `dst_*`, `bytes_*`, `bundle_id` | |
 | Extensible | `attrs Map(String, String)` | Long tail per event family; new ES hooks need no migration |

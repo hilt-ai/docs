@@ -18,10 +18,10 @@ The catch: a seccomp filter can only be installed by a process **on itself**, be
 ```mermaid
 flowchart TB
   subgraph Task["ECS Fargate Task"]
-    Installer["dag-fargate-installer sidecar\n(essential=false)\ncopies binary → shared volume, exits"]
+    Installer["dag-fargate-installer sidecar<br/>(essential=false)<br/>copies binary → shared volume, exits"]
     subgraph App["App container"]
-      Agent["dag-fargate-agent (PID 1)\ninstalls seccomp filter, PTRACE_SEIZE"]
-      Child["customer app\n(fork+exec child, inherits filter)"]
+      Agent["dag-fargate-agent (PID 1)<br/>installs seccomp filter, PTRACE_SEIZE"]
+      Child["customer app<br/>(fork+exec child, inherits filter)"]
       Agent --> Child
     end
   end
