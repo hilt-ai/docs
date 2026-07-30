@@ -19,7 +19,7 @@ This mechanism is specific to ECS Fargate. On Kubernetes and plain Linux VMs, th
 
 - An ECS Fargate task (Linux, `x86_64` or `arm64`/Graviton)
 - A reachable Hilt ingest endpoint (`DAG_SHIP_URL`, provided during onboarding)
-- Access to pull `cybe/dag-fargate-installer` (Docker Hub), or mirror it into your own ECR
+- The installer image URI Hilt gives you at onboarding (usually a pinned tag in your account's ECR, e.g. `<account>.dkr.ecr.<region>.amazonaws.com/<name>/dag-fargate-installer:vX.Y.Z`). The task execution role must be able to pull it.
 
 ## What gets injected into your task definition
 
@@ -49,27 +49,42 @@ Pick whichever surface matches how you manage task definitions today. All four p
     go install github.com/hilt-ai/data-access-governance/tools/dag-taskdef-inject@latest
     ```
   </Step>
-  <Step title="Inject your existing task definition">
+  <Step title="Export your current task definition">
+    ```bash
+    aws ecs describe-task-definition \
+      --task-definition <YOUR_TASK_FAMILY> \
+      --query taskDefinition > taskdef.json
+
+    # Strip fields ECS rejects on re-register:
+    python3 -c 'import json; td=json.load(open("taskdef.json"));
+    [td.pop(k, None) for k in ("taskDefinitionArn","revision","status","requiresAttributes",
+    "compatibilities","registeredAt","registeredBy","deregisteredAt")];
+    json.dump(td, open("taskdef.json","w"), indent=2)'
+    ```
+  </Step>
+  <Step title="Inject the agent">
     ```bash
     dag-taskdef-inject \
       --in taskdef.json \
       --out taskdef-injected.json \
-      --ship-url https://<name>-ingest.hilt.ai/ingest
+      --ship-url https://<name>-ingest.hilt.ai/ingest \
+      --image <INSTALLER_IMAGE_URI>
     ```
 
-    The tool is idempotent — running it again on an already-injected task definition is a no-op.
+    Use the installer image URI from onboarding for `--image`. The tool is idempotent — running it again on an already-injected task definition is a no-op.
   </Step>
   <Step title="Register and roll out">
     ```bash
     aws ecs register-task-definition --cli-input-json file://taskdef-injected.json
 
-    aws ecs update-service --cluster my-cluster --service my-service \
-      --task-definition my-app-with-dag
+    aws ecs update-service \
+      --cluster <YOUR_CLUSTER> \
+      --service <YOUR_SERVICE> \
+      --task-definition <FAMILY>:<NEW_REVISION> \
+      --force-new-deployment
     ```
   </Step>
 </Steps>
-
-You can also point the CLI at a live task definition family with `--from-aws <family>` if you'd rather not check a JSON file into your pipeline.
 
 ### Option 2: Terraform
 
@@ -78,6 +93,7 @@ module "dag_fargate" {
   source                = "github.com/hilt-ai/data-access-governance//deploy/fargate/terraform"
   container_definitions = jsonencode(local.my_containers)
   ship_url              = "https://<name>-ingest.hilt.ai/ingest"
+  installer_image       = "<INSTALLER_IMAGE_URI>"
 }
 
 resource "aws_ecs_task_definition" "app" {
@@ -101,7 +117,7 @@ resource "aws_ecs_task_definition" "app" {
 | `container_definitions` | Your original container definitions JSON | required |
 | `ship_url` | Hilt ingest endpoint URL | required |
 | `mode` | `full` or `metadata` (see [Modes](#modes)) | `"full"` |
-| `installer_image` | Installer sidecar image | `"cybe/dag-fargate-installer:latest"` |
+| `installer_image` | Installer sidecar image (use the URI from onboarding) | required in practice — pass the pinned ECR URI Hilt provides |
 | `target_containers` | Container names to inject (empty = all `essential` containers) | `[]` |
 | `pid_mode_task` | Set the task's `pidMode` to `"task"` for sibling-container net visibility | `false` |
 
@@ -111,7 +127,7 @@ Copilot generates the task definition from `manifest.yml`, so this path is manif
 
 <Steps>
   <Step title="Add the sidecar, volume, entrypoint, and env vars">
-    Merge the `sidecars`, `storage.volumes`, and `entrypoint` blocks from the [Copilot manifest snippet](https://github.com/hilt-ai/data-access-governance/blob/main/deploy/fargate/copilot/manifest.snippet.yml) into your service's `copilot/<service>/manifest.yml`, replacing `<original-command>` with your app's real entrypoint.
+    Merge the `sidecars`, `storage.volumes`, and `entrypoint` blocks from the [Copilot manifest snippet](https://github.com/hilt-ai/data-access-governance/blob/main/deploy/fargate/copilot/manifest.snippet.yml) into your service's `copilot/<service>/manifest.yml`, replacing `<original-command>` with your app's real entrypoint and the installer `image:` with the URI from onboarding.
   </Step>
   <Step title="Add the SYS_PTRACE capability and dependsOn">
     These two settings aren't first-class manifest fields, so they go through Copilot's task-definition override mechanism:
@@ -138,6 +154,7 @@ dag-taskdef-inject \
   --in taskdef.cfn.yaml \
   --format cloudformation \
   --ship-url https://<name>-ingest.hilt.ai/ingest \
+  --image <INSTALLER_IMAGE_URI> \
   --out taskdef-injected.cfn.yaml
 ```
 

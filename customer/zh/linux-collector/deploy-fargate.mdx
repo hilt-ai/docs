@@ -19,7 +19,7 @@ Fargate 采集器（`dag-fargate-agent`）作为 **应用容器内的 PID 1** �
 
 - 一个 ECS Fargate 任务（Linux，`x86_64` 或 `arm64`/Graviton）
 - 一个可访问的 Hilt 摄取端点（`DAG_SHIP_URL`，在入驻过程中提供）
-- 能够拉取 `cybe/dag-fargate-installer`（Docker Hub），或将其镜像到你自己的 ECR 中
+- Hilt 在入驻时提供的安装器镜像 URI（通常是你账户 ECR 中的固定标签，例如 `<account>.dkr.ecr.<region>.amazonaws.com/<name>/dag-fargate-installer:vX.Y.Z`）。任务执行角色必须有权限拉取该镜像。
 
 ## 会对任务定义注入哪些内容
 
@@ -49,27 +49,42 @@ Fargate 采集器（`dag-fargate-agent`）作为 **应用容器内的 PID 1** �
     go install github.com/hilt-ai/data-access-governance/tools/dag-taskdef-inject@latest
     ```
   </Step>
-  <Step title="对现有任务定义进行注入">
+  <Step title="导出当前任务定义">
+    ```bash
+    aws ecs describe-task-definition \
+      --task-definition <YOUR_TASK_FAMILY> \
+      --query taskDefinition > taskdef.json
+
+    # Strip fields ECS rejects on re-register:
+    python3 -c 'import json; td=json.load(open("taskdef.json"));
+    [td.pop(k, None) for k in ("taskDefinitionArn","revision","status","requiresAttributes",
+    "compatibilities","registeredAt","registeredBy","deregisteredAt")];
+    json.dump(td, open("taskdef.json","w"), indent=2)'
+    ```
+  </Step>
+  <Step title="注入代理">
     ```bash
     dag-taskdef-inject \
       --in taskdef.json \
       --out taskdef-injected.json \
-      --ship-url https://<name>-ingest.hilt.ai/ingest
+      --ship-url https://<name>-ingest.hilt.ai/ingest \
+      --image <INSTALLER_IMAGE_URI>
     ```
 
-    该工具是幂等的——对已经注入过的任务定义再次运行不会产生任何效果。
+    `--image` 使用入驻时提供的安装器镜像 URI。该工具是幂等的——对已经注入过的任务定义再次运行不会产生任何效果。
   </Step>
   <Step title="注册并上线">
     ```bash
     aws ecs register-task-definition --cli-input-json file://taskdef-injected.json
 
-    aws ecs update-service --cluster my-cluster --service my-service \
-      --task-definition my-app-with-dag
+    aws ecs update-service \
+      --cluster <YOUR_CLUSTER> \
+      --service <YOUR_SERVICE> \
+      --task-definition <FAMILY>:<NEW_REVISION> \
+      --force-new-deployment
     ```
   </Step>
 </Steps>
-
-如果你不想在流水线中维护一个 JSON 文件，也可以通过 `--from-aws <family>` 让 CLI 直接读取一个正在使用的任务定义家族（family）。
 
 ### 方式二：Terraform
 
@@ -78,6 +93,7 @@ module "dag_fargate" {
   source                = "github.com/hilt-ai/data-access-governance//deploy/fargate/terraform"
   container_definitions = jsonencode(local.my_containers)
   ship_url              = "https://<name>-ingest.hilt.ai/ingest"
+  installer_image       = "<INSTALLER_IMAGE_URI>"
 }
 
 resource "aws_ecs_task_definition" "app" {
@@ -101,7 +117,7 @@ resource "aws_ecs_task_definition" "app" {
 | `container_definitions` | 你的原始容器定义 JSON | 必填 |
 | `ship_url` | Hilt 摄取端点 URL | 必填 |
 | `mode` | `full` 或 `metadata`（参见[模式](#模式)） | `"full"` |
-| `installer_image` | 安装器 sidecar 镜像 | `"cybe/dag-fargate-installer:latest"` |
+| `installer_image` | 安装器 sidecar 镜像（使用入驻时提供的 URI） | 实际使用中必填 — 传入 Hilt 提供的固定 ECR URI |
 | `target_containers` | 要注入的容器名称（留空 = 所有 `essential` 容器） | `[]` |
 | `pid_mode_task` | 将任务的 `pidMode` 设为 `"task"`，以获得同任务内其他容器的网络可见性 | `false` |
 
@@ -111,7 +127,7 @@ Copilot 会从 `manifest.yml` 生成任务定义，因此这条路径只涉及�
 
 <Steps>
   <Step title="添加 sidecar、共享卷、入口点和环境变量">
-    将 [Copilot manifest 片段](https://github.com/hilt-ai/data-access-governance/blob/main/deploy/fargate/copilot/manifest.snippet.yml) 中的 `sidecars`、`storage.volumes` 和 `entrypoint` 块合并到你的服务的 `copilot/<service>/manifest.yml` 中，并将 `<original-command>` 替换为你应用真正的入口点。
+    将 [Copilot manifest 片段](https://github.com/hilt-ai/data-access-governance/blob/main/deploy/fargate/copilot/manifest.snippet.yml) 中的 `sidecars`、`storage.volumes` 和 `entrypoint` 块合并到你的服务的 `copilot/<service>/manifest.yml` 中，并将 `<original-command>` 替换为你应用真正的入口点，将安装器的 `image:` 替换为入驻时提供的 URI。
   </Step>
   <Step title="添加 SYS_PTRACE 能力和 dependsOn">
     这两项设置并非 manifest 的一等字段，因此需要通过 Copilot 的任务定义覆盖机制来添加：
@@ -138,6 +154,7 @@ dag-taskdef-inject \
   --in taskdef.cfn.yaml \
   --format cloudformation \
   --ship-url https://<name>-ingest.hilt.ai/ingest \
+  --image <INSTALLER_IMAGE_URI> \
   --out taskdef-injected.cfn.yaml
 ```
 
